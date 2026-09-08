@@ -73,6 +73,8 @@ export default async function ScriptDetailPage({
       duration: episode.duration,
       style: episode.style,
       status: episode.status,
+      audioUrl: episode.audioUrl,
+      bgmPrompt: episode.bgmPrompt,
     })),
     characters: script.characters.map((item) => ({
       id: item.id,

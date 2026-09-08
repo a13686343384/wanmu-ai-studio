@@ -1,7 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import { LayoutGrid, Sparkles, Video } from "lucide-react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import { ScriptDetailHeader } from "@/components/creation/film-factory/detail/ScriptDetailHeader"
 import { WorkflowTabs } from "@/components/creation/film-factory/detail/WorkflowTabs"
 import { EpisodeList } from "@/components/creation/film-factory/detail/EpisodeList"
@@ -13,6 +16,8 @@ import { StoryboardEditor } from "@/components/creation/film-factory/detail/Stor
 import { StoryboardGenerateDialog } from "@/components/creation/film-factory/detail/StoryboardGenerateDialog"
 import { ConsultDialog } from "@/components/creation/film-factory/detail/ConsultDialog"
 import { RecapDialog, type RecapResult } from "@/components/creation/film-factory/detail/RecapDialog"
+import { VideoBatchDialog } from "@/components/creation/film-factory/video/VideoBatchDialog"
+import { PostProductionPanel } from "@/components/creation/film-factory/post/PostProductionPanel"
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
 import type { ScriptDetail } from "@/lib/serializers/script"
 
@@ -44,6 +49,8 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
     storyboard: StoryboardDTO
     kind: "image" | "video"
   } | null>(null)
+  const [videoBatchOpen, setVideoBatchOpen] = useState(false)
+  const [postOpen, setPostOpen] = useState(false)
 
   const activeEpisode = script.episodes.find((e) => e.id === activeEpisodeId) ?? null
 
@@ -216,13 +223,36 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
         <span>单集风格：{activeEpisode?.style ?? "跟随全剧"}</span>
         <span className="text-zinc-700">·</span>
         <span>目标画幅 {script.targetAspect}</span>
-        <span className="ml-auto">
+        <span>
           {script.processingStatus === "processing" ? (
             <span className="text-amber-400">{script.progressLabel ?? "处理中"}</span>
           ) : (
             <span className="text-emerald-400">{script.progressLabel ?? "就绪"}</span>
           )}
         </span>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={() => setVideoBatchOpen(true)}
+            disabled={storyboards.length === 0}
+          >
+            <Video className="h-3.5 w-3.5" />
+            下一步 · 出视频
+          </Button>
+          <Button variant="outline" size="sm" className="h-7" onClick={() => setPostOpen(true)}>
+            <Sparkles className="h-3.5 w-3.5" />
+            后期合成
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7" asChild>
+            <Link href="/canvas">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              打通到画布
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* 弹窗与抽屉 */}
@@ -277,6 +307,32 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
           void reloadScript()
         }}
       />
+
+      {activeEpisode && (
+        <>
+          <VideoBatchDialog
+            open={videoBatchOpen}
+            onOpenChange={setVideoBatchOpen}
+            episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
+            storyboards={storyboards}
+            onDone={() => {
+              void loadStoryboards()
+              void reloadScript()
+            }}
+          />
+
+          <PostProductionPanel
+            open={postOpen}
+            onOpenChange={setPostOpen}
+            scriptId={script.id}
+            episodeId={activeEpisode.id}
+            episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
+            storyboards={storyboards}
+            audioUrl={activeEpisode.audioUrl}
+            onRefresh={() => void reloadScript()}
+          />
+        </>
+      )}
     </div>
   )
 }

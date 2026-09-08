@@ -87,6 +87,9 @@ export interface EpisodeDTO {
   duration: number
   style: string | null
   status: string
+  /** 后期产物 */
+  audioUrl: string | null
+  bgmPrompt: string | null
 }
 
 export interface AssetDTO {
