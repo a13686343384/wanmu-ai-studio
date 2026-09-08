@@ -243,6 +243,11 @@ model Episode {
   style    String? // 单集风格，null 表示跟随全剧
   status   String @default("draft") // draft | outlined | assets_ready | storyboarded | video_ready | completed
 
+  // 后期产物
+  audioUrl   String? // 配音 / BGM 混音结果
+  bgmPrompt  String? // BGM 风格描述
+  bgmModel   String? // 使用的音频模型
+
   script      Script       @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   storyboards Storyboard[]
 

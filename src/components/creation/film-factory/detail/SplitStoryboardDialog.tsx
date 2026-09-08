@@ -1,0 +1,405 @@
+"use client"
+
+import { useState } from "react"
+import {
+  ImageIcon,
+  Loader2,
+  Music,
+  Scissors,
+  Sparkles,
+  Video,
+} from "lucide-react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { OptionPills } from "@/components/creation/film-factory/intake/OptionCard"
+import {
+  AUDIO_MODELS,
+  IMAGE_MODELS,
+  RESOLUTIONS,
+  TEXT_MODELS,
+  VIDEO_MODELS,
+} from "@/lib/constants"
+import { cn } from "@/lib/utils"
+
+type Mode = "image" | "text" | "video" | "bgm"
+
+const TABS: { value: Mode; label: string; icon: typeof Scissors }[] = [
+  { value: "image", label: "出图", icon: ImageIcon },
+  { value: "text", label: "仅拆分镜", icon: Scissors },
+  { value: "video", label: "出视频", icon: Video },
+  { value: "bgm", label: "后期 BGM", icon: Music },
+]
+
+/**
+ * 拆分镜弹窗（4 个 Tab）。
+ * - 出图：拆分镜后逐镜生成分镜图
+ * - 仅拆分镜：只做镜头切分
+ * - 出视频：拆分镜后逐镜出视频（可免分镜图直出）
+ * - 后期 BGM：为整集生成 BGM / 配音轨道
+ */
+export function SplitStoryboardDialog({
+  open,
+  onOpenChange,
+  scriptId,
+  episodeId,
+  episodeTitle,
+  onDone,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  scriptId: string
+  episodeId: string
+  episodeTitle: string
+  onDone: () => void
+}) {
+  const [tab, setTab] = useState<Mode>("image")
+  const [textModel, setTextModel] = useState(TEXT_MODELS[0]!.id)
+  const [imageModel, setImageModel] = useState("man-image-v2-lite")
+  const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0]!.id)
+  const [audioModel, setAudioModel] = useState(AUDIO_MODELS[0]!.id)
+  const [resolution, setResolution] = useState("1080p")
+  const [skipImage, setSkipImage] = useState(false)
+  const [negativePrompt, setNegativePrompt] = useState("")
+  const [bgmPrompt, setBgmPrompt] = useState("沉稳大气的纪录片解说氛围，低频铺底，渐强收尾")
+  const [smartLyrics, setSmartLyrics] = useState(true)
+
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [step, setStep] = useState("")
+
+  async function run() {
+    setRunning(true)
+    setProgress(4)
+    setStep("正在拆分镜头…")
+
+    const timer = window.setInterval(() => {
+      setProgress((value) => (value >= 94 ? value : value + 5 + Math.random() * 7))
+    }, 520)
+
+    try {
+      if (tab === "bgm") {
+        const res = await fetch(`/api/scripts/${scriptId}/episodes/${episodeId}/bgm`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            prompt: bgmPrompt,
+            model: audioModel,
+            duration: "15s",
+            smartLyrics,
+          }),
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "BGM 生成失败")
+        setStep("混音完成")
+        toast.success("BGM 已生成")
+      } else {
+        // 1) 拆分镜
+        const splitRes = await fetch(
+          `/api/scripts/${scriptId}/episodes/${episodeId}/storyboards`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ mode: tab === "text" ? "text" : tab, model: textModel, regenerate: true }),
+          },
+        )
+        const splitPayload = await splitRes.json()
+        if (!splitRes.ok) throw new Error(splitPayload.error ?? "拆分镜失败")
+
+        const storyboards = splitPayload.data.storyboards as { id: string; number: number }[]
+
+        if (tab === "text") {
+          setStep(`已拆出 ${storyboards.length} 个镜头`)
+          toast.success("拆分镜完成", { description: `共 ${storyboards.length} 个镜头` })
+        } else {
+          // 2) 逐镜生成产物
+          for (let index = 0; index < storyboards.length; index++) {
+            const storyboard = storyboards[index]!
+            setStep(
+              `${tab === "image" ? "生成分镜图" : "生成视频"} ${index + 1}/${storyboards.length}（分镜 ${storyboard.number}）`,
+            )
+            setProgress(Math.round(((index + 1) / storyboards.length) * 90) + 5)
+
+            const genRes = await fetch(`/api/storyboards/${storyboard.id}/generate`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                kind: tab,
+                model: tab === "image" ? imageModel : videoModel,
+                prompt: "按分镜描述生成",
+                negativePrompt: negativePrompt || undefined,
+                aspectRatio: "9:16",
+                resolution,
+                duration: "5s",
+                skipStoryboardImage: skipImage,
+              }),
+            })
+            const genPayload = await genRes.json()
+            if (!genRes.ok) {
+              toast.error(`分镜 ${storyboard.number} 生成失败`, {
+                description: genPayload.error,
+              })
+            }
+          }
+          toast.success(tab === "image" ? "分镜图已全部生成" : "视频已全部生成")
+        }
+      }
+
+      setProgress(100)
+      setStep("完成")
+      onDone()
+      window.setTimeout(() => onOpenChange(false), 500)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "执行失败")
+    } finally {
+      window.clearInterval(timer)
+      window.setTimeout(() => {
+        setRunning(false)
+        setProgress(0)
+        setStep("")
+      }, 600)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(value) => !running && onOpenChange(value)}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Scissors className="h-4 w-4 text-orange-400" />
+            拆分镜 · {episodeTitle}
+          </DialogTitle>
+          <DialogDescription>
+            选择处理方式：只切镜头、连出分镜图、连出视频，或直接做后期 BGM。
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={(value) => setTab(value as Mode)}>
+          <TabsList className="w-full">
+            {TABS.map((item) => {
+              const Icon = item.icon
+              return (
+                <TabsTrigger key={item.value} value={item.value} className="flex-1 gap-1.5">
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+
+          {/* 出图 */}
+          <TabsContent value="image" className="space-y-4 pt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-400">拆分用文本模型</Label>
+                <Select value={textModel} onValueChange={setTextModel}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEXT_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-400">出图模型</Label>
+                <Select value={imageModel} onValueChange={setImageModel}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IMAGE_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name} · {model.cost}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-zinc-400">分辨率</Label>
+              <OptionPills
+                options={RESOLUTIONS.map((r) => ({ value: r, label: r }))}
+                value={resolution}
+                onChange={setResolution}
+              />
+            </div>
+
+            <p className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+              AI 会先把本集切成镜头，再按每个镜头的描述逐张出图。分镜图会作为后续出视频的首帧参考。
+            </p>
+          </TabsContent>
+
+          {/* 仅拆分镜 */}
+          <TabsContent value="text" className="space-y-4 pt-3">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-zinc-400">拆分用文本模型</Label>
+              <Select value={textModel} onValueChange={setTextModel}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEXT_MODELS.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name} · {model.cost} 积分/次
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+              只做镜头切分，不消耗生图额度。适合先确认镜头结构，再决定是否出图。
+            </p>
+          </TabsContent>
+
+          {/* 出视频 */}
+          <TabsContent value="video" className="space-y-4 pt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-400">视频模型</Label>
+                <Select value={videoModel} onValueChange={setVideoModel}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VIDEO_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name} · {model.cost}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-400">分辨率</Label>
+                <OptionPills
+                  options={RESOLUTIONS.map((r) => ({ value: r, label: r }))}
+                  value={resolution}
+                  onChange={setResolution}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
+              <div>
+                <p className="text-xs text-zinc-200">免分镜图直出</p>
+                <p className="text-[11px] text-zinc-500">
+                  跳过静帧，直接按镜头描述生成视频（更省积分，稳定性略低）
+                </p>
+              </div>
+              <Switch checked={skipImage} onCheckedChange={setSkipImage} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-zinc-400">反向提示词（禁止项）</Label>
+              <Input
+                value={negativePrompt}
+                onChange={(event) => setNegativePrompt(event.target.value)}
+                placeholder="例如：低清晰度、多余手指、文字水印、畸形"
+                className="h-8 text-xs"
+              />
+            </div>
+          </TabsContent>
+
+          {/* 后期 BGM */}
+          <TabsContent value="bgm" className="space-y-4 pt-3">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-zinc-400">音乐 / 人声风格</Label>
+              <Input
+                value={bgmPrompt}
+                onChange={(event) => setBgmPrompt(event.target.value)}
+                placeholder="描述你想要的音乐/人声风格"
+                className="h-8 text-xs"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-400">音频模型</Label>
+                <Select value={audioModel} onValueChange={setAudioModel}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUDIO_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name} 内置 · {model.cost} 起
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end">
+                <div className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+                  <span className="text-xs text-zinc-300">智能歌词</span>
+                  <Switch checked={smartLyrics} onCheckedChange={setSmartLyrics} />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {running && (
+          <div className="space-y-1.5 rounded-lg border border-orange-500/30 bg-orange-500/[0.06] p-3">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-1.5 text-orange-300">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {step || "处理中…"}
+              </span>
+              <span className="tabular-nums text-zinc-500">{Math.round(progress)}%</span>
+            </div>
+            <Progress value={progress} indicatorClassName="bg-orange-500" />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-zinc-600">
+            共 {TEXT_MODELS.length + IMAGE_MODELS.length + VIDEO_MODELS.length + AUDIO_MODELS.length} 个内置模型可选
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>
+              取消
+            </Button>
+            <Button
+              variant="brand"
+              onClick={() => void run()}
+              disabled={running || (tab === "bgm" && bgmPrompt.trim().length < 2)}
+              className={cn(running && "opacity-90")}
+            >
+              {running ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              开始
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

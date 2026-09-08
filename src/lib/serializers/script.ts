@@ -75,3 +75,69 @@ export function toScriptSummary(script: ScriptRecord): ScriptSummary {
     updatedAt: script.updatedAt.toISOString(),
   }
 }
+
+/* ---------------------------- 详情页类型 ---------------------------- */
+
+export interface EpisodeDTO {
+  id: string
+  number: number
+  title: string
+  content: string
+  summary: string | null
+  duration: number
+  style: string | null
+  status: string
+}
+
+export interface AssetDTO {
+  id: string
+  name: string
+  description: string
+  imageUrl: string | null
+  prompt: string | null
+  status: string
+  /** 角色专有 */
+  appearance?: string | null
+  personality?: string | null
+  /** 场景专有 */
+  environment?: string | null
+  lighting?: string | null
+}
+
+export interface ConsultationDTO {
+  id: string
+  type: string
+  output: string
+  model: string
+  status: string
+  suggestions: {
+    id: string
+    category: string
+    severity: "high" | "medium" | "low"
+    issue: string
+    suggestion: string
+    mustFix: boolean
+  }[]
+  createdAt: string
+}
+
+export interface ScriptDetail extends ScriptSummary {
+  content: string
+  era: string | null
+  tone: string | null
+  narrativeStyle: string | null
+  visualStyle: string | null
+  costumeStyle: string | null
+  allowedContent: string[] | null
+  forbiddenContent: string[] | null
+  processingMode: string
+  executionMode: string
+  textModel: string
+  consultModel: string | null
+  dialogueModel: string | null
+  episodes: EpisodeDTO[]
+  characters: AssetDTO[]
+  scenes: AssetDTO[]
+  props: AssetDTO[]
+  consultations: ConsultationDTO[]
+}
