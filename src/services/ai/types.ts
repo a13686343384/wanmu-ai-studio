@@ -99,6 +99,20 @@ export interface ConsultScriptResult {
   suggestions: ConsultationSuggestion[]
 }
 
+export interface ConsultChatInput {
+  scriptTitle: string
+  /** 正在讨论的诊断建议 */
+  suggestion: string
+  /** 用户这轮想怎么改 */
+  message: string
+  model: string
+}
+
+export interface ConsultChatResult {
+  /** AI 对这轮想法的回应与改法要点 */
+  reply: string
+}
+
 export interface OptimizeDialogueInput {
   content: string
   model: string
@@ -254,6 +268,7 @@ export interface SplitStoryboardsResult {
 export interface AIService {
   analyzeScript(input: AnalyzeScriptInput): Promise<AIResult<ScriptAnalysis>>
   consultScript(input: ConsultScriptInput): Promise<AIResult<ConsultScriptResult>>
+  consultChat(input: ConsultChatInput): Promise<AIResult<ConsultChatResult>>
   optimizeDialogue(input: OptimizeDialogueInput): Promise<AIResult<OptimizeDialogueResult>>
   generateOutline(input: GenerateOutlineInput): Promise<AIResult<GenerateOutlineResult>>
   summarizeEpisode(input: SummarizeEpisodeInput): Promise<AIResult<SummarizeEpisodeResult>>

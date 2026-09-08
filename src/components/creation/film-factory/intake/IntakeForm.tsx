@@ -47,6 +47,12 @@ export function IntakeForm() {
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
 
+  // 统计正文里的分集标记（【第N集 …】），供审阅弹窗按标记切集
+  const markedEpisodes = (() => {
+    const matches = content.match(/【第\s*\d+\s*集[^】]*】/g)
+    return matches ? new Set(matches).size : 0
+  })()
+
   function patchConfig(patch: Partial<IntakeConfig>) {
     setConfig((current) => ({ ...current, ...patch }))
   }
@@ -194,6 +200,7 @@ export function IntakeForm() {
           scriptId={scriptId}
           initialTitle={title}
           initialAspect={config.targetAspect}
+          markedEpisodes={markedEpisodes || null}
           onBack={() => setReviewOpen(false)}
         />
       )}

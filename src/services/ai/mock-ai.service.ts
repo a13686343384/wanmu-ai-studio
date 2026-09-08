@@ -3,7 +3,9 @@ import type {
   AIResult,
   AnalyzeScriptInput,
   CharacterDraft,
+  ConsultChatInput,
   ConsultScriptInput,
+  ConsultChatResult,
   ConsultScriptResult,
   GenerateAudioInput,
   GenerateAudioResult,
@@ -109,6 +111,14 @@ export const mockAIService: AIService = {
   },
 
   /* ---------------------------- 会诊 ---------------------------- */
+
+  async consultChat(input: ConsultChatInput): Promise<AIResult<ConsultChatResult>> {
+    await mockDelay(600, 1200)
+
+    const reply = `收到你的想法（「${input.message.slice(0, 40)}${input.message.length > 40 ? "…" : ""}」）。结合《${input.scriptTitle}》的诊断项「${input.suggestion.slice(0, 24)}…」，建议这样落笔：先在受影响集数前补一场过渡戏交代动机，再把对话精简到功能表达，最后用一个小钩子收尾。确认后点「按勾选生成改法」，我会把整条改写预览出来。`
+
+    return { data: { reply }, usage: usage(input.model, costOf(TEXT_MODELS, input.model)) }
+  },
 
   async consultScript(input: ConsultScriptInput): Promise<AIResult<ConsultScriptResult>> {
     await mockDelay(900, 1800)

@@ -42,11 +42,11 @@ import { cn } from "@/lib/utils"
 
 type Mode = "image" | "text" | "video" | "bgm"
 
-const TABS: { value: Mode; label: string; icon: typeof Scissors }[] = [
-  { value: "image", label: "出图", icon: ImageIcon },
-  { value: "text", label: "仅拆分镜", icon: Scissors },
-  { value: "video", label: "出视频", icon: Video },
-  { value: "bgm", label: "后期 BGM", icon: Music },
+const TABS: { value: Mode; label: string; description: string; icon: typeof Scissors }[] = [
+  { value: "text", label: "仅拆分镜", description: "只拆镜切，不出图/视频", icon: Scissors },
+  { value: "image", label: "出图", description: "拆镜组 + 每镜出一张分镜图", icon: ImageIcon },
+  { value: "video", label: "出视频", description: "为镜串出视频（方式下面选）", icon: Video },
+  { value: "bgm", label: "后期 BGM", description: "本集一整轨 BGM / 配音", icon: Music },
 ]
 
 /**
@@ -77,7 +77,10 @@ export function SplitStoryboardDialog({
   const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0]!.id)
   const [audioModel, setAudioModel] = useState(AUDIO_MODELS[0]!.id)
   const [resolution, setResolution] = useState("1080p")
+  const [quality, setQuality] = useState("low")
   const [skipImage, setSkipImage] = useState(false)
+  const [regenerateDone, setRegenerateDone] = useState(false)
+  const [safeRewrite, setSafeRewrite] = useState(false)
   const [negativePrompt, setNegativePrompt] = useState("")
   const [bgmPrompt, setBgmPrompt] = useState("沉稳大气的纪录片解说氛围，低频铺底，渐强收尾")
   const [smartLyrics, setSmartLyrics] = useState(true)
@@ -193,13 +196,28 @@ export function SplitStoryboardDialog({
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Mode)}>
-          <TabsList className="w-full">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-none border-0 bg-transparent p-0 sm:grid-cols-4">
             {TABS.map((item) => {
               const Icon = item.icon
               return (
-                <TabsTrigger key={item.value} value={item.value} className="flex-1 gap-1.5">
-                  <Icon className="h-3.5 w-3.5" />
-                  {item.label}
+                <TabsTrigger
+                  key={item.value}
+                  value={item.value}
+                  aria-label={item.label}
+                  className={cn(
+                    "h-auto flex-col items-start gap-1 rounded-xl border p-2.5 text-left",
+                    tab === item.value
+                      ? "border-zinc-500 bg-zinc-800"
+                      : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600",
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-100">
+                    <Icon className="h-3.5 w-3.5" />
+                    {item.label}
+                  </span>
+                  <span className="block text-left text-[10px] leading-snug text-zinc-500">
+                    {item.description}
+                  </span>
                 </TabsTrigger>
               )
             })}
@@ -241,17 +259,38 @@ export function SplitStoryboardDialog({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-[11px] text-zinc-400">分辨率</Label>
-              <OptionPills
-                options={RESOLUTIONS.map((r) => ({ value: r, label: r }))}
-                value={resolution}
-                onChange={setResolution}
-              />
+            <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-950/50 p-3">
+              <p className="text-[11px] text-zinc-400">生图模型（出人物/场景图 + 分镜图）</p>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-500">清晰度</Label>
+                <OptionPills
+                  options={["1K", "2K", "4K"].map((r) => ({ value: r, label: r }))}
+                  value={resolution}
+                  onChange={setResolution}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-zinc-500">画质档位</Label>
+                <OptionPills
+                  options={[
+                    { value: "low", label: "低画质" },
+                    { value: "standard", label: "标准画质" },
+                    { value: "high", label: "高画质" },
+                  ]}
+                  value={quality}
+                  onChange={setQuality}
+                />
+              </div>
+              <p className="text-[10px] leading-relaxed text-zinc-600">
+                影视剧的分镜图 / 首帧图 / 调度图固定按 1K · 低画质出（它们只是视频的参考帧，
+                出大图只会更慢更贵），此处不可调。
+              </p>
             </div>
 
             <p className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
-              AI 会先把本集切成镜头，再按每个镜头的描述逐张出图。分镜图会作为后续出视频的首帧参考。
+              开：同一大分段内的相邻分镜逐张出（后一张参考前一张），锁住地点 / 环境 / 光线 /
+              色调 —— 像一点但同段画面衔接；不同大分段之间「照常并发」，互不影响。关：
+              段内也并发，最快，但同段相邻分镜可能有轻微漂移。
             </p>
           </TabsContent>
 
@@ -317,6 +356,28 @@ export function SplitStoryboardDialog({
               <Switch checked={skipImage} onCheckedChange={setSkipImage} />
             </div>
 
+            <div className="space-y-2.5 rounded-xl border border-zinc-800 bg-zinc-950/50 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-zinc-200">重出已生成的</p>
+                  <p className="text-[11px] text-zinc-500">
+                    默认只补未失败的；勾选则连已生成的也覆盖重出（旧图/视频保留到新的出好为止）。
+                  </p>
+                </div>
+                <Switch checked={regenerateDone} onCheckedChange={setRegenerateDone} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-zinc-200">安全改写（防审核拦截）</p>
+                  <p className="text-[11px] text-zinc-500">
+                    血腥/暴力自动软化为合规词 + 用电影化剪辑表达，让严格审核的模型也能过审。默认关
+                    （保留血腥、用宽松模型时开）。
+                  </p>
+                </div>
+                <Switch checked={safeRewrite} onCheckedChange={setSafeRewrite} />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-[11px] text-zinc-400">反向提示词（禁止项）</Label>
               <Input
@@ -325,6 +386,14 @@ export function SplitStoryboardDialog({
                 placeholder="例如：低清晰度、多余手指、文字水印、畸形"
                 className="h-8 text-xs"
               />
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2.5 text-[11px] leading-relaxed text-amber-300/90">
+              <p>分镜图 14 / 个 × 实际镜头数（拆分镜后结算）</p>
+              <p>增强资产（首帧/清晰度/人群卡）14 / 个 × 实际镜头组数（拆分镜后结算）</p>
+              <p className="text-amber-400/60">
+                数值仅预估，实际消耗会因参考图数量、各段时长、模型参数（比例/清晰度）等浮动，拆分镜后按实际镜头数 / 时长结算。
+              </p>
             </div>
           </TabsContent>
 

@@ -386,6 +386,7 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
             scriptId={script.id}
             episodeId={activeEpisode.id}
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
+            episode={activeEpisode}
             result={recapResult}
             onLoaded={setRecapResult}
           />
