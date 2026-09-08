@@ -2,11 +2,11 @@ import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { AppProviders } from "@/components/providers/AppProviders"
+import { NavBar } from "@/components/layout/NavBar"
 
 /**
  * 已登录应用区布局。
  * 服务端校验会话：未登录直接跳转 /login，并带上 callbackUrl。
- * 任务 4 会在此布局内加入 NavBar。
  */
 export default async function DashboardLayout({
   children,
@@ -21,7 +21,10 @@ export default async function DashboardLayout({
 
   return (
     <AppProviders>
-      <div className="min-h-screen bg-zinc-950">{children}</div>
+      <div className="flex min-h-screen flex-col bg-zinc-950">
+        <NavBar />
+        <div className="flex-1">{children}</div>
+      </div>
     </AppProviders>
   )
 }
