@@ -131,6 +131,8 @@ export function GenerationPanel() {
                 <img
                   src={result.poster ?? result.url}
                   alt={result.prompt.slice(0, 24)}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">

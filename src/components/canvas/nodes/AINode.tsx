@@ -110,6 +110,8 @@ export function AINode({ id, data, selected }: NodeProps) {
           <img
             src={nodeData.url}
             alt={nodeData.prompt ?? ""}
+            loading="lazy"
+            decoding="async"
             className="w-full rounded-md border border-zinc-800 object-cover"
           />
         )}

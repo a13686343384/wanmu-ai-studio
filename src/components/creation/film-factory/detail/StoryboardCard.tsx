@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { memo, useState } from "react"
 import { Clapperboard, ImageIcon, Loader2, Pencil, Play, Video } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,8 +28,9 @@ export interface StoryboardDTO {
  * 分镜卡片。
  * 展示镜号 / 镜头类型 / 画面 / 描述 / 台词 / 运镜，
  * 并提供生成分镜图、出视频、编辑三个入口。
+ * memo 纯展示优化：父组件需保证各回调引用稳定。
  */
-export function StoryboardCard({
+export const StoryboardCard = memo(function StoryboardCard({
   storyboard,
   busy,
   onGenerateImage,
@@ -64,6 +65,8 @@ export function StoryboardCard({
             <img
               src={storyboard.imageUrl}
               alt={`分镜 ${storyboard.number}`}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
             <button
@@ -184,11 +187,17 @@ export function StoryboardCard({
               <video src={storyboard.videoUrl!} controls autoPlay className="max-h-[80vh]" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={storyboard.imageUrl} alt="" className="max-h-[80vh] object-contain" />
+              <img
+                src={storyboard.imageUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="max-h-[80vh] object-contain"
+              />
             )}
           </div>
         </div>
       )}
     </div>
   )
-}
+})

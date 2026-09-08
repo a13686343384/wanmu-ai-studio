@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ChevronDown,
+  Clapperboard,
   Info,
   ListChecks,
   Plus,
@@ -36,6 +37,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { FadeIn } from "@/components/shared/motion"
+import { RowListSkeleton } from "@/components/shared/skeletons"
 import type { ScriptSummary } from "@/lib/serializers/script"
 
 type SortKey = "updated" | "created" | "title"
@@ -236,29 +240,27 @@ export function ScriptList() {
 
       {/* 列表 */}
       {loading ? (
-        <div className="mt-6 space-y-2.5">
-          {Array.from({ length: 2 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-[118px] animate-pulse rounded-xl border border-zinc-800 bg-zinc-900/40"
-            />
-          ))}
+        <div className="mt-6">
+          <RowListSkeleton count={3} />
         </div>
       ) : sorted.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 py-20 text-center">
-          <p className="text-sm text-zinc-400">还没有剧本</p>
-          <p className="mt-1 text-xs text-zinc-600">
-            点击「新建剧本」粘贴你的剧本，AI 会通读全本并推荐集数 / 时长 / 三幕结构
-          </p>
-          <Button variant="inverse" size="sm" className="mt-4" asChild>
-            <Link href="/creation/film-factory/new">
-              <Plus />
-              新建剧本
-            </Link>
-          </Button>
+        <div className="mt-6">
+          <EmptyState
+            icon={Clapperboard}
+            title="还没有剧本"
+            description="点击「新建剧本」粘贴你的剧本，AI 会通读全本并推荐集数 / 时长 / 三幕结构"
+            action={
+              <Button variant="inverse" size="sm" asChild>
+                <Link href="/creation/film-factory/new">
+                  <Plus />
+                  新建剧本
+                </Link>
+              </Button>
+            }
+          />
         </div>
       ) : (
-        <>
+        <FadeIn key={query}>
           <Section
             title="In Production"
             count={inProduction.length}
@@ -280,7 +282,7 @@ export function ScriptList() {
             items={completed}
             dot="bg-emerald-400"
           />
-        </>
+        </FadeIn>
       )}
 
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>

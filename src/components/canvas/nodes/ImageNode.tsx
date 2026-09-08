@@ -32,6 +32,8 @@ export function ImageNode({ id, data, selected }: NodeProps) {
         <img
           src={nodeData.url}
           alt={nodeData.label}
+          loading="lazy"
+          decoding="async"
           className="w-full rounded-md border border-zinc-800 object-cover"
         />
       ) : (

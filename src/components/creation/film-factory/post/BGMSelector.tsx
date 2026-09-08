@@ -75,7 +75,7 @@ export function BGMSelector({
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setPreviewing(previewing === preset.id ? null : preset.id)}
-                aria-label="试听"
+                aria-label={previewing === preset.id ? `停止试听 ${preset.label}` : `试听 ${preset.label}`}
               >
                 {previewing === preset.id ? (
                   <Square className="h-3 w-3 text-orange-400" />

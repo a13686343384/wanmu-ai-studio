@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { LayoutGrid, Sparkles, Video } from "lucide-react"
+import { LayoutGrid, ListVideo, Package, Sparkles, Video } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ScriptDetailHeader } from "@/components/creation/film-factory/detail/ScriptDetailHeader"
 import { WorkflowTabs } from "@/components/creation/film-factory/detail/WorkflowTabs"
 import { EpisodeList } from "@/components/creation/film-factory/detail/EpisodeList"
@@ -51,6 +52,10 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
   } | null>(null)
   const [videoBatchOpen, setVideoBatchOpen] = useState(false)
   const [postOpen, setPostOpen] = useState(false)
+
+  // 移动端（< lg）隐藏左右两栏，用抽屉承载分集列表与资产侧栏
+  const [episodesSheetOpen, setEpisodesSheetOpen] = useState(false)
+  const [assetsSheetOpen, setAssetsSheetOpen] = useState(false)
 
   const activeEpisode = script.episodes.find((e) => e.id === activeEpisodeId) ?? null
 
@@ -150,6 +155,29 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
   const totalAssets =
     script.characters.length + script.scenes.length + script.props.length
 
+  // 稳定引用：StoryboardCard 已用 React.memo 包裹，避免父组件重渲染导致全网格失效
+  const handleEditStoryboard = useCallback((storyboard: StoryboardDTO) => {
+    setEditing(storyboard)
+  }, [])
+  const handleGenerateImage = useCallback((storyboard: StoryboardDTO) => {
+    setGenerateTarget({ storyboard, kind: "image" })
+  }, [])
+  const handleGenerateVideo = useCallback((storyboard: StoryboardDTO) => {
+    setGenerateTarget({ storyboard, kind: "video" })
+  }, [])
+  const handleSplit = useCallback(() => setSplitOpen(true), [])
+  const handleRecap = useCallback(() => {
+    setRecapResult(null)
+    setRecapOpen(true)
+  }, [])
+  const handleSelectEpisode = useCallback(
+    (id: string) => {
+      setActiveEpisodeId(id)
+      setEpisodesSheetOpen(false)
+    },
+    [],
+  )
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       <ScriptDetailHeader
@@ -163,6 +191,48 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
         processing={script.processingStatus}
         counts={{ episodes: script.episodes.length, assets: totalAssets, storyboards: storyboards.length }}
       />
+
+      {/* 移动端分集 / 资产入口（< lg 时左右两栏隐藏） */}
+      <div className="flex items-center gap-2 border-b border-zinc-800/80 bg-zinc-950 px-3 py-2 lg:hidden">
+        <Sheet open={episodesSheetOpen} onOpenChange={setEpisodesSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="h-7">
+              <ListVideo className="h-3.5 w-3.5" />
+              分集 {script.episodes.length}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 p-0">
+            <SheetTitle className="sr-only">分集列表</SheetTitle>
+            <EpisodeList
+              episodes={script.episodes}
+              activeId={activeEpisodeId}
+              onSelect={handleSelectEpisode}
+            />
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={assetsSheetOpen} onOpenChange={setAssetsSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="h-7">
+              <Package className="h-3.5 w-3.5" />
+              资产 {totalAssets}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-80 p-0">
+            <SheetTitle className="sr-only">全局资产</SheetTitle>
+            {/* pt-10 避开 Sheet 右上角的关闭按钮，防止与刷新按钮重叠 */}
+            <div className="h-full pt-10">
+              <AssetSidebar
+                scriptId={script.id}
+                characters={script.characters}
+                scenes={script.scenes}
+                props={script.props}
+                onRefresh={() => void reloadScript()}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
         {/* 左：分集列表 */}
@@ -188,18 +258,11 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
               progress={progress}
               progressLabel={progressLabel}
               hasEpisode={Boolean(activeEpisode)}
-              onSplit={() => setSplitOpen(true)}
-              onRecap={() => {
-                setRecapResult(null)
-                setRecapOpen(true)
-              }}
-              onGenerateImage={(storyboard) =>
-                setGenerateTarget({ storyboard, kind: "image" })
-              }
-              onGenerateVideo={(storyboard) =>
-                setGenerateTarget({ storyboard, kind: "video" })
-              }
-              onEdit={setEditing}
+              onSplit={handleSplit}
+              onRecap={handleRecap}
+              onGenerateImage={handleGenerateImage}
+              onGenerateVideo={handleGenerateVideo}
+              onEdit={handleEditStoryboard}
             />
           </section>
         </main>
@@ -217,7 +280,7 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
       </div>
 
       {/* 底部状态条 */}
-      <div className="flex items-center gap-3 border-t border-zinc-800/80 bg-zinc-950 px-4 py-2 text-[11px] text-zinc-500">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-zinc-800/80 bg-zinc-950 px-4 py-2 text-[11px] text-zinc-500">
         <span>单集时长 {script.episodeDuration}s</span>
         <span className="text-zinc-700">·</span>
         <span>单集风格：{activeEpisode?.style ?? "跟随全剧"}</span>

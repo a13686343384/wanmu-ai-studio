@@ -1,5 +1,6 @@
 "use client"
 
+import { memo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   CheckSquare,
@@ -79,8 +80,9 @@ function MenuItems({ project, onOpen, onRename, onShare, onMove, onDelete }: Men
 /**
  * 画布项目卡片。
  * 支持右键菜单与右上角「更多」菜单，两种入口操作一致。
+ * memo 纯展示优化：父组件需保证 project / actions / view 引用稳定。
  */
-export function ProjectCard({
+export const ProjectCard = memo(function ProjectCard({
   project,
   actions,
   view = "grid",
@@ -92,10 +94,10 @@ export function ProjectCard({
   const router = useRouter()
   const cover = makePoster(project.name, `${project.name}-${project.id}`, "16:9")
 
-  const handleOpen = () => {
+  const handleOpen = useCallback(() => {
     actions.onOpen(project)
     router.push(`/canvas/${project.id}`)
-  }
+  }, [actions, project, router])
 
   const menu = <MenuItems project={project} {...actions} />
 
@@ -108,6 +110,8 @@ export function ProjectCard({
             <img
               src={cover}
               alt={project.name}
+              loading="lazy"
+              decoding="async"
               className="h-12 w-20 shrink-0 cursor-pointer rounded-md object-cover"
               onClick={handleOpen}
             />
@@ -147,6 +151,8 @@ export function ProjectCard({
             <img
               src={cover}
               alt={project.name}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-[1.03]"
               onClick={handleOpen}
             />
@@ -185,4 +191,4 @@ export function ProjectCard({
       <ContextMenuContent>{menu}</ContextMenuContent>
     </ContextMenu>
   )
-}
+})

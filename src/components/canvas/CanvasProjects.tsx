@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   Archive,
   ChevronDown,
+  FolderOpen,
   LayoutGrid,
   List,
   Plus,
@@ -58,6 +59,9 @@ import { NewProjectDialog } from "@/components/canvas/NewProjectDialog"
 import { RenameDialog } from "@/components/canvas/RenameDialog"
 import { CreateTeamDialog } from "@/components/layout/CreateTeamDialog"
 import { JoinTeamDialog } from "@/components/layout/JoinTeamDialog"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { FadeIn } from "@/components/shared/motion"
+import { CardGridSkeleton, RowListSkeleton } from "@/components/shared/skeletons"
 import { useWorkspaces } from "@/hooks/useWorkspaces"
 import { cn } from "@/lib/utils"
 import type { ProjectSummary } from "@/app/api/projects/route"
@@ -132,7 +136,7 @@ export function CanvasProjects() {
 
   /* ---------------------------- 操作 ---------------------------- */
 
-  async function shareLink(project: ProjectSummary) {
+  const shareLink = useCallback(async (project: ProjectSummary) => {
     const url = `${window.location.origin}/canvas/${project.id}`
     try {
       await navigator.clipboard.writeText(url)
@@ -140,7 +144,7 @@ export function CanvasProjects() {
     } catch {
       toast.info("分享链接", { description: url })
     }
-  }
+  }, [])
 
   async function confirmDelete() {
     if (!deleting) return
@@ -189,16 +193,20 @@ export function CanvasProjects() {
     void loadProjects()
   }
 
-  const actions = {
-    onOpen: () => {},
-    onRename: (project: ProjectSummary) => setRenaming(project),
-    onShare: (project: ProjectSummary) => void shareLink(project),
-    onMove: (project: ProjectSummary) => {
-      setMoving(project)
-      setMoveTarget(workspaces.find((w) => w.id !== project.workspaceId)?.id ?? "")
-    },
-    onDelete: (project: ProjectSummary) => setDeleting(project),
-  }
+  // 稳定引用：ProjectCard 已用 React.memo 包裹，避免父组件重渲染导致全列表失效
+  const actions = useMemo(
+    () => ({
+      onOpen: () => {},
+      onRename: (project: ProjectSummary) => setRenaming(project),
+      onShare: (project: ProjectSummary) => void shareLink(project),
+      onMove: (project: ProjectSummary) => {
+        setMoving(project)
+        setMoveTarget(workspaces.find((w) => w.id !== project.workspaceId)?.id ?? "")
+      },
+      onDelete: (project: ProjectSummary) => setDeleting(project),
+    }),
+    [shareLink, workspaces],
+  )
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
@@ -349,47 +357,38 @@ export function CanvasProjects() {
       {/* 内容区 */}
       <div className="mt-6">
         {loading ? (
-          <div
-            className={cn(
-              view === "grid"
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "space-y-2",
-            )}
-          >
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "animate-pulse rounded-xl border border-zinc-800 bg-zinc-900/40",
-                  view === "grid" ? "aspect-video" : "h-16",
-                )}
-              />
-            ))}
-          </div>
+          view === "grid" ? (
+            <CardGridSkeleton count={8} />
+          ) : (
+            <RowListSkeleton count={6} rowClassName="h-16" />
+          )
         ) : projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 py-20 text-center">
-            <p className="text-sm text-zinc-400">还没有项目</p>
-            <p className="mt-1 text-xs text-zinc-600">
-              点击「新建项目」创建第一个画布，或从影视工厂「打通到画布」自动生成
-            </p>
-            <Button variant="inverse" size="sm" className="mt-4" onClick={() => setNewOpen(true)}>
-              <Plus />
-              新建项目
-            </Button>
-          </div>
+          <EmptyState
+            icon={FolderOpen}
+            title="还没有项目"
+            description="点击「新建项目」创建第一个画布，或从影视工厂「打通到画布」自动生成"
+            action={
+              <Button variant="inverse" size="sm" onClick={() => setNewOpen(true)}>
+                <Plus />
+                新建项目
+              </Button>
+            }
+          />
         ) : (
-          <div
-            className={cn(
-              view === "grid"
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "space-y-2",
-            )}
-          >
-            <NewProjectCard view={view} onClick={() => setNewOpen(true)} />
-            {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} actions={actions} view={view} />
-            ))}
-          </div>
+          <FadeIn key={`${scope}-${view}`}>
+            <div
+              className={cn(
+                view === "grid"
+                  ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "space-y-2",
+              )}
+            >
+              <NewProjectCard view={view} onClick={() => setNewOpen(true)} />
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} actions={actions} view={view} />
+              ))}
+            </div>
+          </FadeIn>
         )}
       </div>
 

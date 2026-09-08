@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { cn } from "@/lib/utils"
 import type { AssetDTO } from "@/lib/serializers/script"
 
@@ -191,11 +192,13 @@ export function AssetSidebar({
 
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
                   {items.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-zinc-800 px-3 py-6 text-center text-[11px] leading-relaxed text-zinc-600">
-                      还没有{KIND_META[kind].label}
-                      <br />
-                      点击右上角刷新按钮从剧本提取
-                    </p>
+                    <EmptyState
+                      size="compact"
+                      icon={KIND_META[kind].icon}
+                      title={`还没有${KIND_META[kind].label}`}
+                      description="点击右上角刷新按钮从剧本提取"
+                      className="border-none bg-transparent"
+                    />
                   ) : (
                     items.map((item) => (
                       <AssetCard key={item.id} asset={item} kind={kind} />
@@ -221,7 +224,13 @@ function AssetCard({ asset, kind }: { asset: AssetDTO; kind: AssetKind }) {
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950">
           {asset.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-cover" />
+            <img
+              src={asset.imageUrl}
+              alt={asset.name}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               {asset.status === "generating" ? (

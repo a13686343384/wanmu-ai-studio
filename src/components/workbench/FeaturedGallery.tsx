@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { motion } from "framer-motion"
 import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { WorkCard } from "@/components/workbench/WorkCard"
@@ -50,10 +51,16 @@ export function FeaturedGallery() {
         ref={scrollerRef}
         className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
       >
-        {FEATURED_WORKS.map((work) => (
-          <div key={work.id} className="snap-start">
+        {FEATURED_WORKS.map((work, index) => (
+          <motion.div
+            key={work.id}
+            className="snap-start"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut", delay: index * 0.05 }}
+          >
             <WorkCard work={work} total={FEATURED_WORKS.length} />
-          </div>
+          </motion.div>
         ))}
       </div>
     </section>

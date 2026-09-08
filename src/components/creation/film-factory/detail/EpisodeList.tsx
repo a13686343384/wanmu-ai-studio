@@ -1,12 +1,18 @@
 "use client"
 
 import { Clock, Play } from "lucide-react"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { useProgressiveList } from "@/hooks/useProgressiveList"
 import { cn } from "@/lib/utils"
 import type { EpisodeDTO } from "@/lib/serializers/script"
+
+/** 分集数超过该阈值时启用渐进渲染，避免一次挂载过多 DOM。 */
+const PROGRESSIVE_THRESHOLD = 100
 
 /**
  * 分集列表（左栏）。
  * 展示集号、标题、摘要、时长与状态，点击切换当前分集。
+ * 长列表（>100 集）自动启用渐进渲染，滚动到底部附近再挂载后续分集。
  */
 export function EpisodeList({
   episodes,
@@ -17,6 +23,13 @@ export function EpisodeList({
   activeId: string | null
   onSelect: (id: string) => void
 }) {
+  const progressive = episodes.length > PROGRESSIVE_THRESHOLD
+  const { visibleCount, hasMore, sentinelRef, getVisible } = useProgressiveList(episodes.length, {
+    initialCount: 30,
+    step: 30,
+  })
+  const visible = progressive ? getVisible(episodes) : episodes
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-2">
@@ -28,60 +41,69 @@ export function EpisodeList({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {episodes.length === 0 ? (
-          <p className="px-3 py-6 text-center text-[11px] leading-relaxed text-zinc-600">
-            还没有分集
-            <br />
-            完成 INTAKE 后会自动生成
-          </p>
+          <EmptyState
+            size="compact"
+            title="还没有分集"
+            description="完成 INTAKE 后会自动生成"
+            className="m-3 border-none bg-transparent"
+          />
         ) : (
-          episodes.map((episode) => {
-            const active = episode.id === activeId
-            return (
-              <button
-                key={episode.id}
-                type="button"
-                onClick={() => onSelect(episode.id)}
-                className={cn(
-                  "w-full border-b border-zinc-900 px-3 py-2.5 text-left transition-colors",
-                  active ? "bg-zinc-800/70" : "hover:bg-zinc-900/60",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "text-[11px] font-medium tabular-nums",
-                      active ? "text-orange-400" : "text-zinc-500",
-                    )}
-                  >
-                    EP{String(episode.number).padStart(2, "0")}
-                  </span>
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-xs",
-                      active ? "text-zinc-100" : "text-zinc-300",
-                    )}
-                  >
-                    {episode.title}
-                  </span>
-                  {episode.status === "storyboarded" && (
-                    <Play className="h-2.5 w-2.5 text-cyan-400" />
+          <>
+            {visible.map((episode) => {
+              const active = episode.id === activeId
+              return (
+                <button
+                  key={episode.id}
+                  type="button"
+                  onClick={() => onSelect(episode.id)}
+                  className={cn(
+                    "w-full border-b border-zinc-900 px-3 py-2.5 text-left transition-colors",
+                    active ? "bg-zinc-800/70" : "hover:bg-zinc-900/60",
                   )}
-                </div>
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "text-[11px] font-medium tabular-nums",
+                        active ? "text-orange-400" : "text-zinc-500",
+                      )}
+                    >
+                      EP{String(episode.number).padStart(2, "0")}
+                    </span>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs",
+                        active ? "text-zinc-100" : "text-zinc-300",
+                      )}
+                    >
+                      {episode.title}
+                    </span>
+                    {episode.status === "storyboarded" && (
+                      <Play className="h-2.5 w-2.5 text-cyan-400" />
+                    )}
+                  </div>
 
-                <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">
-                  {episode.summary ?? episode.content.slice(0, 60)}
-                </p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">
+                    {episode.summary ?? episode.content.slice(0, 60)}
+                  </p>
 
-                <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-600">
-                  <span className="flex items-center gap-0.5">
-                    <Clock className="h-2.5 w-2.5" />
-                    {episode.duration}s
-                  </span>
-                  <span>{episode.style ?? "跟随全剧"}</span>
-                </div>
-              </button>
-            )
-          })
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-600">
+                    <span className="flex items-center gap-0.5">
+                      <Clock className="h-2.5 w-2.5" />
+                      {episode.duration}s
+                    </span>
+                    <span>{episode.style ?? "跟随全剧"}</span>
+                  </div>
+                </button>
+              )
+            })}
+
+            {progressive && (
+              <div ref={sentinelRef} className="px-3 py-3 text-center text-[10px] text-zinc-600">
+                {hasMore ? `已显示 ${visibleCount} / ${episodes.length} 集，滚动加载更多…` : `已显示全部 ${episodes.length} 集`}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

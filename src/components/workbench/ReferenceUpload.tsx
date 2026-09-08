@@ -91,7 +91,13 @@ export function ReferenceUpload() {
           >
             {asset.kind === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={asset.url} alt={asset.name} className="h-full w-full object-cover" />
+              <img
+                src={asset.url}
+                alt={asset.name}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400">
                 <Icon className="h-4 w-4" />

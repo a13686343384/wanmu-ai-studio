@@ -5,6 +5,7 @@ import { Save } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { cn } from "@/lib/utils"
 import type { EpisodeDTO } from "@/lib/serializers/script"
 
@@ -64,8 +65,12 @@ export function ScriptContent({
 
   if (!episode) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-center text-xs text-zinc-600">
-        选择左侧分集查看剧本内容
+      <div className="flex h-full items-center p-6">
+        <EmptyState
+          size="compact"
+          title="选择左侧分集查看剧本内容"
+          className="h-full w-full justify-center border-none bg-transparent"
+        />
       </div>
     )
   }

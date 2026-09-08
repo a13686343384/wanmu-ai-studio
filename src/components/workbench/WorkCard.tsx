@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Play } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { makePoster } from "@/services/ai/mock-media"
@@ -10,7 +11,7 @@ import type { FeaturedWork } from "@/lib/mock-data/featured-works"
  * 精选作品卡片。
  * 结构：封面（含类型标签 / 序号 / 播放按钮）+ 标题 + 描述。
  */
-export function WorkCard({ work, total }: { work: FeaturedWork; total: number }) {
+export const WorkCard = memo(function WorkCard({ work, total }: { work: FeaturedWork; total: number }) {
   const cover = makePoster(work.title, work.seed, work.aspectRatio)
   const isPortrait = work.aspectRatio === "9:16"
 
@@ -28,6 +29,8 @@ export function WorkCard({ work, total }: { work: FeaturedWork; total: number })
         <img
           src={cover}
           alt={work.title}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
 
@@ -59,4 +62,4 @@ export function WorkCard({ work, total }: { work: FeaturedWork; total: number })
       </div>
     </article>
   )
-}
+})

@@ -44,7 +44,13 @@ export function VideoPreview({
       >
         {poster || src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={poster ?? src!} alt="" className="h-full w-full object-cover" />
+          <img
+            src={poster ?? src!}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-zinc-600">
             暂无视频
