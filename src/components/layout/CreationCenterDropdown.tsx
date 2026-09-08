@@ -27,6 +27,7 @@ export function CreationCenterDropdown() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-testid="creation-center-trigger"
           className={cn(
             "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors outline-none",
             active

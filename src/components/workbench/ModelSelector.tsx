@@ -28,6 +28,7 @@ export function ModelSelector() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-testid="model-trigger"
           className="flex max-w-[240px] items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
         >
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-orange-400" />

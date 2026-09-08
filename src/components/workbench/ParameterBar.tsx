@@ -33,6 +33,7 @@ function ParamSelect({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-testid={`param-${label}`}
           className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
           aria-label={label}
         >
@@ -125,7 +126,13 @@ export function ParameterBar({ onGenerate }: { onGenerate: () => void }) {
           <span className="font-medium tabular-nums">{formatNumber(cost)}</span>
         </span>
 
-        <Button variant="brand" size="sm" onClick={onGenerate} disabled={!canGenerate}>
+        <Button
+          variant="brand"
+          size="sm"
+          data-testid="generate"
+          onClick={onGenerate}
+          disabled={!canGenerate}
+        >
           {isGenerating ? <Loader2 className="animate-spin" /> : <Zap />}
           生成
         </Button>

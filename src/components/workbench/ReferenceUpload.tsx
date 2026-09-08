@@ -74,6 +74,7 @@ export function ReferenceUpload() {
 
       <button
         type="button"
+        data-testid="reference-upload"
         onClick={() => inputRef.current?.click()}
         className="flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-700 text-zinc-500 transition-colors hover:border-orange-500/60 hover:text-orange-400"
       >

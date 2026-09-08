@@ -137,7 +137,11 @@ export function ProjectCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-700">
+        <div
+          data-testid="project-card"
+          data-project-name={project.name}
+          className="group relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-700"
+        >
           <div className="relative aspect-video cursor-pointer overflow-hidden bg-zinc-950">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

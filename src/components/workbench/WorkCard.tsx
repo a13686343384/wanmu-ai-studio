@@ -16,6 +16,7 @@ export function WorkCard({ work, total }: { work: FeaturedWork; total: number })
 
   return (
     <article
+      data-testid="work-card"
       className={cn(
         "group relative shrink-0 cursor-pointer overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/40 transition-all duration-300",
         "hover:-translate-y-1 hover:border-zinc-700 hover:shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]",

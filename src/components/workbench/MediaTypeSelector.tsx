@@ -29,6 +29,7 @@ export function MediaTypeSelector() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-testid="media-type-trigger"
           className="flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/15"
         >
           <Icon className="h-3.5 w-3.5" />
