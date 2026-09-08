@@ -1,8 +1,9 @@
 # 进度与交接（PROGRESS）
 
-> **最后更新：** 2026-09-08
-> **当前状态：** 21 个任务中完成 **18 个**（Phase 0–6 全部功能已交付），剩余 3 个为收尾类任务。
-> **验证基线：** `tsc --noEmit` 0 错误 · `npm run build` 成功 · 冒烟 **17/17** · E2E **26/26**。
+> **最后更新：** 2026-09-09
+> **当前状态：** 21 个任务**全部完成**（功能交付 + UI/性能打磨 + 文档与部署配置）。
+> **验证基线：** `tsc --noEmit` 0 错误 · `npm run build` 成功 · 冒烟 **17/17** · E2E **26/26** · `npm run lint` 通过。
+> **全新环境演练已通过：** 克隆 → `npm ci` → 内嵌库自动 initdb → `db:setup` → `build` → `start` → 冒烟 17/17。
 
 ---
 
@@ -29,8 +30,8 @@
 | 6 视频与后期 | 17 视频生成 | ✅ | 批量出片队列、进度条、视频预览播放器 |
 | | 18 音频/BGM 与后期 | ✅ | 配音生成、BGM 库试听、混音导出面板 |
 | 7 收尾 | 19 E2E 测试 | ✅ | Playwright 26 用例全绿（认证/工作台/画布/影视工厂） |
-| | 20 UI 打磨与性能 | ⏳ **待办** | 见下方「下一步」 |
-| | 21 文档与部署 | ⏳ **待办** | 见下方「下一步」 |
+| | 20 UI 打磨与性能 | ✅ | 共享 Loading/Error/Empty 组件、Skeleton 骨架屏、framer-motion 转场、memo/懒加载/渐进渲染、移动端抽屉入口 |
+| | 21 文档与部署 | ✅ | README / setup-guide / api-reference / Dockerfile + docker-compose；全新环境演练通过 |
 
 ---
 
@@ -40,9 +41,10 @@
 
 ```bash
 npx tsc --noEmit          # 0 错误
-npm run build             # 构建成功（30 条路由）
+npm run build             # 构建成功（30 条路由，standalone 输出）
 npm run test:smoke        # 17/17 —— 后端链路
 npm run test:e2e          # 26/26 —— 端到端 UI
+npm run lint              # ESLint 通过
 ```
 
 **冒烟脚本覆盖**（`scripts/smoke-test.mjs`）：登录 → 工作台生成扣费 → 画布建项目/存节点/重载/重命名 → INTAKE 建档 → AI 分析 → 审阅创建分集 → 会诊 → 资产提取 → 拆分镜 → 清理。
@@ -70,35 +72,34 @@ FULL_PAGE=1 node scripts/screenshot.mjs /creation/film-factory/new
 
 ---
 
-## 三、下一步（任务 20–21）—— 接手者从这里开始
+## 三、任务 20–21 交付记录（2026-09-09 完成）
 
-### 任务 20：UI 打磨与性能优化（建议优先）
+### 任务 20：UI 打磨与性能优化 ✅
 
-**目标：** 视觉一致性、加载体验、错误兜底、响应式。
+- [x] 新建 `src/components/shared/LoadingSpinner.tsx`（品牌色旋转 + 文案）
+- [x] 新建 `src/components/shared/ErrorBoundary.tsx`（含 `ErrorFallback`；`src/app/error.tsx` 路由级兜底 + (dashboard) 布局包裹）
+- [x] 新建 `src/components/shared/EmptyState.tsx`，替换画布项目 / 剧本列表 / 分镜区 / 分集列表 / 资产侧栏 / 剧本内容区零散空状态
+- [x] `Skeleton` 统一骨架屏（`shared/skeletons.tsx`：`CardGridSkeleton` / `RowListSkeleton`），并新增 canvas、film-factory、[scriptId]、canvas/[projectId] 四个路由级 `loading.tsx`
+- [x] framer-motion：`shared/motion.tsx`（`FadeIn` 内容入场 + `PageTransition` 路由转场）、精选画廊交错入场、EmptyState 上浮淡入。弹窗出入保留 shadcn/Tailwind data-state 动画（已达标，改动 Radix 结构风险大于收益）
+- [x] 长列表：`hooks/useProgressiveList.ts`（IntersectionObserver 渐进渲染，分集 >100 集自动启用，免依赖）
+- [x] `React.memo` 包裹 `StoryboardCard` / `WorkCard` / `ProjectCard`，父级用 `useCallback`/`useMemo` 稳定回调
+- [x] 图片懒加载：全部 `<img>` 补 `loading="lazy" decoding="async"`
+- [x] 移动端：详情页 < lg 增加「分集 / 资产」Sheet 抽屉入口；底部状态条 `flex-wrap` 防 375px 横向滚动
+- [x] 无障碍复查：icon-only 按钮均有 `aria-label`；BGM 试听按钮改为可区分文案
 
-- [ ] 新建 `src/components/shared/LoadingSpinner.tsx`（品牌色旋转 + 文案）
-- [ ] 新建 `src/components/shared/ErrorBoundary.tsx`（全局错误捕获 + 重试按钮）
-- [ ] 新建 `src/components/shared/EmptyState.tsx`（插画位 + 文案 + CTA），替换各页零散空状态
-- [ ] 用 `Skeleton` 统一各列表页骨架屏（目前画布/影视工厂各自手写了 pulse 块）
-- [ ] 弹窗出入、页面转场加 framer-motion（当前仅靠 Tailwind animate）
-- [ ] 长列表虚拟化（分集数 > 100 时）
-- [ ] `React.memo` 包裹 `StoryboardCard`、`WorkCard`、`ProjectCard`
-- [ ] 图片懒加载（`loading="lazy"`）
-- [ ] 移动端适配复查：`(dashboard)/layout.tsx` 已有抽屉导航，但详情页三栏在 < lg 时隐藏侧栏，需要给移动端补「分集/资产」入口
-- [ ] 无障碍：给所有 icon-only 按钮补 `aria-label`（已大部分完成，需复查）
+**验收：** e2e 26/26；build 后共享 First Load JS 87.3 kB（framer-motion 计入后无显著增长）。
 
-**验收：** `npm run test:e2e` 仍 26/26；`npm run build` 首屏 JS 无显著增长；移动端 375px 宽无横向滚动。
+### 任务 21：文档与部署 ✅
 
-### 任务 21：文档与部署
+- [x] `README.md`：项目介绍、功能、技术栈、快速开始、Docker 部署、目录结构、开发指南、截图占位
+- [x] `docs/setup-guide.md`：环境要求、三种数据库方式、环境变量表、生产构建、10 分钟演练清单、常见问题
+- [x] `docs/api-reference.md`：全部 23 个 route 文件 / 31 个端点的请求、响应、错误码
+- [x] `Dockerfile`（多阶段，standalone 运行层 + 一次性 migrate 层）+ `docker-compose.yml`（PostgreSQL 16 + migrate + app，健康检查与依赖顺序）+ `.dockerignore`
+- [x] `next.config.mjs` 增加 `output: "standalone"`（本地 dev/start 不受影响）
+- [x] 全新环境演练：`git clone → npm ci → db:dev（自动 initdb）→ db:setup → build → start → test:smoke 17/17` ✅
+- [x] 顺带修复：`.eslintrc.json` 内容为 CommonJS 导致 `npm run lint` 报错 → 改名 `.eslintrc.js`；`.pgdata/`、`.screenshots/` 被误提交 → 移出追踪并补齐 `.gitignore`（`db:dev` 缺 `.pgdata` 会自动 initdb，克隆后零手工初始化）
 
-- [x] `AGENTS.md`（开发约定）— 已写
-- [x] `docs/PROGRESS.md`（本文件）— 已写
-- [ ] `README.md`：项目介绍、技术栈、快速开始、目录结构、截图占位
-- [ ] `docs/api-reference.md`：全部 20 个 API 端点的请求/响应/错误码
-- [ ] `Dockerfile` + `docker-compose.yml`（Next.js + PostgreSQL 16）
-- [ ] 全新环境演练：`git clone → npm ci → db:setup → build → start`
-
-**验收：** 新机器按 README 能在 10 分钟内跑起来。
+> 注：本机无 Docker，`docker compose` 未实际构建运行；compose 文件已通过 YAML 校验，依赖的 standalone 构建路径已在演练中验证。
 
 ---
 
@@ -133,6 +134,9 @@ FULL_PAGE=1 node scripts/screenshot.mjs /creation/film-factory/new
 | 画布节点 | `src/components/canvas/nodes/`、`src/stores/useCanvasStore.ts` |
 | 影视工厂详情页 | `src/components/creation/film-factory/detail/ScriptDetailView.tsx` |
 | 测试 | `tests/e2e/`、`scripts/smoke-test.mjs` |
+| 共享 UI 组件 | `src/components/shared/`（LoadingSpinner / ErrorBoundary / EmptyState / motion / skeletons） |
+| 文档 | `docs/setup-guide.md`、`docs/api-reference.md`、根目录 `README.md` |
+| 部署 | `Dockerfile`、`docker-compose.yml`、`.dockerignore`（standalone：`next.config.mjs`） |
 
 ---
 

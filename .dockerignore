@@ -1,0 +1,24 @@
+# 依赖与构建产物在容器内重新获取，不拷贝本地状态
+node_modules
+.next
+out
+
+# 内嵌开发数据库与测试产物（体积大且与镜像无关）
+.pgdata
+.screenshots
+test-results
+playwright-report
+blob-report
+coverage
+
+# 版本库与本地密钥（运行时通过环境变量注入，禁止烤进镜像）
+.git
+.env
+.env.local
+.env*.local
+
+# 杂项
+.DS_Store
+*.pem
+npm-debug.log*
+*.tsbuildinfo

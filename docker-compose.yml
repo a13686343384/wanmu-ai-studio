@@ -1,0 +1,63 @@
+# 万幕生：Next.js 应用 + PostgreSQL 16
+#
+# 用法：
+#   docker compose up --build -d     # 启动（自动迁移 + 种子 + 应用）
+#   docker compose logs -f app       # 等待 "Ready in xx ms" 后访问 http://localhost:3000
+#   docker compose down              # 停止（数据保留在命名卷 wanmusheng-pgdata）
+#
+# 演示账号：demo@wanmusheng.com / demo1234
+# 生产环境务必覆盖 NEXTAUTH_SECRET（与 NEXTAUTH_URL）：
+#   NEXTAUTH_SECRET=$(openssl rand -base64 32) NEXTAUTH_URL=https://your.host docker compose up -d
+
+name: wanmusheng
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wanmusheng
+    volumes:
+      - wanmusheng-pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # 调试方便；纯生产可删除
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wanmusheng"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # 一次性服务：等 db 就绪后执行迁移 + 种子（种子全 upsert，幂等）
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/wanmusheng?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/wanmusheng?schema=public
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-please-change-me-in-production}
+      AI_MODE: ${AI_MODE:-mock}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  wanmusheng-pgdata:
