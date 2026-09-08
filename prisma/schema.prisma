@@ -1,0 +1,384 @@
+// 万幕生 (Manvo TV) — Prisma Schema
+// 数据库：PostgreSQL
+// 运行 `npm run db:migrate` 生成迁移与 Prisma Client
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ============================================================
+   用户与认证（NextAuth 兼容）
+   ============================================================ */
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  tapies        Int       @default(1000) // 积分余额
+  membership    String    @default("free") // free | pro | enterprise
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships WorkspaceMember[]
+  ownedSpaces Workspace[]       @relation("WorkspaceOwner")
+  createdProjects Project[]     @relation("ProjectCreator")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/* ============================================================
+   工作区 / 团队
+   ============================================================ */
+
+model Workspace {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  isPersonal  Boolean @default(false)
+
+  owner   User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members WorkspaceMember[]
+  projects Project[]
+  scripts Script[]
+  canvases Canvas[]
+  joinRequests TeamJoinRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String   @default("member") // owner | admin | member
+  joinedAt    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+/// 申请加入团队（32 位 Team ID 流程）
+model TeamJoinRequest {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  message     String?
+  status      String   @default("pending") // pending | approved | rejected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+/* ============================================================
+   项目 / 画布
+   ============================================================ */
+
+model Project {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  workspaceId String
+  creatorId   String?
+  coverImage  String?
+  status      String  @default("active") // active | archived | deleted
+  folder      String? // 文件夹名（用于“仅文件夹”筛选）
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator   User?     @relation("ProjectCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  canvas    Canvas?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+/// React Flow 画布数据
+model Canvas {
+  id        String  @id @default(cuid())
+  projectId String  @unique
+  workspaceId String?
+  nodes     Json    @default("[]")
+  edges     Json    @default("[]")
+  viewport  Json    @default("{\"x\":0,\"y\":0,\"zoom\":1}")
+  metadata  Json    @default("{}")
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+/* ============================================================
+   剧本（影视工厂核心）
+   ============================================================ */
+
+model Script {
+  id          String  @id @default(cuid())
+  title       String
+  content     String  @db.Text // 原始剧本文本
+  synopsis    String? @db.Text // 简介
+  workspaceId String
+  creatorId   String?
+
+  // AI 推理元信息
+  genre          String? // 题材
+  narrativeStyle String? // 叙事风格
+  visualStyle    String? // 视觉风格
+  costumeStyle   String? // 服化道风格
+  era            String? // 时代背景
+  tone           String? // 基调
+  allowedContent   Json? // 允许内容
+  forbiddenContent Json? // 禁止内容
+
+  // 作品配置
+  workType        String @default("vertical_short")
+  seriesType      String @default("limited")
+  targetAspect    String @default("9:16")
+  totalEpisodes   Int    @default(1)
+  episodeDuration Int    @default(90)
+
+  // 处理配置
+  processingMode String @default("consult_optimize")
+  executionMode  String @default("step_by_step")
+  textModel      String @default("ovlm-6")
+  consultModel   String?
+  dialogueModel  String?
+
+  // 状态
+  status           String @default("intake")
+  processingStatus String @default("idle")
+  progress         Int    @default(0) // 0-100
+  progressLabel    String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  episodes      Episode[]
+  characters    Character[]
+  scenes        Scene[]
+  props         Prop[]
+  consultations Consultation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([processingStatus])
+}
+
+model Episode {
+  id       String @id @default(cuid())
+  scriptId String
+  number   Int
+  title    String
+  content  String @db.Text
+  summary  String? @db.Text
+  duration Int    @default(90)
+  style    String? // 单集风格，null 表示跟随全剧
+  status   String @default("draft") // draft | outlined | assets_ready | storyboarded | video_ready | completed
+
+  script      Script       @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  storyboards Storyboard[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scriptId, number])
+  @@index([scriptId])
+}
+
+/* ---------------------- 资产：角色 / 妆造 / 场景 / 道具 ---------------------- */
+
+model Character {
+  id          String  @id @default(cuid())
+  scriptId    String
+  name        String
+  description String  @db.Text
+  appearance  String? @db.Text
+  personality String? @db.Text
+  imageUrl    String?
+  prompt      String? @db.Text
+  status      String  @default("pending") // pending | generating | completed | failed
+
+  script   Script    @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  costumes Costume[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scriptId])
+}
+
+model Costume {
+  id          String  @id @default(cuid())
+  characterId String
+  name        String
+  description String  @db.Text
+  imageUrl    String?
+  prompt      String? @db.Text
+  status      String  @default("pending")
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([characterId])
+}
+
+model Scene {
+  id          String  @id @default(cuid())
+  scriptId    String
+  name        String
+  description String  @db.Text
+  environment String? @db.Text
+  lighting    String?
+  imageUrl    String?
+  prompt      String? @db.Text
+  status      String  @default("pending")
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scriptId])
+}
+
+model Prop {
+  id          String  @id @default(cuid())
+  scriptId    String
+  name        String
+  description String  @db.Text
+  imageUrl    String?
+  prompt      String? @db.Text
+  status      String  @default("pending")
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scriptId])
+}
+
+/* ---------------------------- 分镜 ---------------------------- */
+
+model Storyboard {
+  id        String  @id @default(cuid())
+  episodeId String
+  number    Int
+  shotType  String  @default("中景") // 近景 | 中景 | 远景 | 特写 | 全景
+  description String @db.Text
+  dialogue  String? @db.Text
+  action    String? @db.Text
+  camera    String? // 运镜
+  duration  Float?
+
+  // 生成产物
+  imageUrl String?
+  videoUrl String?
+  audioUrl String?
+
+  // 生成参数
+  prompt         String? @db.Text
+  negativePrompt String? @db.Text
+  model          String?
+  generationParams Json?
+
+  status String @default("pending") // pending | generating | completed | failed
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([episodeId, number])
+  @@index([episodeId])
+}
+
+/* ---------------------------- 会诊 ---------------------------- */
+
+model Consultation {
+  id       String @id @default(cuid())
+  scriptId String
+  type     String // diagnosis | dialogue_optimization | review
+  input    String @db.Text
+  output   String @db.Text
+  suggestions Json // [{ id, text, accepted }]
+  model    String
+  status   String @default("pending") // pending | completed | applied
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scriptId])
+}
