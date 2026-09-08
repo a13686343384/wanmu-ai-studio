@@ -45,3 +45,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# embedded dev database & screenshots (AGENTS.md: 不要提交)
+/.pgdata/
+/.screenshots/
