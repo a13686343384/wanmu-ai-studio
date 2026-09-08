@@ -48,7 +48,7 @@ for (const route of routes) {
   await page.waitForTimeout(900)
 
   const file = resolve(OUT_DIR, fileNameFor(route))
-  await page.screenshot({ path: file, fullPage: false })
+  await page.screenshot({ path: file, fullPage: process.env.FULL_PAGE === "1" })
   console.log(`✓ ${route} → .screenshots/${fileNameFor(route)}`)
 }
 

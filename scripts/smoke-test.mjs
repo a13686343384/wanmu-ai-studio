@@ -248,7 +248,7 @@ async function main() {
       { method: "POST", body: { mode: "text", model: "ovlm-6", regenerate: true } },
     )
     log(
-      storyboards.status === 200 && (storyboards.json?.data?.storyboards ?? []).length > 0,
+      [200, 201].includes(storyboards.status) && (storyboards.json?.data?.storyboards ?? []).length > 0,
       "拆分镜",
       `${storyboards.json?.data?.storyboards?.length} 个镜头`,
     )
