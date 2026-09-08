@@ -111,8 +111,8 @@ test.describe("影视工厂", () => {
 
     await expect(page).toHaveURL(/\/creation\/film-factory\/[a-z0-9]+/i, { timeout: 60_000 })
     await expect(page.getByText(title, { exact: true })).toBeVisible()
-    await expect(page.getByText("分集列表")).toBeVisible()
-    await expect(page.getByText("全局资产")).toBeVisible()
+    await expect(page.getByText("分集", { exact: true })).toBeVisible()
+    await expect(page.getByText("全剧资产")).toBeVisible()
   })
 
   test("详情页展示工作流、分集与分镜区", async ({ page }) => {
@@ -120,12 +120,13 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await expect(page.getByRole("button", { name: /剧本会诊/ })).toBeVisible()
+    await expect(page.getByRole("button", { name: /^会诊/ })).toBeVisible()
     await expect(page.getByText("剧本内容")).toBeVisible()
     await expect(page.getByText("尚未拆分镜")).toBeVisible()
     await expect(page.getByText("先让 AI 复述理解本集").first()).toBeVisible()
     await expect(page.getByText(/单集时长/)).toBeVisible()
-    await expect(page.getByText("全局资产")).toBeVisible()
+    await expect(page.getByText("全剧资产")).toBeVisible()
+    await expect(page.getByRole("button", { name: /下一步/ }).first()).toBeVisible()
   })
 
   test("剧本会诊弹窗可以出具诊断报告", async ({ page }) => {
@@ -133,7 +134,7 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await page.getByRole("button", { name: /剧本会诊/ }).click()
+    await page.getByRole("button", { name: /^会诊/ }).click()
     await page.getByRole("button", { name: /开始会诊/ }).click()
 
     await expect(page.getByText("诊断报告", { exact: true }).first()).toBeVisible({ timeout: 40_000 })

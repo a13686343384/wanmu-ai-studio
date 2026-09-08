@@ -116,7 +116,7 @@ export function AssetSidebar({
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-2">
         <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-          全局资产
+          全剧资产
         </span>
         <Button
           variant="ghost"

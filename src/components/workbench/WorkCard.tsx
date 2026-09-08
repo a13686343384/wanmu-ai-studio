@@ -9,7 +9,7 @@ import type { FeaturedWork } from "@/lib/mock-data/featured-works"
 
 /**
  * 精选作品卡片。
- * 结构：封面（含类型标签 / 序号 / 播放按钮）+ 标题 + 描述。
+ * 结构：封面（左上类型标签 + 序号、右上时长、居中常显播放按钮）+ 下方标题与描述。
  */
 export const WorkCard = memo(function WorkCard({ work, total }: { work: FeaturedWork; total: number }) {
   const cover = makePoster(work.title, work.seed, work.aspectRatio)
@@ -34,26 +34,27 @@ export const WorkCard = memo(function WorkCard({ work, total }: { work: Featured
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
 
-        <Badge
-          variant="muted"
-          className="absolute left-3 top-3 border-white/10 bg-black/50 text-[10px] text-zinc-200 backdrop-blur"
-        >
-          {work.category}
-        </Badge>
+        <div className="absolute left-3 top-3 flex items-center gap-2">
+          <Badge
+            variant="muted"
+            className="border-white/10 bg-black/50 text-[10px] text-zinc-200 backdrop-blur"
+          >
+            {work.category}
+          </Badge>
+          <span className="text-[10px] tabular-nums text-zinc-300/80">
+            {String(work.index).padStart(2, "0")} / {String(total).padStart(2, "0")}
+          </span>
+        </div>
 
-        <span className="absolute bottom-3 left-3 text-[11px] tabular-nums text-zinc-300/80">
-          {String(work.index).padStart(2, "0")} / {String(total).padStart(2, "0")}
-        </span>
-
-        <span className="absolute bottom-3 right-3 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-300 backdrop-blur">
+        <span className="absolute right-3 top-3 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-300 backdrop-blur">
           {work.duration}
         </span>
 
-        <div className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-lg transition-transform duration-300 group-hover:scale-105">
+        <span className="absolute inset-y-0 right-4 flex items-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-lg transition-transform duration-300 group-hover:scale-110">
             <Play className="ml-0.5 h-4 w-4 fill-current" />
           </span>
-        </div>
+        </span>
       </div>
 
       <div className="space-y-1 p-4">

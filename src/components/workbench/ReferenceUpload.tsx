@@ -21,15 +21,15 @@ const KIND_ICON = {
 } as const
 
 /**
- * 参考素材上传区。
- * 支持点击选择与拖拽上传，已上传素材以缩略图形式展示，可单独移除。
+ * 参考素材上传入口：面板左侧的虚线方块（拖拽 / 点击上传）。
+ * 已上传素材由 `ReferenceThumbnails` 在提示词下方展示。
  */
 export function ReferenceUpload() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const references = useWorkbenchStore((s) => s.references)
   const addReferences = useWorkbenchStore((s) => s.addReferences)
-  const removeReference = useWorkbenchStore((s) => s.removeReference)
+  const mediaType = useWorkbenchStore((s) => s.mediaType)
 
   function ingest(files: FileList | File[]) {
     const list = Array.from(files).slice(0, MAX_FILES - references.length)
@@ -45,10 +45,14 @@ export function ReferenceUpload() {
 
   return (
     <div
-      className={cn(
-        "flex flex-wrap items-center gap-2 rounded-xl border border-dashed p-2.5 transition-colors",
-        dragging ? "border-orange-500 bg-orange-500/5" : "border-zinc-800 bg-zinc-900/40",
-      )}
+      data-testid="reference-upload"
+      role="button"
+      tabIndex={0}
+      aria-label="上传参考素材"
+      onClick={() => inputRef.current?.click()}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") inputRef.current?.click()
+      }}
       onDragOver={(event) => {
         event.preventDefault()
         setDragging(true)
@@ -59,6 +63,12 @@ export function ReferenceUpload() {
         setDragging(false)
         if (event.dataTransfer.files.length) ingest(event.dataTransfer.files)
       }}
+      className={cn(
+        "flex h-[84px] w-[84px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 self-start rounded-lg border border-dashed transition-colors",
+        dragging
+          ? "border-orange-500 bg-orange-500/5 text-orange-400"
+          : "border-zinc-700 bg-zinc-900/40 text-zinc-500 hover:border-orange-500/60 hover:text-orange-400",
+      )}
     >
       <input
         ref={inputRef}
@@ -72,22 +82,29 @@ export function ReferenceUpload() {
         }}
       />
 
-      <button
-        type="button"
-        data-testid="reference-upload"
-        onClick={() => inputRef.current?.click()}
-        className="flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-700 text-zinc-500 transition-colors hover:border-orange-500/60 hover:text-orange-400"
-      >
-        <Plus className="h-4 w-4" />
-        <span className="text-[11px]">参考图</span>
-      </button>
+      <Plus className="h-4 w-4" />
+      <span className="px-1 text-center text-[11px] leading-tight">
+        {mediaType === "image" ? "参考图" : "参考内容"}
+      </span>
+    </div>
+  )
+}
 
+/** 已上传参考素材的缩略图行（空时不渲染）。 */
+export function ReferenceThumbnails() {
+  const references = useWorkbenchStore((s) => s.references)
+  const removeReference = useWorkbenchStore((s) => s.removeReference)
+
+  if (references.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-2 border-t border-zinc-800/60 px-3 pb-2.5 pt-2">
       {references.map((asset) => {
         const Icon = KIND_ICON[asset.kind]
         return (
           <div
             key={asset.id}
-            className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+            className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
           >
             {asset.kind === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -117,14 +134,6 @@ export function ReferenceUpload() {
           </div>
         )
       })}
-
-      {references.length === 0 && (
-        <p className="px-2 text-xs leading-relaxed text-zinc-600">
-          上传参考图、参考视频或参考音频
-          <br />
-          可自由组合图、文、音、视频
-        </p>
-      )}
     </div>
   )
 }

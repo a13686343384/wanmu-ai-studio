@@ -4,7 +4,7 @@ import { useCallback } from "react"
 import { AlertCircle, Play } from "lucide-react"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
-import { ReferenceUpload } from "@/components/workbench/ReferenceUpload"
+import { ReferenceUpload, ReferenceThumbnails } from "@/components/workbench/ReferenceUpload"
 import { PromptInput } from "@/components/workbench/PromptInput"
 import { ParameterBar } from "@/components/workbench/ParameterBar"
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore"
@@ -21,7 +21,7 @@ const STAGES: Record<string, string[]> = {
  */
 export function GenerationPanel() {
   const store = useWorkbenchStore()
-  const { mediaType, prompt, modelId, references, aspectRatio, resolution, duration, count, style } =
+  const { mediaType, prompt, modelId, references, aspectRatio, resolution, duration, count, style, smartLyrics } =
     store
 
   const run = useCallback(async () => {
@@ -53,6 +53,7 @@ export function GenerationPanel() {
           duration,
           count,
           style,
+          smartLyrics,
           references: references.map((r) => ({ name: r.name, kind: r.kind })),
         }),
       })
@@ -93,15 +94,18 @@ export function GenerationPanel() {
     duration,
     count,
     style,
+    smartLyrics,
     store,
   ])
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl backdrop-blur">
-      <div className="space-y-3 p-3">
-        <ReferenceUpload />
+      <div className={mediaType === "audio" ? "p-3" : "flex items-start gap-3 p-3"}>
+        {mediaType !== "audio" && <ReferenceUpload />}
         <PromptInput />
       </div>
+
+      <ReferenceThumbnails />
 
       {store.isGenerating && (
         <div className="space-y-1.5 border-t border-zinc-800/80 px-3 py-2.5">

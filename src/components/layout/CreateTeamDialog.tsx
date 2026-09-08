@@ -68,24 +68,16 @@ export function CreateTeamDialog({
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="team-name">团队名称</Label>
+            <Label htmlFor="team-name" className="sr-only">
+              团队名称
+            </Label>
             <Input id="team-name" placeholder="请输入团队名称" {...form.register("name")} />
             {form.formState.errors.name && (
               <p className="text-xs text-rose-400">{form.formState.errors.name.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="team-desc">团队简介（可选）</Label>
-            <Input
-              id="team-desc"
-              placeholder="一句话说明这个团队做什么"
-              {...form.register("description")}
-            />
-            {form.formState.errors.description && (
-              <p className="text-xs text-rose-400">{form.formState.errors.description.message}</p>
-            )}
-          </div>
+          <input type="hidden" {...form.register("description")} />
 
           <DialogFooter>
             <Button

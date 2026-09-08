@@ -158,7 +158,7 @@ export const ProjectCard = memo(function ProjectCard({
             />
             {project.itemCount > 0 && (
               <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-300 backdrop-blur">
-                {project.itemCount} 节点
+                {project.itemCount} 个项目
               </span>
             )}
           </div>

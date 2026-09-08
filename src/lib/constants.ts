@@ -170,7 +170,7 @@ export const AUDIO_MODELS: readonly AIModel[] = [
 export const VIDEO_FEATURES = [
   {
     id: "reference-to-video",
-    name: "全能参考生视频",
+    name: "全能参考视频",
     description: "自由组合图片 + ≤15s 视频 + ≤15s 音频",
   },
   {

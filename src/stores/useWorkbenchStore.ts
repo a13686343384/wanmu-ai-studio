@@ -41,6 +41,8 @@ interface WorkbenchState {
   duration: string
   count: number
   style: string | null
+  /** 音频模式：智能歌词 / 纯音乐 */
+  smartLyrics: boolean
   prompt: string
   references: ReferenceAsset[]
   isGenerating: boolean
@@ -56,6 +58,7 @@ interface WorkbenchState {
   setDuration: (value: string) => void
   setCount: (value: number) => void
   setStyle: (value: string | null) => void
+  setSmartLyrics: (value: boolean) => void
   setPrompt: (value: string) => void
   addReferences: (assets: ReferenceAsset[]) => void
   removeReference: (id: string) => void
@@ -91,6 +94,7 @@ const initialState = {
   duration: "5s",
   count: 1,
   style: null,
+  smartLyrics: true,
   prompt: "",
   references: [] as ReferenceAsset[],
   isGenerating: false,
@@ -125,6 +129,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set, get) => ({
   setDuration: (duration) => set({ duration }),
   setCount: (count) => set({ count }),
   setStyle: (style) => set({ style }),
+  setSmartLyrics: (smartLyrics) => set({ smartLyrics }),
   setPrompt: (prompt) => set({ prompt }),
 
   addReferences: (assets) =>

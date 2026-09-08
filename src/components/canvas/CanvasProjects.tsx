@@ -347,8 +347,9 @@ export function CanvasProjects() {
           </Button>
 
           {scope === "team" && (
-            <Button variant="ghost" size="icon-sm" aria-label="团队管理">
+            <Button variant="ghost" size="sm" className="h-8">
               <Settings2 className="h-4 w-4 text-zinc-400" />
+              团队管理
             </Button>
           )}
         </div>

@@ -27,12 +27,16 @@ function isNavActive(pathname: string, href: string) {
  * 全局顶部导航栏。
  * 左侧：品牌 + 主导航（工作台 / 画布 / 创作中心 / 插件 / 联系我们）
  * 右侧：工作区切换、积分、会员升级、帮助、通知、头像
+ * 影视工厂详情页为沉浸式全屏布局，此导航自动隐藏。
  */
 export function NavBar() {
   useSyncAuth()
   const pathname = usePathname()
   const [createTeamOpen, setCreateTeamOpen] = useState(false)
   const [joinTeamOpen, setJoinTeamOpen] = useState(false)
+
+  const immersive = /^\/creation\/film-factory\/[^/]+$/.test(pathname)
+  if (immersive) return null
 
   return (
     <>

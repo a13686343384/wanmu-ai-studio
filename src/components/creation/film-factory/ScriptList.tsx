@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  ArrowDown,
+  Bot,
   ChevronDown,
   Clapperboard,
-  Info,
   ListChecks,
   Plus,
   Search,
@@ -39,7 +40,7 @@ import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
-import { RowListSkeleton } from "@/components/shared/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { ScriptSummary } from "@/lib/serializers/script"
 
 type SortKey = "updated" | "created" | "title"
@@ -61,6 +62,7 @@ export function ScriptList() {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<SortKey>("updated")
   const [deleting, setDeleting] = useState<ScriptSummary | null>(null)
+  const [hintOpen, setHintOpen] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -141,12 +143,14 @@ export function ScriptList() {
 
   function Section({
     title,
+    tag,
     count,
     hint,
     items,
     dot,
   }: {
     title: string
+    tag: string
     count: number
     hint: string
     items: ScriptSummary[]
@@ -158,12 +162,16 @@ export function ScriptList() {
       <section className="mt-6">
         <div className="mb-2.5 flex items-center gap-2">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-300">
-            {String(count).padStart(2, "0")} {title}
-          </h2>
-          <span className="text-[11px] text-zinc-500">{hint}</span>
+          <h2 className="text-xs font-medium tracking-wider text-zinc-300">{title}</h2>
+          <span className="text-xs font-medium tabular-nums text-zinc-400">
+            {String(count).padStart(2, "0")}
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            {tag}
+          </span>
+          <span className="text-[11px] text-zinc-600">· {hint}</span>
         </div>
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((script) => (
             <ScriptCard key={script.id} script={script} onDelete={setDeleting} />
           ))}
@@ -176,10 +184,23 @@ export function ScriptList() {
     <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
       <FactoryHeader counts={counts} />
 
-      {/* 提示条 */}
+      {/* 提示条（可折叠） */}
       <div className="mt-5 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-400">
-        <Info className="h-3.5 w-3.5 shrink-0 text-sky-400" />
-        这是「专业影视级」创作线，和剧本工厂不是一回事 —— 影视工厂按分集逐步打磨，适合正式成片。
+        <Bot className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+        {hintOpen && (
+          <span>
+            这是「专业影视级」创作线，和剧本工厂不是一回事
+            ——影视工厂按分集逐步打磨，适合正式成片。
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setHintOpen((value) => !value)}
+          className="ml-auto rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-200"
+          aria-label={hintOpen ? "收起提示" : "展开提示"}
+        >
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${hintOpen ? "" : "-rotate-90"}`} />
+        </button>
       </div>
 
       {/* 工具条 */}
@@ -197,6 +218,7 @@ export function ScriptList() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8">
+              <ArrowDown className="h-3.5 w-3.5" />
               {SORT_LABEL[sort]}
               <ChevronDown className="h-3 w-3" />
             </Button>
@@ -221,8 +243,13 @@ export function ScriptList() {
             <ListChecks className="h-3.5 w-3.5" />
             任务队列
           </Button>
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => void stopAll()}>
-            <Square className="h-3.5 w-3.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-zinc-400 hover:text-rose-300"
+            onClick={() => void stopAll()}
+          >
+            <Square className="h-3.5 w-3.5 fill-current text-rose-400" />
             停止全部
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={() => toast.info("导入剧本", { description: "支持 txt / docx，即将上线" })}>
@@ -240,8 +267,13 @@ export function ScriptList() {
 
       {/* 列表 */}
       {loading ? (
-        <div className="mt-6">
-          <RowListSkeleton count={3} />
+        <div
+          className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          aria-busy="true"
+        >
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-[212px] rounded-xl" />
+          ))}
         </div>
       ) : sorted.length === 0 ? (
         <div className="mt-6">
@@ -262,21 +294,24 @@ export function ScriptList() {
       ) : (
         <FadeIn key={query}>
           <Section
-            title="In Production"
+            title="制作中"
+            tag="RUNNING"
             count={inProduction.length}
             hint="机器在跑"
             items={inProduction}
             dot="bg-amber-400 animate-pulse"
           />
           <Section
-            title="Ready"
+            title="待描述"
+            tag="READY"
             count={ready.length}
             hint="等你下一步"
             items={ready}
             dot="bg-sky-400"
           />
           <Section
-            title="Completed"
+            title="已完成"
+            tag="DONE"
             count={completed.length}
             hint="已交付"
             items={completed}

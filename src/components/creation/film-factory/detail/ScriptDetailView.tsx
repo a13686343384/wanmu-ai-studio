@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { LayoutGrid, ListVideo, Package, Sparkles, Video } from "lucide-react"
+import { ListVideo, Package, Sparkles, Video, Wand2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ScriptDetailHeader } from "@/components/creation/film-factory/detail/ScriptDetailHeader"
 import { WorkflowTabs } from "@/components/creation/film-factory/detail/WorkflowTabs"
+import { EpisodeStrip } from "@/components/creation/film-factory/detail/EpisodeStrip"
 import { EpisodeList } from "@/components/creation/film-factory/detail/EpisodeList"
 import { ScriptContent } from "@/components/creation/film-factory/detail/ScriptContent"
 import { AssetSidebar } from "@/components/creation/film-factory/detail/AssetSidebar"
@@ -22,9 +23,19 @@ import { PostProductionPanel } from "@/components/creation/film-factory/post/Pos
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
 import type { ScriptDetail } from "@/lib/serializers/script"
 
+/** 各阶段对应的「下一步」动作文案与触发器。 */
+const NEXT_STEP_LABEL: Record<string, string> = {
+  intake: "下一步 · 剧本大纲",
+  outlining: "下一步 · 出人物/场景资产",
+  assets: "下一步 · 出人物/场景资产",
+  storyboarding: "下一步 · 拆分镜",
+  video: "下一步 · 出视频",
+  post_production: "下一步 · 后期合成",
+}
+
 /**
- * 剧本详情页主视图。
- * 三栏布局：分集列表 / 剧本内容 + 分镜 / 资产侧边栏。
+ * 剧本详情页主视图（沉浸式全屏布局，与设计稿一致）：
+ * 顶部返回条 → 工作流步骤条 → 分集胶片条 → 剧本内容 | 分镜 左右分栏 → 右侧资产栏 → 底部状态条。
  * 负责协调会诊、复述理解、拆分镜与分镜产物生成等全部交互。
  */
 export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetail }) {
@@ -53,7 +64,7 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
   const [videoBatchOpen, setVideoBatchOpen] = useState(false)
   const [postOpen, setPostOpen] = useState(false)
 
-  // 移动端（< lg）隐藏左右两栏，用抽屉承载分集列表与资产侧栏
+  // 移动端（< lg）隐藏资产栏与内容分栏，用抽屉承载分集与资产
   const [episodesSheetOpen, setEpisodesSheetOpen] = useState(false)
   const [assetsSheetOpen, setAssetsSheetOpen] = useState(false)
 
@@ -178,97 +189,99 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
     [],
   )
 
+  function runNextStep() {
+    switch (script.status) {
+      case "intake":
+      case "outlining":
+      case "assets":
+        void reloadScript()
+        toast.info("资产提取", { description: "点击右上角刷新按钮从剧本提取人物/场景/道具" })
+        setAssetsSheetOpen(false)
+        break
+      case "storyboarding":
+        setSplitOpen(true)
+        break
+      case "video":
+        setVideoBatchOpen(true)
+        break
+      default:
+        setPostOpen(true)
+    }
+  }
+
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+    <div className="flex h-screen flex-col">
       <ScriptDetailHeader
         script={script}
         onConsult={() => setConsultOpen(true)}
         onGenerateCover={() => void generateCover()}
+        onRefresh={() => void reloadScript()}
       />
 
       <WorkflowTabs
-        status={script.status}
+        script={script}
         processing={script.processingStatus}
         counts={{ episodes: script.episodes.length, assets: totalAssets, storyboards: storyboards.length }}
       />
 
-      {/* 移动端分集 / 资产入口（< lg 时左右两栏隐藏） */}
-      <div className="flex items-center gap-2 border-b border-zinc-800/80 bg-zinc-950 px-3 py-2 lg:hidden">
-        <Sheet open={episodesSheetOpen} onOpenChange={setEpisodesSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7">
-              <ListVideo className="h-3.5 w-3.5" />
-              分集 {script.episodes.length}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0">
-            <SheetTitle className="sr-only">分集列表</SheetTitle>
-            <EpisodeList
-              episodes={script.episodes}
-              activeId={activeEpisodeId}
-              onSelect={handleSelectEpisode}
-            />
-          </SheetContent>
-        </Sheet>
+      <div className="flex min-h-0 flex-1">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* 分集胶片条 */}
+          <section className="border-b border-zinc-800/80 bg-zinc-950/40 px-3 pb-1 pt-2">
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-[11px] font-medium tracking-wider text-zinc-400">
+                分集
+              </span>
+              <span className="text-[11px] tabular-nums text-zinc-600">
+                {script.episodes.length} 集
+              </span>
 
-        <Sheet open={assetsSheetOpen} onOpenChange={setAssetsSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7">
-              <Package className="h-3.5 w-3.5" />
-              资产 {totalAssets}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-80 p-0">
-            <SheetTitle className="sr-only">全局资产</SheetTitle>
-            {/* pt-10 避开 Sheet 右上角的关闭按钮，防止与刷新按钮重叠 */}
-            <div className="h-full pt-10">
-              <AssetSidebar
-                scriptId={script.id}
-                characters={script.characters}
-                scenes={script.scenes}
-                props={script.props}
-                onRefresh={() => void reloadScript()}
+              <div className="ml-auto flex items-center gap-1.5">
+                <Button variant="brand" size="sm" className="h-7" onClick={runNextStep}>
+                  <Wand2 className="h-3.5 w-3.5" />
+                  {NEXT_STEP_LABEL[script.status] ?? "下一步"}
+                </Button>
+                <Button variant="outline" size="sm" className="h-7" asChild>
+                  <Link href="/canvas">打通到画布</Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="hidden lg:block">
+              <EpisodeStrip
+                episodes={script.episodes}
+                activeId={activeEpisodeId}
+                onSelect={setActiveEpisodeId}
               />
             </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
-        {/* 左：分集列表 */}
-        <aside className="hidden min-h-0 border-r border-zinc-800/80 bg-zinc-950/40 lg:block">
-          <EpisodeList
-            episodes={script.episodes}
-            activeId={activeEpisodeId}
-            onSelect={setActiveEpisodeId}
-          />
-        </aside>
-
-        {/* 中：剧本内容 + 分镜 */}
-        <main className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section className="min-h-0 border-b border-zinc-800/80">
-            <ScriptContent episode={activeEpisode} onSaved={() => void reloadScript()} />
           </section>
-          <section className="min-h-0">
-            <StoryboardSection
-              storyboards={storyboards}
-              loading={storyboardsLoading}
-              busyId={busyId}
-              generating={generating}
-              progress={progress}
-              progressLabel={progressLabel}
-              hasEpisode={Boolean(activeEpisode)}
-              onSplit={handleSplit}
-              onRecap={handleRecap}
-              onGenerateImage={handleGenerateImage}
-              onGenerateVideo={handleGenerateVideo}
-              onEdit={handleEditStoryboard}
-            />
-          </section>
+
+          {/* 内容区：剧本内容 | 分镜 */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)] xl:grid-rows-1">
+            <section className="min-h-0 border-b border-zinc-800/80 xl:border-b-0 xl:border-r">
+              <ScriptContent episode={activeEpisode} onSaved={() => void reloadScript()} />
+            </section>
+            <section className="min-h-0">
+              <StoryboardSection
+                storyboards={storyboards}
+                loading={storyboardsLoading}
+                busyId={busyId}
+                generating={generating}
+                progress={progress}
+                progressLabel={progressLabel}
+                hasEpisode={Boolean(activeEpisode)}
+                onSplit={handleSplit}
+                onRecap={handleRecap}
+                onGenerateImage={handleGenerateImage}
+                onGenerateVideo={handleGenerateVideo}
+                onEdit={handleEditStoryboard}
+              />
+            </section>
+          </div>
         </main>
 
         {/* 右：资产侧边栏 */}
-        <aside className="hidden min-h-0 border-l border-zinc-800/80 bg-zinc-950/40 lg:block">
+        <aside className="hidden min-h-0 w-[300px] shrink-0 border-l border-zinc-800/80 bg-zinc-950/40 lg:block">
           <AssetSidebar
             scriptId={script.id}
             characters={script.characters}
@@ -309,12 +322,46 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
             <Sparkles className="h-3.5 w-3.5" />
             后期合成
           </Button>
-          <Button variant="ghost" size="sm" className="h-7" asChild>
-            <Link href="/canvas">
-              <LayoutGrid className="h-3.5 w-3.5" />
-              打通到画布
-            </Link>
-          </Button>
+
+          {/* 移动端分集 / 资产入口（< lg 时两栏隐藏） */}
+          <Sheet open={episodesSheetOpen} onOpenChange={setEpisodesSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 lg:hidden">
+                <ListVideo className="h-3.5 w-3.5" />
+                分集 {script.episodes.length}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0">
+              <SheetTitle className="sr-only">分集列表</SheetTitle>
+              <EpisodeList
+                episodes={script.episodes}
+                activeId={activeEpisodeId}
+                onSelect={handleSelectEpisode}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={assetsSheetOpen} onOpenChange={setAssetsSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 lg:hidden">
+                <Package className="h-3.5 w-3.5" />
+                资产 {totalAssets}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 p-0">
+              <SheetTitle className="sr-only">全剧资产</SheetTitle>
+              {/* pt-10 避开 Sheet 右上角的关闭按钮，防止与刷新按钮重叠 */}
+              <div className="h-full pt-10">
+                <AssetSidebar
+                  scriptId={script.id}
+                  characters={script.characters}
+                  scenes={script.scenes}
+                  props={script.props}
+                  onRefresh={() => void reloadScript()}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 

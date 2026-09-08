@@ -1,8 +1,9 @@
 "use client"
 
-import { Check, Circle, Loader2 } from "lucide-react"
+import { Check, Circle, History, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WORKFLOW_STAGES } from "@/lib/constants"
+import type { ScriptDetail } from "@/lib/serializers/script"
 
 const STAGE_ORDER = WORKFLOW_STAGES.map((s) => s.key)
 
@@ -13,69 +14,80 @@ function stageIndex(status: string) {
 }
 
 /**
- * 工作流阶段标签栏：建档 → 剧本大纲 → 人物/场景 → 拆分镜 → 视频 → 后期。
- * 已完成的阶段打勾，当前阶段高亮，未开始为灰色。
+ * 工作流步骤条（与设计稿一致）：
+ * 左侧为剧本元信息（剧型 / 集数 / 历史），右侧为 ①建档 → ②剧本大纲 → … 的横向步骤。
+ * 已完成阶段绿色打勾，当前阶段橙色高亮，未开始灰色。
  */
 export function WorkflowTabs({
-  status,
+  script,
   processing,
   counts,
 }: {
-  status: string
+  script: Pick<ScriptDetail, "status" | "processingStatus" | "seriesType" | "totalEpisodes" | "updatedAt">
   processing: string
   counts: { episodes: number; assets: number; storyboards: number }
 }) {
-  const current = stageIndex(status)
+  const current = stageIndex(script.status)
 
   return (
-    <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-800/80 bg-zinc-950/60 px-4 py-2">
-      {WORKFLOW_STAGES.map((stage, index) => {
-        const done = index < current
-        const active = index === current
-        const running = active && processing === "processing"
+    <div className="flex items-center gap-4 overflow-x-auto border-b border-zinc-800/80 bg-zinc-950/60 px-4 py-2">
+      {/* 剧本元信息 */}
+      <div className="flex shrink-0 items-center gap-2 border-r border-zinc-800/80 pr-4 text-[11px] text-zinc-500">
+        <span>{script.seriesType === "limited" ? "限定剧" : "连载剧"}</span>
+        <span className="text-zinc-700">·</span>
+        <span>{counts.episodes || script.totalEpisodes} 集</span>
+        <span className="flex items-center gap-1 text-zinc-600">
+          <History className="h-3 w-3" />
+          更新于 {script.updatedAt.slice(5, 16).replace("T", " ")}
+        </span>
+      </div>
 
-        return (
-          <div key={stage.key} className="flex items-center">
-            <div
-              className={cn(
-                "flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs transition-colors",
-                active
-                  ? "bg-zinc-800 text-zinc-100"
-                  : done
-                    ? "text-zinc-400"
-                    : "text-zinc-600",
-              )}
-            >
-              <span
+      {/* 步骤条 */}
+      <div className="flex items-center">
+        {WORKFLOW_STAGES.map((stage, index) => {
+          const done = index < current
+          const active = index === current
+          const running = active && processing === "processing"
+          const isLast = index === WORKFLOW_STAGES.length - 1
+
+          return (
+            <div key={stage.key} className="flex items-center">
+              <div
                 className={cn(
-                  "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
-                  done
-                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
-                    : active
-                      ? "border-orange-500/60 bg-orange-500/15 text-orange-400"
-                      : "border-zinc-700",
+                  "flex items-center gap-1.5 whitespace-nowrap text-xs transition-colors",
+                  active ? "font-medium text-orange-300" : done ? "text-zinc-400" : "text-zinc-600",
                 )}
               >
-                {done ? (
-                  <Check className="h-2 w-2" />
-                ) : running ? (
-                  <Loader2 className="h-2 w-2 animate-spin" />
-                ) : (
-                  <Circle className="h-1 w-1 fill-current" />
-                )}
-              </span>
-              {stage.label}
+                <span
+                  className={cn(
+                    "flex h-[18px] w-[18px] items-center justify-center rounded-full border text-[10px] tabular-nums",
+                    active
+                      ? "border-orange-500 bg-orange-500 text-zinc-950"
+                      : done
+                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-400"
+                        : "border-zinc-700 text-zinc-600",
+                  )}
+                >
+                  {done ? (
+                    <Check className="h-2.5 w-2.5" />
+                  ) : running ? (
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  ) : active ? (
+                    index + 1
+                  ) : (
+                    <Circle className="h-1 w-1 fill-current" />
+                  )}
+                </span>
+                {stage.label}
+              </div>
+
+              {!isLast && <span className="mx-2 h-px w-7 bg-zinc-800" aria-hidden />}
             </div>
+          )
+        })}
+      </div>
 
-            {index < WORKFLOW_STAGES.length - 1 && (
-              <span className="mx-0.5 h-px w-4 bg-zinc-800" />
-            )}
-          </div>
-        )
-      })}
-
-      <div className="ml-auto flex items-center gap-3 whitespace-nowrap pl-4 text-[11px] text-zinc-600">
-        <span>分集 {counts.episodes}</span>
+      <div className="ml-auto hidden shrink-0 items-center gap-3 whitespace-nowrap pl-4 text-[11px] text-zinc-600 md:flex">
         <span>资产 {counts.assets}</span>
         <span>分镜 {counts.storyboards}</span>
       </div>

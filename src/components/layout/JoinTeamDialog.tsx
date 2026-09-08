@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { joinTeamSchema, type JoinTeamInput } from "@/lib/validations/workspace"
 
 /**
@@ -80,9 +79,8 @@ export function JoinTeamDialog({
 
           <div className="space-y-2">
             <Label htmlFor="team-message">申请留言（可选）</Label>
-            <Textarea
+            <Input
               id="team-message"
-              rows={3}
               placeholder="如：Hi 我是新来的设计师"
               {...form.register("message")}
             />

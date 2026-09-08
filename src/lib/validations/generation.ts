@@ -15,6 +15,8 @@ export const generateRequestSchema = z.object({
   duration: z.string().default("5s"),
   count: z.number().int().min(1).max(4).default(1),
   style: z.string().nullable().optional(),
+  /** 音频模式：智能歌词 / 纯音乐 */
+  smartLyrics: z.boolean().optional(),
   references: z.array(referenceSchema).max(12).default([]),
 })
 

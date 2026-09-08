@@ -31,12 +31,12 @@ export function NewProjectCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/20 transition-colors hover:border-orange-500/60 hover:bg-zinc-900/40"
+      className="group flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 transition-colors hover:border-zinc-600 hover:bg-zinc-900/70"
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800 text-zinc-300 transition-colors group-hover:bg-orange-500 group-hover:text-white">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-zinc-900 shadow-md transition-transform group-hover:scale-105">
         <Plus className="h-5 w-5" />
       </span>
-      <span className="text-sm text-zinc-400 group-hover:text-zinc-200">新建项目</span>
+      <span className="text-sm text-zinc-300">新建项目</span>
     </button>
   )
 }
