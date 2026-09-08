@@ -102,7 +102,7 @@ test.describe("影视工厂", () => {
 
     await page.getByRole("button", { name: /AI 智能立项/ }).click()
 
-    await expect(page.getByText("AI 正在通读你的剧本")).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText("正在通读全本，理解剧情脉络")).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText("审阅并创建剧本")).toBeVisible({ timeout: 60_000 })
     await expect(page.getByText("AI 推理结果")).toBeVisible()
     await expect(page.getByText("AI 立项方案")).toBeVisible()

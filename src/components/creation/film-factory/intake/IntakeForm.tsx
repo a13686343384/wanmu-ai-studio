@@ -70,7 +70,7 @@ export function IntakeForm() {
 
     setAnalyzing(true)
     setProgress(8)
-    setProgressLabel("正在通读剧本…")
+    setProgressLabel("正在通读全本，理解剧情脉络…")
 
     // 进度条在等待期间缓慢推进
     const timer = window.setInterval(() => {

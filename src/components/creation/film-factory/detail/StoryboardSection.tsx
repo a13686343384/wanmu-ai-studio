@@ -1,12 +1,14 @@
 "use client"
 
-import { Clapperboard, Loader2, Scissors, Sparkles, Wand2 } from "lucide-react"
+import { useState } from "react"
+import { Clapperboard, ImageIcon, Loader2, Scissors, Sparkles, Video, Wand2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StoryboardCard, type StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
+import { cn } from "@/lib/utils"
 
 /**
  * 分镜区（中栏下半部分）。
@@ -40,24 +42,62 @@ export function StoryboardSection({
   onGenerateVideo: (storyboard: StoryboardDTO) => void
   onEdit: (storyboard: StoryboardDTO) => void
 }) {
+  const [filter, setFilter] = useState<"all" | "image" | "video">("all")
+  const filtered =
+    filter === "image"
+      ? storyboards.filter((item) => item.imageUrl)
+      : filter === "video"
+        ? storyboards.filter((item) => item.videoUrl)
+        : storyboards
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
+        <span className="text-[11px] font-medium tracking-wider text-zinc-500">
           分镜 · 镜组
         </span>
         {storyboards.length > 0 && (
-          <span className="text-[11px] text-zinc-600">{storyboards.length} 个镜头</span>
+          <span className="text-[11px] tabular-nums text-zinc-600">{storyboards.length} 个镜头</span>
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
+          {storyboards.length > 0 && (
+            <div className="flex items-center rounded-md border border-zinc-800 p-0.5">
+              {(
+                [
+                  { value: "all", label: "全部", icon: Clapperboard },
+                  { value: "image", label: "已出图", icon: ImageIcon },
+                  { value: "video", label: "已出视频", icon: Video },
+                ] as const
+              ).map((option) => {
+                const Icon = option.icon
+                const active = filter === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFilter(option.value)}
+                    aria-label={`筛选${option.label}`}
+                    className={cn(
+                      "flex items-center gap-1 rounded p-1.5 text-[10px] transition-colors",
+                      active ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300",
+                    )}
+                  >
+                    <Icon className="h-3 w-3" />
+                    {active && <span>{option.label}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <Button variant="ghost" size="sm" className="h-7" onClick={onRecap} disabled={!hasEpisode}>
             <Sparkles className="h-3.5 w-3.5" />
             先让 AI 复述理解本集
           </Button>
-          <Button variant="outline" size="sm" className="h-7" onClick={onSplit} disabled={!hasEpisode}>
+          <Button variant="inverse" size="sm" className="h-7" onClick={onSplit} disabled={!hasEpisode}>
             <Scissors className="h-3.5 w-3.5" />
-            {storyboards.length > 0 ? "重新拆分镜" : "批量生成分镜"}
+            {storyboards.length > 0 ? "重新拆分镜" : "批量生成"}
           </Button>
         </div>
       </div>
@@ -82,6 +122,10 @@ export function StoryboardSection({
               <Skeleton key={index} className="aspect-video rounded-xl" />
             ))}
           </div>
+        ) : filtered.length === 0 && storyboards.length > 0 ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center text-center text-xs text-zinc-600">
+            没有符合筛选条件的镜头
+          </div>
         ) : storyboards.length === 0 ? (
           <EmptyState
             icon={Clapperboard}
@@ -102,9 +146,9 @@ export function StoryboardSection({
             }
           />
         ) : (
-          <FadeIn>
+          <FadeIn key={filter}>
             <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-3">
-              {storyboards.map((storyboard) => (
+              {filtered.map((storyboard) => (
                 <StoryboardCard
                   key={storyboard.id}
                   storyboard={storyboard}

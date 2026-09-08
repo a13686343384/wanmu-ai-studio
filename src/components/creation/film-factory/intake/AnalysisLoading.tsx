@@ -27,17 +27,24 @@ export function AnalysisLoading({
   label?: string | null
 }) {
   const [visibleStep, setVisibleStep] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
     if (!active) {
       setVisibleStep(0)
+      setElapsed(0)
       return
     }
     setVisibleStep(0)
+    setElapsed(0)
     const timer = window.setInterval(() => {
       setVisibleStep((step) => (step < STEPS.length - 1 ? step + 1 : step))
     }, 900)
-    return () => window.clearInterval(timer)
+    const clock = window.setInterval(() => setElapsed((value) => value + 1), 1000)
+    return () => {
+      window.clearInterval(timer)
+      window.clearInterval(clock)
+    }
   }, [active])
 
   if (!active) return null
@@ -50,9 +57,11 @@ export function AnalysisLoading({
             <Sparkles className="h-4 w-4 animate-pulse text-orange-400" />
           </span>
           <div>
-            <p className="text-sm font-medium text-zinc-100">AI 正在通读你的剧本</p>
+            <p className="text-sm font-medium text-zinc-100">
+              {label ?? "正在通读全本，理解剧情脉络…"}
+            </p>
             <p className="text-[11px] text-zinc-500">
-              {label ?? "通读全本后推荐集数 / 单集时长 / 三幕结构 / 题材 / 视觉风格 / 服化道"}
+              已用 {elapsed}s · 吞全本 + 推理通常需 1-3 分钟，请保持弹窗打开
             </p>
           </div>
         </div>

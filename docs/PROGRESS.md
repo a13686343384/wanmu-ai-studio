@@ -1,6 +1,6 @@
 # 进度与交接（PROGRESS）
 
-> **最后更新：** 2026-09-09
+> **最后更新：** 2026-09-09（UI 对齐产品需求图 ×3 轮）
 > **当前状态：** 21 个任务**全部完成**（功能交付 + UI/性能打磨 + 文档与部署配置）。
 > **验证基线：** `tsc --noEmit` 0 错误 · `npm run build` 成功 · 冒烟 **17/17** · E2E **26/26** · `npm run lint` 通过。
 > **全新环境演练已通过：** 克隆 → `npm ci` → 内嵌库自动 initdb → `db:setup` → `build` → `start` → 冒烟 17/17。
@@ -115,6 +115,8 @@ FULL_PAGE=1 node scripts/screenshot.mjs /creation/film-factory/new
 | 分镜产物生成是串行 | `VideoBatchDialog` 逐个 await | 可改为并发 + 队列，注意积分并发扣减 |
 | 无单元测试 | 只有 E2E 与冒烟 | 补关键纯函数的 Vitest 用例（`lib/utils`、`serializers`、`mock-ai`） |
 | 生产迁移用 `migrate deploy` | `db:setup` 已包含 | 上线前确认 `DATABASE_URL` 指向真实 PG |
+| 出片前检查/衔接建议未实现 | 需求图 32：出图前检查（必须先解决/建议补齐）与相邻衔接待建议（6 处边界）需新增检查引擎 | 在 `StoryboardSection` 上加检查面板，逻辑挂在拆分镜/生成后 |
+| 分析 loading 无「取消」 | 需求图 3 底部状态条带取消按钮，涉及三段串行 fetch 的 AbortController 透传 | 给 IntakeForm 三段请求传 AbortSignal |
 
 ---
 
