@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { jsonError, jsonOk, withErrorHandling } from "@/lib/api"
-import { requireUser } from "@/lib/session"
+import { requireScriptAccess, requireUser } from "@/lib/session"
 import { z } from "zod"
 
 const patchScriptSchema = z.object({
@@ -21,19 +21,6 @@ const patchScriptSchema = z.object({
   episodeDuration: z.number().int().min(5).max(3600).optional(),
   targetAspect: z.enum(["9:16", "16:9", "1:1", "4:3", "3:4"]).optional(),
 })
-
-/** 校验剧本归属。 */
-export async function assertScriptAccess(scriptId: string, userId: string) {
-  const script = await prisma.script.findFirst({
-    where: { id: scriptId, workspace: { members: { some: { userId } } } },
-  })
-
-  if (!script) {
-    throw Object.assign(new Error("剧本不存在或无权访问"), { statusCode: 404 })
-  }
-
-  return script
-}
 
 /** GET /api/scripts/[id] — 剧本详情（含分集与资产计数） */
 export const GET = withErrorHandling(
@@ -90,7 +77,7 @@ export const GET = withErrorHandling(
 export const PATCH = withErrorHandling(
   async (req: Request, { params }: { params: { id: string } }) => {
     const user = await requireUser()
-    await assertScriptAccess(params.id, user.id)
+    await requireScriptAccess(params.id, user.id)
 
     const body = await req.json()
     const input = patchScriptSchema.parse(body)
@@ -119,7 +106,7 @@ export const PATCH = withErrorHandling(
 export const DELETE = withErrorHandling(
   async (_req: Request, { params }: { params: { id: string } }) => {
     const user = await requireUser()
-    await assertScriptAccess(params.id, user.id)
+    await requireScriptAccess(params.id, user.id)
 
     await prisma.script.delete({ where: { id: params.id } })
 

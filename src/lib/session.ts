@@ -54,3 +54,16 @@ export async function requireDefaultWorkspace(userId: string) {
 
   return workspace
 }
+
+/** 校验剧本归属：当前用户必须是该剧本所属工作区的成员。 */
+export async function requireScriptAccess(scriptId: string, userId: string) {
+  const script = await prisma.script.findFirst({
+    where: { id: scriptId, workspace: { members: { some: { userId } } } },
+  })
+
+  if (!script) {
+    throw new AppError("剧本不存在或无权访问", 404)
+  }
+
+  return script
+}

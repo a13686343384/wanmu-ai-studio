@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
-import type { ScriptSummary } from "@/app/api/scripts/route"
+import type { ScriptSummary } from "@/lib/serializers/script"
 
 type SortKey = "updated" | "created" | "title"
 

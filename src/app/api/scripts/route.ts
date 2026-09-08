@@ -2,79 +2,8 @@ import { prisma } from "@/lib/prisma"
 import { jsonOk, withErrorHandling } from "@/lib/api"
 import { requireDefaultWorkspace, requireUser } from "@/lib/session"
 import { createScriptSchema } from "@/lib/validations/generation"
+import { toScriptSummary } from "@/lib/serializers/script"
 import type { Prisma } from "@prisma/client"
-
-export interface ScriptSummary {
-  id: string
-  title: string
-  synopsis: string | null
-  genre: string | null
-  status: string
-  processingStatus: string
-  progress: number
-  progressLabel: string | null
-  workType: string
-  seriesType: string
-  targetAspect: string
-  totalEpisodes: number
-  episodeDuration: number
-  workspaceId: string
-  workspaceName: string
-  isPersonal: boolean
-  episodeCount: number
-  characterCount: number
-  sceneCount: number
-  propCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-/** 把 Prisma 查询结果映射为前端使用的脚本摘要。 */
-export function toScriptSummary(script: {
-  id: string
-  title: string
-  synopsis: string | null
-  genre: string | null
-  status: string
-  processingStatus: string
-  progress: number
-  progressLabel: string | null
-  workType: string
-  seriesType: string
-  targetAspect: string
-  totalEpisodes: number
-  episodeDuration: number
-  workspaceId: string
-  createdAt: Date
-  updatedAt: Date
-  workspace?: { name: string; isPersonal: boolean } | null
-  _count?: { episodes: number; characters: number; scenes: number; props: number }
-}): ScriptSummary {
-  return {
-    id: script.id,
-    title: script.title,
-    synopsis: script.synopsis,
-    genre: script.genre,
-    status: script.status,
-    processingStatus: script.processingStatus,
-    progress: script.progress,
-    progressLabel: script.progressLabel,
-    workType: script.workType,
-    seriesType: script.seriesType,
-    targetAspect: script.targetAspect,
-    totalEpisodes: script.totalEpisodes,
-    episodeDuration: script.episodeDuration,
-    workspaceId: script.workspaceId,
-    workspaceName: script.workspace?.name ?? "",
-    isPersonal: script.workspace?.isPersonal ?? true,
-    episodeCount: script._count?.episodes ?? 0,
-    characterCount: script._count?.characters ?? 0,
-    sceneCount: script._count?.scenes ?? 0,
-    propCount: script._count?.props ?? 0,
-    createdAt: script.createdAt.toISOString(),
-    updatedAt: script.updatedAt.toISOString(),
-  }
-}
 
 /**
  * GET /api/scripts

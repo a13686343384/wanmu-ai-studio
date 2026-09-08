@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/creation/film-factory/StatusBadge"
 import { makePoster } from "@/services/ai/mock-media"
 import { relativeTime } from "@/lib/utils"
 import { WORK_TYPES } from "@/lib/constants"
-import type { ScriptSummary } from "@/app/api/scripts/route"
+import type { ScriptSummary } from "@/lib/serializers/script"
 
 const WORK_TYPE_LABEL = Object.fromEntries(WORK_TYPES.map((w) => [w.value, w.label]))
 
