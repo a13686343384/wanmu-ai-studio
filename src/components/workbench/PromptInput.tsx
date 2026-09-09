@@ -48,16 +48,10 @@ export function PromptInput() {
         className="w-full resize-none bg-transparent px-1 py-1 text-sm leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600"
       />
 
-      {/* @ 引用入口：点击或输入 @ 均可唤起 */}
+      {/* @ 引用入口：输入 @ 唤起素材列表 */}
       <Popover open={mentionOpen} onOpenChange={setMentionOpen}>
         <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="mt-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-orange-400"
-            aria-label="引用素材"
-          >
-            <AtSign className="h-3 w-3" />
-          </button>
+          <span className="hidden" />
         </PopoverTrigger>
         <PopoverContent align="start" className="w-64 p-1">
           {references.length === 0 ? (

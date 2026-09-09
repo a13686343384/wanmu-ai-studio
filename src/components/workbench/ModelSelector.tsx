@@ -44,7 +44,7 @@ export function ModelSelector() {
             onSelect={() => setModel(model.id)}
             className={cn(
               "flex-col items-start gap-1 py-2",
-              model.id === modelId && "bg-zinc-800",
+              model.id === modelId && "mb-1.5 border-b border-zinc-800 bg-zinc-800 pb-2.5",
             )}
           >
             <span className="flex w-full items-center gap-2">
