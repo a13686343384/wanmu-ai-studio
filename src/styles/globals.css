@@ -84,12 +84,24 @@
   height: 96px;
 }
 
-/* 画布操作页：连接点磁吸与悬停放大 */
+/* 画布操作页：连接点（吸附跟随由 JS 驱动；这里管显隐、贴外侧定位与配色） */
 .react-flow .studio-handle {
+  opacity: 0;
   transition:
-    transform 0.12s ease,
+    transform 0.16s ease-out,
+    opacity 0.18s ease,
     border-color 0.12s ease,
-    box-shadow 0.12s ease;
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+/* 悬停节点 / 选中节点 / 连线中时显示 */
+.react-flow__node:hover .studio-handle,
+.react-flow__node.selected .studio-handle,
+.react-flow .studio-handle.react-flow__handle-connecting,
+.react-flow .studio-handle.react-flow__handle-connectingfrom,
+.react-flow .studio-handle.react-flow__handle-connectingto,
+.react-flow .studio-handle.react-flow__handle-valid {
+  opacity: 1;
 }
 /* 透明扩热区：把手有效命中范围比可见圆大 9px */
 .react-flow .studio-handle::after {
@@ -98,16 +110,18 @@
   inset: -9px;
   border-radius: 9999px;
 }
-.react-flow .studio-handle:hover {
-  transform: scale(1.3);
+/* 挂在卡片外侧，压住边线 */
+.react-flow .studio-handle.react-flow__handle-left {
+  left: -14px;
+}
+.react-flow .studio-handle.react-flow__handle-right {
+  right: -14px;
+}
+.react-flow .studio-handle:hover,
+.react-flow .studio-handle.react-flow__handle-connecting {
   border-color: #f97316 !important;
   color: #f97316;
   box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15);
-}
-/* 拖拽连线过程中：半径内可吸附的目标把手 */
-.react-flow .studio-handle.react-flow__handle-connecting {
-  transform: scale(1.3);
-  border-color: #fb923c !important;
 }
 .react-flow .studio-handle.react-flow__handle-valid {
   background: #f97316;

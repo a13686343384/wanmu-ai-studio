@@ -117,6 +117,8 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
   const saveTimer = useRef<number | null>(null)
   const stateRef = useRef({ nodes, edges })
   stateRef.current = { nodes, edges }
+  const flowWrapperRef = useRef<HTMLDivElement>(null)
+  const interactionLock = useRef(false)
 
   /* ---------------------------- 加载 / 保存 ---------------------------- */
 
@@ -253,6 +255,96 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
     setNodes(next.nodes)
     setEdges(next.edges)
   }, [setNodes, setEdges])
+
+  /* ---------------------------- 把手磁吸跟随 ---------------------------- */
+
+  const appliedOffsets = useRef(new WeakMap<HTMLElement, { dx: number; dy: number }>())
+
+  const resetHandles = useCallback(() => {
+    flowWrapperRef.current
+      ?.querySelectorAll<HTMLElement>(".react-flow__handle.studio-handle")
+      .forEach((handle) => {
+        if (handle.style.transform) {
+          handle.style.transform = ""
+          handle.style.opacity = ""
+          appliedOffsets.current.delete(handle)
+        }
+      })
+  }, [])
+
+  // 指针靠近把手（捕捉半径 28px）时，把手中心跟随鼠标并放大，离开范围平滑归位；
+  // 距离一律按「锚点」（未应用跟随位移的原始中心）计算，避免跟随态下的自参考振荡。
+  // 拖动节点 / 拖拽连线期间锁定。
+  useEffect(() => {
+    const wrapper = flowWrapperRef.current
+    if (!wrapper) return
+
+    const CAPTURE_RANGE = 28
+    const applied = appliedOffsets.current
+    let frame = 0
+    let lastEvent: PointerEvent | null = null
+
+    const anchorOf = (handle: HTMLElement) => {
+      const rect = handle.getBoundingClientRect()
+      const offset = applied.get(handle)
+      return {
+        x: rect.x + rect.width / 2 - (offset?.dx ?? 0),
+        y: rect.y + rect.height / 2 - (offset?.dy ?? 0),
+      }
+    }
+
+    const apply = () => {
+      frame = 0
+      if (!lastEvent || interactionLock.current) return
+      const handles = wrapper.querySelectorAll<HTMLElement>(".react-flow__handle.studio-handle")
+      let captured: HTMLElement | null = null
+      let bestDx = 0
+      let bestDy = 0
+      let bestDist = CAPTURE_RANGE
+
+      handles.forEach((handle) => {
+        const anchor = anchorOf(handle)
+        const dx = lastEvent!.clientX - anchor.x
+        const dy = lastEvent!.clientY - anchor.y
+        const dist = Math.hypot(dx, dy)
+        if (dist < bestDist) {
+          bestDist = dist
+          bestDx = dx
+          bestDy = dy
+          captured = handle
+        }
+      })
+
+      handles.forEach((handle) => {
+        if (handle === captured) {
+          applied.set(handle, { dx: bestDx, dy: bestDy })
+          handle.style.opacity = "1"
+          handle.style.transform = `translate(0, -50%) translate(${bestDx}px, ${bestDy}px) scale(1.25)`
+        } else if (applied.has(handle)) {
+          applied.delete(handle)
+          handle.style.transform = ""
+          handle.style.opacity = ""
+        }
+      })
+    }
+
+    const onMove = (event: PointerEvent) => {
+      lastEvent = event
+      if (!frame) frame = requestAnimationFrame(apply)
+    }
+    const onLeave = () => {
+      lastEvent = null
+      resetHandles()
+    }
+
+    wrapper.addEventListener("pointermove", onMove)
+    wrapper.addEventListener("pointerleave", onLeave)
+    return () => {
+      wrapper.removeEventListener("pointermove", onMove)
+      wrapper.removeEventListener("pointerleave", onLeave)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [resetHandles])
 
   /* ---------------------------- 节点操作 ---------------------------- */
 
@@ -575,14 +667,28 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
             />
           )}
 
-          <div className="relative min-w-0 flex-1">
+          <div ref={flowWrapperRef} className="relative min-w-0 flex-1">
             <ReactFlow
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              onNodeDragStop={pushHistory}
+              onNodeDragStart={() => {
+                interactionLock.current = true
+                resetHandles()
+              }}
+              onNodeDragStop={() => {
+                interactionLock.current = false
+                pushHistory()
+              }}
+              onConnectStart={() => {
+                interactionLock.current = true
+              }}
+              onConnectEnd={() => {
+                interactionLock.current = false
+                resetHandles()
+              }}
               onNodesDelete={pushHistory}
               onPaneContextMenu={onPaneContextMenu}
               onPaneClick={closeContextMenu}
