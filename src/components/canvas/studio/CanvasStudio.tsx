@@ -46,6 +46,7 @@ import {
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -708,16 +709,6 @@ function CanvasStudioInner({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {!sidebarOpen && (
-            <button
-              type="button"
-              aria-label="展开侧栏"
-              className="p-1 text-zinc-400"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <PanelLeftOpen className="h-4 w-4" />
-            </button>
-          )}
           <h1 className="max-w-[240px] truncate text-sm text-zinc-200">
             {projectName}
           </h1>
@@ -834,14 +825,35 @@ function CanvasStudioInner({
 
         {/* 主体 */}
         <div className="flex min-h-0 flex-1">
-          {sidebarOpen && (
-            <StudioSidebar
-              nodes={nodes}
-              tab={sidebarTab}
-              onTabChange={setSidebarTab}
-              onLocate={locateNode}
-              onCollapse={() => setSidebarOpen(false)}
-            />
+          <AnimatePresence initial={false}>
+            {sidebarOpen && (
+              <motion.aside
+                initial={{ x: -240, opacity: 0.6 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -240, opacity: 0 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className="flex min-h-0 shrink-0"
+              >
+                <StudioSidebar
+                  nodes={nodes}
+                  tab={sidebarTab}
+                  onTabChange={setSidebarTab}
+                  onLocate={locateNode}
+                  onCollapse={() => setSidebarOpen(false)}
+                />
+              </motion.aside>
+            )}
+          </AnimatePresence>
+          {!sidebarOpen && (
+            <button
+              type="button"
+              aria-label="展开侧栏"
+              onClick={() => setSidebarOpen(true)}
+              className="sticky top-0 z-10 flex h-28 w-7 items-start justify-center rounded-r-lg border border-l-0 border-zinc-800 bg-zinc-900/90 pt-3 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+              style={{ writingMode: "vertical-rl", letterSpacing: "0.2em" }}
+            >
+              画布 / 资产
+            </button>
           )}
 
           <div className="studio-workspace relative flex min-w-0 flex-1 flex-col">
@@ -1080,17 +1092,6 @@ function CanvasStudioInner({
                   className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30"
                 >
                   <Copy className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="网格吸附设置"
-                  onClick={() => setSnapToGrid((value) => !value)}
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100",
-                    snapToGrid && "text-orange-400",
-                  )}
-                >
-                  <Magnet className="h-4 w-4" />
                 </button>
               </div>
             </footer>
