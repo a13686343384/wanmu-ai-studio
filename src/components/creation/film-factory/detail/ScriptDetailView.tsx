@@ -550,27 +550,6 @@ export function ScriptDetailView({
         }}
       />
 
-      <ScriptInfoDialog
-        open={infoOpen}
-        onOpenChange={setInfoOpen}
-        script={script}
-        onOpenPacing={() => {
-          setInfoOpen(false)
-          setPacingOpen(true)
-        }}
-      />
-
-      <PacingProfileDialog
-        open={pacingOpen}
-        onOpenChange={setPacingOpen}
-        script={script}
-        value={pacing}
-        onSave={(profile: PacingProfile) => {
-          setPacing(profile)
-          void reloadScript()
-        }}
-      />
-
       <ConsultDialog
         open={consultOpen}
         onOpenChange={setConsultOpen}
