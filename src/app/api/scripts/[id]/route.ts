@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { jsonError, jsonOk, withErrorHandling } from "@/lib/api"
 import { requireScriptAccess, requireUser } from "@/lib/session"
 import { z } from "zod"
+import { Prisma } from "@prisma/client"
 
 const patchScriptSchema = z.object({
   title: z.string().trim().min(1).max(60).optional(),
@@ -20,6 +21,7 @@ const patchScriptSchema = z.object({
   totalEpisodes: z.number().int().min(1).max(500).optional(),
   episodeDuration: z.number().int().min(5).max(3600).optional(),
   targetAspect: z.enum(["9:16", "16:9", "1:1", "4:3", "3:4"]).optional(),
+  pacingProfile: z.record(z.unknown()).nullable().optional(),
 })
 
 /** GET /api/scripts/[id] — 剧本详情（含分集与资产计数） */
@@ -84,7 +86,7 @@ export const PATCH = withErrorHandling(
 
     const script = await prisma.script.update({
       where: { id: params.id },
-      data: input,
+      data: input as Prisma.ScriptUncheckedUpdateInput,
     })
 
     return jsonOk(

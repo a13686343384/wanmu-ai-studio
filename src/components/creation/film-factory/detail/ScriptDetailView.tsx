@@ -27,6 +27,11 @@ import {
   RecapDialog,
   type RecapResult,
 } from "@/components/creation/film-factory/detail/RecapDialog"
+import { ScriptInfoDialog } from "@/components/creation/film-factory/detail/ScriptInfoDialog"
+import {
+  PacingProfileDialog,
+  type PacingProfile,
+} from "@/components/creation/film-factory/detail/PacingProfileDialog"
 import { VideoBatchDialog } from "@/components/creation/film-factory/video/VideoBatchDialog"
 import { PostProductionPanel } from "@/components/creation/film-factory/post/PostProductionPanel"
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
@@ -80,6 +85,11 @@ export function ScriptDetailView({
   const [postOpen, setPostOpen] = useState(false)
 
   // 移动端（< lg）隐藏资产栏与内容分栏，用抽屉承载分集与资产
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [pacingOpen, setPacingOpen] = useState(false)
+  const [pacing, setPacing] = useState<PacingProfile | null>(
+    (initialScript as unknown as { pacingProfile?: PacingProfile }).pacingProfile ?? null,
+  )
   const [episodesSheetOpen, setEpisodesSheetOpen] = useState(false)
   const [assetsSheetOpen, setAssetsSheetOpen] = useState(false)
 
@@ -308,6 +318,7 @@ export function ScriptDetailView({
         onConsult={() => setConsultOpen(true)}
         onGenerateCover={() => void generateCover()}
         onRefresh={() => void reloadScript()}
+        onInfo={() => setInfoOpen(true)}
       />
 
       <WorkflowTabs
@@ -515,6 +526,48 @@ export function ScriptDetailView({
           />
         </>
       )}
+
+      <ScriptInfoDialog
+        open={infoOpen}
+        onOpenChange={setInfoOpen}
+        script={script}
+        onOpenPacing={() => {
+          setInfoOpen(false)
+          setPacingOpen(true)
+        }}
+      />
+
+      <PacingProfileDialog
+        open={pacingOpen}
+        onOpenChange={setPacingOpen}
+        script={script}
+        value={pacing}
+        onSave={(profile) => {
+          setPacing(profile)
+          void reloadScript()
+        }}
+      />
+
+      <ScriptInfoDialog
+        open={infoOpen}
+        onOpenChange={setInfoOpen}
+        script={script}
+        onOpenPacing={() => {
+          setInfoOpen(false)
+          setPacingOpen(true)
+        }}
+      />
+
+      <PacingProfileDialog
+        open={pacingOpen}
+        onOpenChange={setPacingOpen}
+        script={script}
+        value={pacing}
+        onSave={(profile: PacingProfile) => {
+          setPacing(profile)
+          void reloadScript()
+        }}
+      />
 
       <ConsultDialog
         open={consultOpen}

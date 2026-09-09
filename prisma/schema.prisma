@@ -227,6 +227,7 @@ model Script {
   consultations Consultation[]
 
   createdAt DateTime @default(now())
+  pacingProfile Json?
   updatedAt DateTime @updatedAt
 
   @@index([workspaceId])

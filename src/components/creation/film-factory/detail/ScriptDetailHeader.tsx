@@ -26,11 +26,13 @@ export function ScriptDetailHeader({
   onConsult,
   onGenerateCover,
   onRefresh,
+  onInfo,
 }: {
   script: ScriptDetail
   onConsult: () => void
   onGenerateCover: () => void
   onRefresh?: () => void
+  onInfo: () => void
 }) {
   const mustFix = script.consultations[0]?.suggestions?.filter((s) => s.mustFix).length ?? 0
 
@@ -63,8 +65,13 @@ export function ScriptDetailHeader({
           {script.executionMode === "step_by_step" ? "逐步确认(推荐)" : "全自动一步到位"}
         </Badge>
 
-        <Button variant="ghost" size="sm" className="hidden h-7 px-2 text-xs text-zinc-500 lg:inline-flex" asChild>
-          <Link href={`/creation/film-factory/${script.id}`}>查看全部信息</Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden h-7 px-2 text-xs text-zinc-500 lg:inline-flex"
+          onClick={onInfo}
+        >
+          查看全部信息
         </Button>
       </div>
 
@@ -110,9 +117,7 @@ export function ScriptDetailHeader({
             <DropdownMenuItem asChild>
               <Link href="/canvas">打通到画布</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/creation/film-factory/${script.id}`}>查看全部信息</Link>
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onInfo}>查看全部信息</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>导出剧本</DropdownMenuItem>
           </DropdownMenuContent>
