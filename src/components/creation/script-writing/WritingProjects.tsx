@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { FileText, Loader2, Plus, Search, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -225,15 +226,18 @@ export function WritingProjects() {
           <form onSubmit={create} className="space-y-4">
             <label className="block space-y-2 text-sm text-zinc-400">
               题材配方
-              <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-zinc-200"
-              >
-                {WRITING_GENRES.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
+              <Select value={genre} onValueChange={setGenre}>
+                <SelectTrigger className="h-10 w-full text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WRITING_GENRES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             <label className="block space-y-2 text-sm text-zinc-400">
               剧名

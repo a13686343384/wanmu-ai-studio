@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -473,18 +474,18 @@ export function WritingEditor({
               className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200 outline-none"
             />
             <div className="flex items-center justify-between gap-2">
-              <select
-                aria-label="编剧模型"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="min-w-0 rounded bg-zinc-900 text-xs text-zinc-400"
-              >
-                {TEXT_MODELS.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {item.cost}积分
-                  </option>
-                ))}
-              </select>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger className="h-7 min-w-0 gap-1 text-xs" aria-label="编剧模型">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEXT_MODELS.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} · {item.cost}积分
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 type="submit"
                 size="sm"
@@ -610,18 +611,18 @@ export function WritingEditor({
             <div className="space-y-5">
               <label className="block space-y-2 text-sm text-zinc-400">
                 文本模型
-                <select
-                  aria-label="生成文本模型"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-zinc-100"
-                >
-                  {TEXT_MODELS.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} · {item.cost} 积分/次
-                    </option>
-                  ))}
-                </select>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger className="h-10 w-full text-sm" aria-label="生成文本模型">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEXT_MODELS.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} · {item.cost} 积分/次
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setPanel(null)}>
