@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
+import { RenameDialog } from "@/components/canvas/RenameDialog"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
@@ -62,7 +63,27 @@ export function ScriptList() {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<SortKey>("updated")
   const [deleting, setDeleting] = useState<ScriptSummary | null>(null)
+  const [editing, setEditing] = useState<ScriptSummary | null>(null)
   const [hintOpen, setHintOpen] = useState(true)
+  const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      return JSON.parse(localStorage.getItem("wanmusheng.pinnedScripts") ?? "[]")
+    } catch {
+      return []
+    }
+  })
+
+  function togglePin(script: ScriptSummary) {
+    setPinnedIds((current) => {
+      const next = current.includes(script.id)
+        ? current.filter((id) => id !== script.id)
+        : [...current, script.id]
+      localStorage.setItem("wanmusheng.pinnedScripts", JSON.stringify(next))
+      return next
+    })
+    toast.success("已更新置顶")
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -89,12 +110,15 @@ export function ScriptList() {
   const sorted = useMemo(() => {
     const list = [...scripts]
     list.sort((a, b) => {
+      const pa = pinnedIds.includes(a.id) ? 0 : 1
+      const pb = pinnedIds.includes(b.id) ? 0 : 1
+      if (pa !== pb) return pa - pb
       if (sort === "title") return a.title.localeCompare(b.title, "zh-CN")
       if (sort === "created") return b.createdAt.localeCompare(a.createdAt)
       return b.updatedAt.localeCompare(a.updatedAt)
     })
     return list
-  }, [scripts, sort])
+  }, [scripts, sort, pinnedIds])
 
   const inProduction = sorted.filter((s) => s.processingStatus === "processing")
   const ready = sorted.filter((s) => s.processingStatus !== "processing" && s.status !== "completed")
@@ -173,7 +197,14 @@ export function ScriptList() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((script) => (
-            <ScriptCard key={script.id} script={script} onDelete={setDeleting} />
+            <ScriptCard
+              key={script.id}
+              script={script}
+              pinned={pinnedIds.includes(script.id)}
+              onTogglePin={togglePin}
+              onEdit={setEditing}
+              onDelete={setDeleting}
+            />
           ))}
         </div>
       </section>
@@ -319,6 +350,28 @@ export function ScriptList() {
           />
         </FadeIn>
       )}
+
+      <RenameDialog
+        open={Boolean(editing)}
+        onOpenChange={(open) => !open && setEditing(null)}
+        currentName={editing?.title ?? ""}
+        title="编辑剧本"
+        onSubmit={async (name) => {
+          if (!editing) return
+          const res = await fetch(`/api/scripts/${editing.id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ title: name }),
+          })
+          const payload = await res.json()
+          if (!res.ok) {
+            toast.error(payload.error ?? "修改失败")
+            return
+          }
+          toast.success("已修改")
+          void load()
+        }}
+      />
 
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>

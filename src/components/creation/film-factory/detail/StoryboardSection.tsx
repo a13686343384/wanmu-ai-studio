@@ -174,26 +174,15 @@ export function StoryboardSection({
             description="准备好了吗？AI 会按本集内容切成镜头。你可以先让 AI 复述理解本集，确认无误后再拆；也可以直接出图或出视频，跳过九宫格。"
             className="h-full min-h-[220px] justify-center"
             action={
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button
-                  variant="brand"
-                  size="sm"
-                  onClick={onSplit}
-                  disabled={!hasEpisode}
-                >
-                  <Wand2 className="h-3.5 w-3.5" />
-                  批量生成分镜
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onRecap}
-                  disabled={!hasEpisode}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  先让 AI 复述理解本集（推荐）
-                </Button>
-              </div>
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={onRecap}
+                disabled={!hasEpisode}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                先让 AI 复述理解本集（推荐）
+              </Button>
             }
           />
         ) : (

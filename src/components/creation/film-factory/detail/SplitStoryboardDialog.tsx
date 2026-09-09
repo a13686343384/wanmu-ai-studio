@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   ImageIcon,
   Loader2,
@@ -62,6 +62,7 @@ export function SplitStoryboardDialog({
   scriptId,
   episodeId,
   episodeTitle,
+  initialMode,
   onDone,
 }: {
   open: boolean
@@ -69,9 +70,14 @@ export function SplitStoryboardDialog({
   scriptId: string
   episodeId: string
   episodeTitle: string
+  /** 打开时定位到的 Tab（如「下一步 · 出视频」直开出视频） */
+  initialMode?: Mode
   onDone: () => void
 }) {
-  const [tab, setTab] = useState<Mode>("image")
+  const [tab, setTab] = useState<Mode>(initialMode ?? "image")
+  useEffect(() => {
+    if (open && initialMode) setTab(initialMode)
+  }, [open, initialMode])
   const [textModel, setTextModel] = useState(TEXT_MODELS[0]!.id)
   const [imageModel, setImageModel] = useState("man-image-v2-lite")
   const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0]!.id)

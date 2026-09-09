@@ -37,7 +37,7 @@ const NEXT_STEP_LABEL: Record<string, string> = {
   intake: "下一步 · 剧本大纲",
   outlining: "下一步 · 出人物/场景资产",
   assets: "下一步 · 出人物/场景资产",
-  storyboarding: "下一步 · 拆分镜",
+  storyboarding: "下一步 · 出视频",
   video: "下一步 · 出视频",
   post_production: "下一步 · 后期合成",
 }
@@ -67,6 +67,7 @@ export function ScriptDetailView({
 
   const [assetSetupOpen, setAssetSetupOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
+  const [splitMode, setSplitMode] = useState<"text" | "image" | "video" | "bgm">("image")
   const [consultOpen, setConsultOpen] = useState(false)
   const [recapOpen, setRecapOpen] = useState(false)
   const [recapResult, setRecapResult] = useState<RecapResult | null>(null)
@@ -283,6 +284,7 @@ export function ScriptDetailView({
         else setAssetSetupOpen(true)
         break
       case "storyboarding":
+        setSplitMode("video")
         setSplitOpen(true)
         break
       case "video":
@@ -494,6 +496,7 @@ export function ScriptDetailView({
             scriptId={script.id}
             episodeId={activeEpisode.id}
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
+            initialMode={splitMode}
             onDone={() => {
               void loadStoryboards()
               void reloadScript()

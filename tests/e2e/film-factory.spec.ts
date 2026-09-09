@@ -168,7 +168,7 @@ test.describe("影视工厂", () => {
     await page.waitForLoadState("networkidle")
 
     await page
-      .getByRole("button", { name: /批量生成分镜/ })
+      .getByRole("button", { name: /批量生成/ })
       .first()
       .click()
 
@@ -183,7 +183,7 @@ test.describe("影视工厂", () => {
     await page.waitForLoadState("networkidle")
 
     await page
-      .getByRole("button", { name: /批量生成分镜/ })
+      .getByRole("button", { name: /批量生成/ })
       .first()
       .click()
     await page.getByRole("tab", { name: "仅拆分镜" }).click()

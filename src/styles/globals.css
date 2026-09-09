@@ -165,3 +165,27 @@
     background: #09090b;
   }
 }
+
+/* 工作流步骤连接线「输送电力」动效（当前推进段） */
+.power-line {
+  position: relative;
+  overflow: hidden;
+  background: #27272a;
+}
+.power-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(90deg, transparent, #f97316, transparent);
+  animation: power-flow 1.2s linear infinite;
+}
+@keyframes power-flow {
+  from {
+    left: -12px;
+  }
+  to {
+    left: 100%;
+  }
+}

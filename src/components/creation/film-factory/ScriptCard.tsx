@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { MoreVertical, Trash2, Clapperboard } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { MoreVertical, Pencil, Pin, PinOff, Trash2, Clapperboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -39,19 +40,35 @@ function ClapperStripe({ tone }: { tone: "processing" | "ready" | "done" }) {
  */
 export function ScriptCard({
   script,
+  pinned,
+  onTogglePin,
+  onEdit,
   onDelete,
 }: {
   script: ScriptSummary
+  pinned?: boolean
+  onTogglePin?: (script: ScriptSummary) => void
+  onEdit?: (script: ScriptSummary) => void
   onDelete: (script: ScriptSummary) => void
 }) {
+  const router = useRouter()
   const processing = script.processingStatus === "processing"
   const done = script.status === "completed"
   const tone: "processing" | "ready" | "done" = processing ? "processing" : done ? "done" : "ready"
 
   const stageIndex = WORKFLOW_STAGES.findIndex((stage) => stage.key === script.status)
 
+  // 整卡可点：点在按钮/链接/菜单上不触发进入详情
+  function openDetail(event: React.MouseEvent) {
+    if ((event.target as HTMLElement).closest("button, a")) return
+    router.push(`/creation/film-factory/${script.id}`)
+  }
+
   return (
-    <div className="group overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition-colors hover:border-zinc-700">
+    <div
+      onClick={openDetail}
+      className="group cursor-pointer overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition-all duration-200 hover:-translate-y-1 hover:border-zinc-700 hover:shadow-[0_16px_40px_-16px_rgba(0,0,0,0.85)]"
+    >
       <ClapperStripe tone={tone} />
 
       <div className="space-y-2.5 p-3.5">
@@ -84,11 +101,13 @@ export function ScriptCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/creation/film-factory/${script.id}`}>
-                  <Clapperboard />
-                  打开详情
-                </Link>
+              <DropdownMenuItem onSelect={() => onTogglePin?.(script)}>
+                {pinned ? <PinOff /> : <Pin />}
+                {pinned ? "取消置顶" : "置顶"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onEdit?.(script)}>
+                <Pencil />
+                编辑
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem destructive onSelect={() => onDelete(script)}>

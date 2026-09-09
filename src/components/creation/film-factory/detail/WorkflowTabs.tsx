@@ -81,7 +81,19 @@ export function WorkflowTabs({
                 {stage.label}
               </div>
 
-              {!isLast && <span className="mx-2 h-px w-7 bg-zinc-800" aria-hidden />}
+              {!isLast && (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "mx-2 h-px w-7",
+                    index < current && current > 0
+                      ? "bg-emerald-500/60"
+                      : index === current || index === current - 1
+                        ? "power-line"
+                        : "bg-zinc-800",
+                  )}
+                />
+              )}
             </div>
           )
         })}
