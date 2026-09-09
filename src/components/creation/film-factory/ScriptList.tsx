@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
+import { TaskQueueDialog, StopAllDialog } from "@/components/creation/film-factory/TaskQueueDialog"
 import { RenameDialog } from "@/components/canvas/RenameDialog"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -65,6 +66,8 @@ export function ScriptList() {
   const [deleting, setDeleting] = useState<ScriptSummary | null>(null)
   const [editing, setEditing] = useState<ScriptSummary | null>(null)
   const [hintOpen, setHintOpen] = useState(true)
+  const [queueOpen, setQueueOpen] = useState(false)
+  const [stopAllOpen, setStopAllOpen] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return []
     try {
@@ -269,7 +272,7 @@ export function ScriptList() {
             variant="ghost"
             size="sm"
             className="h-8"
-            onClick={() => toast.info("任务队列", { description: "当前无排队任务" })}
+            onClick={() => setQueueOpen(true)}
           >
             <ListChecks className="h-3.5 w-3.5" />
             任务队列
@@ -278,7 +281,9 @@ export function ScriptList() {
             variant="ghost"
             size="sm"
             className="h-8 text-zinc-400 hover:text-rose-300"
-            onClick={() => void stopAll()}
+            disabled={inProduction.length === 0}
+            title={inProduction.length === 0 ? "没有正在进行的任务" : undefined}
+            onClick={() => setStopAllOpen(true)}
           >
             <Square className="h-3.5 w-3.5 fill-current text-rose-400" />
             停止全部
@@ -350,6 +355,20 @@ export function ScriptList() {
           />
         </FadeIn>
       )}
+
+      <TaskQueueDialog
+        open={queueOpen}
+        onOpenChange={setQueueOpen}
+        scripts={scripts}
+        onChanged={() => void load()}
+      />
+
+      <StopAllDialog
+        open={stopAllOpen}
+        onOpenChange={setStopAllOpen}
+        runningCount={inProduction.length}
+        onConfirm={() => void stopAll()}
+      />
 
       <RenameDialog
         open={Boolean(editing)}
