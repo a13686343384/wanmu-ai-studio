@@ -591,6 +591,7 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
               deleteKeyCode={["Backspace", "Delete"]}
               snapToGrid={snapToGrid}
               snapGrid={[16, 16]}
+              connectionRadius={42}
               proOptions={{ hideAttribution: true }}
               minZoom={0.2}
               maxZoom={2.5}

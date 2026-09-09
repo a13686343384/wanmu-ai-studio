@@ -38,14 +38,14 @@ function PlusHandles() {
       <Handle
         type="target"
         position={Position.Left}
-        className="!flex !h-5 !w-5 !items-center !justify-center !rounded-full !border !border-zinc-600 !bg-zinc-900"
+        className="studio-handle !flex !h-5 !w-5 !items-center !justify-center !rounded-full !border !border-zinc-600 !bg-zinc-900"
       >
         <Plus className="h-3 w-3 text-zinc-500" />
       </Handle>
       <Handle
         type="source"
         position={Position.Right}
-        className="!flex !h-5 !w-5 !items-center !justify-center !rounded-full !border !border-zinc-600 !bg-zinc-900"
+        className="studio-handle !flex !h-5 !w-5 !items-center !justify-center !rounded-full !border !border-zinc-600 !bg-zinc-900"
       >
         <Plus className="h-3 w-3 text-zinc-500" />
       </Handle>
