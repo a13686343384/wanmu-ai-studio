@@ -36,6 +36,9 @@ test.describe("画布", () => {
     await page.getByRole("button", { name: "创建项目" }).click()
     await expect(page).toHaveURL(/\/canvas\/[a-z0-9]+/i)
 
+    // 等待画布数据加载与水合完成（保存指示为「已保存」）
+    await expect(page.getByTestId("studio-save")).toContainText("已保存", { timeout: 15_000 })
+
     // 从底部工具条添加一个文本节点
     await page.getByRole("button", { name: "新建文本", exact: true }).first().click()
     await expect(page.getByText("画布是空的")).toBeHidden()
