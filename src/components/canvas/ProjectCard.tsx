@@ -43,36 +43,67 @@ interface MenuItemsProps extends ProjectCardActions {
   project: ProjectSummary
 }
 
-/** 右键菜单与「更多」菜单共用的条目。 */
-function MenuItems({ project, onOpen, onRename, onShare, onMove, onDelete }: MenuItemsProps) {
+const MENU_ACTIONS = [
+  { key: "open", label: "打开", icon: ExternalLink, danger: false, separatorBefore: false },
+  { key: "rename", label: "重命名", icon: Pencil, danger: false, separatorBefore: false },
+  { key: "select", label: "选择", icon: CheckSquare, danger: false, separatorBefore: false },
+  { key: "move", label: "移动至…", icon: FolderInput, danger: false, separatorBefore: true },
+  { key: "share", label: "分享链接", icon: Link2, danger: false, separatorBefore: false },
+  { key: "delete", label: "删除", icon: Trash2, danger: true, separatorBefore: true },
+] as const
+
+type MenuActionKey = (typeof MENU_ACTIONS)[number]["key"]
+
+function runAction(
+  key: MenuActionKey,
+  project: ProjectSummary,
+  actions: ProjectCardActions,
+) {
+  if (key === "open") actions.onOpen(project)
+  else if (key === "rename") actions.onRename(project)
+  else if (key === "move") actions.onMove(project)
+  else if (key === "share") actions.onShare(project)
+  else if (key === "delete") actions.onDelete(project)
+}
+
+/** 「更多」下拉的条目（必须用 DropdownMenuItem，不能复用右键菜单组件）。 */
+function DropdownItems({ project, actions }: { project: ProjectSummary; actions: ProjectCardActions }) {
   return (
     <>
-      <ContextMenuItem onSelect={() => onOpen(project)}>
-        <ExternalLink />
-        打开
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => onRename(project)}>
-        <Pencil />
-        重命名
-      </ContextMenuItem>
-      <ContextMenuItem>
-        <CheckSquare />
-        选择
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => onMove(project)}>
-        <FolderInput />
-        移动至…
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => onShare(project)}>
-        <Link2 />
-        分享链接
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem destructive onSelect={() => onDelete(project)}>
-        <Trash2 />
-        删除
-      </ContextMenuItem>
+      {MENU_ACTIONS.map((action) => {
+        const Icon = action.icon
+        return (
+          <DropdownMenuItem
+            key={action.key}
+            destructive={action.danger}
+            onSelect={() => runAction(action.key, project, actions)}
+          >
+            <Icon />
+            {action.label}
+          </DropdownMenuItem>
+        )
+      })}
+    </>
+  )
+}
+
+/** 右键菜单条目。 */
+function ContextItems({ project, actions }: { project: ProjectSummary; actions: ProjectCardActions }) {
+  return (
+    <>
+      {MENU_ACTIONS.map((action) => {
+        const Icon = action.icon
+        return (
+          <ContextMenuItem
+            key={action.key}
+            destructive={action.danger}
+            onSelect={() => runAction(action.key, project, actions)}
+          >
+            <Icon />
+            {action.label}
+          </ContextMenuItem>
+        )
+      })}
     </>
   )
 }
@@ -98,8 +129,6 @@ export const ProjectCard = memo(function ProjectCard({
     actions.onOpen(project)
     router.push(`/canvas/${project.id}`)
   }, [actions, project, router])
-
-  const menu = <MenuItems project={project} {...actions} />
 
   if (view === "list") {
     return (
@@ -129,11 +158,11 @@ export const ProjectCard = memo(function ProjectCard({
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">{menu}</DropdownMenuContent>
+              <DropdownMenuContent align="end"><DropdownItems project={project} actions={actions} /></DropdownMenuContent>
             </DropdownMenu>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>{menu}</ContextMenuContent>
+        <ContextMenuContent><ContextItems project={project} actions={actions} /></ContextMenuContent>
       </ContextMenu>
     )
   }
@@ -183,12 +212,12 @@ export const ProjectCard = memo(function ProjectCard({
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">{menu}</DropdownMenuContent>
+              <DropdownMenuContent align="end"><DropdownItems project={project} actions={actions} /></DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>{menu}</ContextMenuContent>
+      <ContextMenuContent><ContextItems project={project} actions={actions} /></ContextMenuContent>
     </ContextMenu>
   )
 })
