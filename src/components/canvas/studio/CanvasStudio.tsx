@@ -259,7 +259,10 @@ function CanvasStudioInner({
         ...stateRef.current,
         viewport: reactFlow.getViewport(),
       })
-      if (body === savedGraph.current) return true
+      if (body === savedGraph.current) {
+        setSaveState("saved")
+        return true
+      }
       setSaveState("saving")
       const task = (async () => {
         try {
