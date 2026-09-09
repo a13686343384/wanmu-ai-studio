@@ -87,6 +87,7 @@ export function StudioTextNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[380px]">
       <NodeLabel icon={<span className="font-serif text-[10px]">T</span>} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
           "rounded-xl border bg-zinc-900/80 p-3 transition-colors",
@@ -147,9 +148,10 @@ export function StudioTextNode({ id, data, selected }: NodeProps) {
           className="w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
         />
       </div>
+      <PlusHandles />
+      </div>
 
       {selected && <StudioComposer nodeId={id} kind="text" prompt={d.prompt} modelId={d.modelId} />}
-      <PlusHandles />
     </div>
   )
 }
@@ -165,6 +167,7 @@ export function StudioImageNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[420px]">
       <NodeLabel icon={<ImageIcon className="h-3 w-3" />} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
           "overflow-hidden rounded-xl border transition-colors",
@@ -212,8 +215,10 @@ export function StudioImageNode({ id, data, selected }: NodeProps) {
         />
       </div>
 
-      {selected && <StudioComposer nodeId={id} kind="image" prompt={d.prompt} modelId={d.modelId} />}
       <PlusHandles />
+      </div>
+
+      {selected && <StudioComposer nodeId={id} kind="image" prompt={d.prompt} modelId={d.modelId} />}
     </div>
   )
 }
@@ -228,9 +233,10 @@ export function StudioVideoNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[420px]">
       <NodeLabel icon={<Video className="h-3 w-3" />} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
-          "relative overflow-hidden rounded-xl border transition-colors",
+          "overflow-hidden rounded-xl border transition-colors",
           selected ? "border-zinc-400/70" : "border-zinc-800 hover:border-zinc-700",
         )}
       >
@@ -268,8 +274,10 @@ export function StudioVideoNode({ id, data, selected }: NodeProps) {
         />
       </div>
 
-      {selected && <StudioComposer nodeId={id} kind="video" prompt={d.prompt} modelId={d.modelId} />}
       <PlusHandles />
+      </div>
+
+      {selected && <StudioComposer nodeId={id} kind="video" prompt={d.prompt} modelId={d.modelId} />}
     </div>
   )
 }
@@ -284,6 +292,7 @@ export function StudioAudioNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[460px]">
       <NodeLabel icon={<AudioLines className="h-3 w-3" />} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
           "overflow-hidden rounded-xl border transition-colors",
@@ -323,8 +332,10 @@ export function StudioAudioNode({ id, data, selected }: NodeProps) {
         />
       </div>
 
-      {selected && <StudioComposer nodeId={id} kind="audio" prompt={d.prompt} modelId={d.modelId} />}
       <PlusHandles />
+      </div>
+
+      {selected && <StudioComposer nodeId={id} kind="audio" prompt={d.prompt} modelId={d.modelId} />}
     </div>
   )
 }
@@ -338,6 +349,7 @@ export function StudioDirectorNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[340px]">
       <NodeLabel icon={<Layers className="h-3 w-3" />} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
           "flex flex-col items-center gap-3 rounded-xl border bg-zinc-900/80 px-6 py-10 text-center transition-colors",
@@ -352,8 +364,10 @@ export function StudioDirectorNode({ id, data, selected }: NodeProps) {
         </Button>
       </div>
 
-      {selected && <StudioComposer nodeId={id} kind="text" prompt={d.prompt} modelId={d.modelId} />}
       <PlusHandles />
+      </div>
+
+      {selected && <StudioComposer nodeId={id} kind="text" prompt={d.prompt} modelId={d.modelId} />}
     </div>
   )
 }
@@ -413,6 +427,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[360px]">
       <NodeLabel icon={<Box className="h-3 w-3" />} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
           "space-y-2.5 rounded-xl border bg-zinc-900/80 p-3 transition-colors",
@@ -542,8 +557,10 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
         </div>
       </div>
 
-      {selected && <StudioComposer nodeId={id} kind="text" prompt={d.prompt} modelId={d.modelId} />}
       <PlusHandles />
+      </div>
+
+      {selected && <StudioComposer nodeId={id} kind="text" prompt={d.prompt} modelId={d.modelId} />}
     </div>
   )
 }
@@ -558,9 +575,10 @@ export function StudioStickyNode({ id, data, selected }: NodeProps) {
   return (
     <div className="w-[240px]">
       <NodeLabel icon={<span className="text-[10px]">🗒</span>} text={d.label} />
+      <div className="relative">
       <div
         className={cn(
-          "group relative rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-3 transition-colors",
+          "group rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-3 transition-colors",
           selected ? "border-amber-400/60" : "hover:border-amber-500/50",
         )}
       >
@@ -581,6 +599,7 @@ export function StudioStickyNode({ id, data, selected }: NodeProps) {
         </button>
       </div>
       <PlusHandles />
+      </div>
     </div>
   )
 }
