@@ -32,6 +32,8 @@
 | 7 收尾 | 19 E2E 测试 | ✅ | Playwright 26 用例全绿（认证/工作台/画布/影视工厂） |
 | | 20 UI 打磨与性能 | ✅ | 共享 Loading/Error/Empty 组件、Skeleton 骨架屏、framer-motion 转场、memo/懒加载/渐进渲染、移动端抽屉入口 |
 | | 21 文档与部署 | ✅ | README / setup-guide / api-reference / Dockerfile + docker-compose；全新环境演练通过 |
+| 22 备忘录需求 | ✅ | 文字+93 截图全量读取；全局快修、画布九项、影视工厂七项、剧本创作样式统一、插件模型配置（16 模板+凭据）、电商设计室（商品套图+A+ 详情页） |
+| 23 新增模块 | ✅ | 剧本创作（WritingProject+版本/导入）、素材上传（MediaFile）、资产配置弹窗、出片前检查、任务队列 |
 
 ---
 
