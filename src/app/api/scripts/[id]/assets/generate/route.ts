@@ -6,6 +6,8 @@ import { buildAssetPrompt } from "@/lib/asset-prompt"
 import { z } from "zod"
 
 const schema = z.object({
+  aspectRatio: z.string().optional(),
+  resolution: z.string().default("1K"),
   kind: z.enum(["character", "scene", "prop"]),
   /** 为空则生成该类全部资产 */
   ids: z.array(z.string()).optional(),
@@ -33,18 +35,31 @@ export const POST = withErrorHandling(
 
     if (input.kind === "character") {
       const items = await prisma.character.findMany({
-        where: { scriptId: script.id, ...(input.ids?.length ? { id: { in: input.ids } } : {}) },
+        where: {
+          scriptId: script.id,
+          ...(input.ids?.length ? { id: { in: input.ids } } : {}),
+        },
       })
-      if (items.length === 0) return jsonError("没有可生成的角色，请先提取资产", 400)
+      if (items.length === 0)
+        return jsonError("没有可生成的角色，请先提取资产", 400)
 
       for (const item of items) {
-        await prisma.character.update({ where: { id: item.id }, data: { status: "generating" } })
-        const prompt = buildAssetPrompt(context, "character", item.name, item.description, item.appearance)
+        await prisma.character.update({
+          where: { id: item.id },
+          data: { status: "generating" },
+        })
+        const prompt = buildAssetPrompt(
+          context,
+          "character",
+          item.name,
+          item.description,
+          item.appearance,
+        )
         const { data } = await ai.generateImage({
           prompt,
           model: input.model,
-          aspectRatio: script.targetAspect,
-          resolution: "1K",
+          aspectRatio: input.aspectRatio ?? script.targetAspect,
+          resolution: input.resolution,
         })
         await prisma.character.update({
           where: { id: item.id },
@@ -56,12 +71,19 @@ export const POST = withErrorHandling(
 
     if (input.kind === "scene") {
       const items = await prisma.scene.findMany({
-        where: { scriptId: script.id, ...(input.ids?.length ? { id: { in: input.ids } } : {}) },
+        where: {
+          scriptId: script.id,
+          ...(input.ids?.length ? { id: { in: input.ids } } : {}),
+        },
       })
-      if (items.length === 0) return jsonError("没有可生成的场景，请先提取资产", 400)
+      if (items.length === 0)
+        return jsonError("没有可生成的场景，请先提取资产", 400)
 
       for (const item of items) {
-        await prisma.scene.update({ where: { id: item.id }, data: { status: "generating" } })
+        await prisma.scene.update({
+          where: { id: item.id },
+          data: { status: "generating" },
+        })
         const prompt = buildAssetPrompt(
           context,
           "scene",
@@ -72,8 +94,8 @@ export const POST = withErrorHandling(
         const { data } = await ai.generateImage({
           prompt,
           model: input.model,
-          aspectRatio: script.targetAspect,
-          resolution: "1K",
+          aspectRatio: input.aspectRatio ?? script.targetAspect,
+          resolution: input.resolution,
         })
         await prisma.scene.update({
           where: { id: item.id },
@@ -84,18 +106,30 @@ export const POST = withErrorHandling(
     }
 
     const items = await prisma.prop.findMany({
-      where: { scriptId: script.id, ...(input.ids?.length ? { id: { in: input.ids } } : {}) },
+      where: {
+        scriptId: script.id,
+        ...(input.ids?.length ? { id: { in: input.ids } } : {}),
+      },
     })
-    if (items.length === 0) return jsonError("没有可生成的道具，请先提取资产", 400)
+    if (items.length === 0)
+      return jsonError("没有可生成的道具，请先提取资产", 400)
 
     for (const item of items) {
-      await prisma.prop.update({ where: { id: item.id }, data: { status: "generating" } })
-      const prompt = buildAssetPrompt(context, "prop", item.name, item.description)
+      await prisma.prop.update({
+        where: { id: item.id },
+        data: { status: "generating" },
+      })
+      const prompt = buildAssetPrompt(
+        context,
+        "prop",
+        item.name,
+        item.description,
+      )
       const { data } = await ai.generateImage({
         prompt,
         model: input.model,
         aspectRatio: "1:1",
-        resolution: "1K",
+        resolution: input.resolution,
       })
       await prisma.prop.update({
         where: { id: item.id },

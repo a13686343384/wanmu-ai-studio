@@ -5,6 +5,7 @@ import { getAIService } from "@/services/ai"
 import { z } from "zod"
 
 const extractSchema = z.object({
+  model: z.string().optional(),
   /** 仅提取指定类别；不传则三类都提取 */
   kinds: z.array(z.enum(["characters", "scenes", "props"])).optional(),
 })
@@ -20,7 +21,7 @@ export const POST = withErrorHandling(
     const script = await requireScriptAccess(params.id, user.id)
 
     const body = await req.json().catch(() => ({}))
-    const { kinds } = extractSchema.parse(body)
+    const { kinds, model } = extractSchema.parse(body)
     const targets = kinds ?? ["characters", "scenes", "props"]
 
     const ai = getAIService()
@@ -34,7 +35,7 @@ export const POST = withErrorHandling(
       if (targets.includes("characters")) {
         const { data } = await ai.extractCharacters({
           content: script.content,
-          model: script.textModel,
+          model: model ?? script.textModel,
         })
         await tx.character.deleteMany({ where: { scriptId: script.id } })
         await tx.character.createMany({
@@ -53,7 +54,7 @@ export const POST = withErrorHandling(
       if (targets.includes("scenes")) {
         const { data } = await ai.extractScenes({
           content: script.content,
-          model: script.textModel,
+          model: model ?? script.textModel,
         })
         await tx.scene.deleteMany({ where: { scriptId: script.id } })
         await tx.scene.createMany({
@@ -72,7 +73,7 @@ export const POST = withErrorHandling(
       if (targets.includes("props")) {
         const { data } = await ai.extractProps({
           content: script.content,
-          model: script.textModel,
+          model: model ?? script.textModel,
         })
         await tx.prop.deleteMany({ where: { scriptId: script.id } })
         await tx.prop.createMany({
@@ -88,9 +89,18 @@ export const POST = withErrorHandling(
     })
 
     const [characters, scenes, props] = await Promise.all([
-      prisma.character.findMany({ where: { scriptId: script.id }, orderBy: { createdAt: "asc" } }),
-      prisma.scene.findMany({ where: { scriptId: script.id }, orderBy: { createdAt: "asc" } }),
-      prisma.prop.findMany({ where: { scriptId: script.id }, orderBy: { createdAt: "asc" } }),
+      prisma.character.findMany({
+        where: { scriptId: script.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.scene.findMany({
+        where: { scriptId: script.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.prop.findMany({
+        where: { scriptId: script.id },
+        orderBy: { createdAt: "asc" },
+      }),
     ])
 
     // 资产提取完成后，剧本推进到「资产就绪」阶段

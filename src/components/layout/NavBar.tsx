@@ -35,7 +35,10 @@ export function NavBar() {
   const [createTeamOpen, setCreateTeamOpen] = useState(false)
   const [joinTeamOpen, setJoinTeamOpen] = useState(false)
 
-  const immersive = /^(\/creation\/film-factory\/[^/]+|\/canvas\/[^/]+)$/.test(pathname)
+  const immersive =
+    /^(\/creation\/film-factory\/[^/]+|\/canvas\/[^/]+|\/creation\/script-writing\/[^/]+)$/.test(
+      pathname,
+    )
   if (immersive) return null
 
   return (
@@ -87,7 +90,12 @@ export function NavBar() {
               <Button variant="ghost" size="icon-sm" aria-label="帮助">
                 <HelpCircle className="h-4 w-4 text-zinc-400" />
               </Button>
-              <Button variant="ghost" size="icon-sm" aria-label="通知" className="relative">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="通知"
+                className="relative"
+              >
                 <Bell className="h-4 w-4 text-zinc-400" />
                 <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-orange-500" />
               </Button>
@@ -98,7 +106,12 @@ export function NavBar() {
             {/* 移动端抽屉导航 */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="打开菜单">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="md:hidden"
+                  aria-label="打开菜单"
+                >
                   <Menu className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
@@ -135,7 +148,10 @@ export function NavBar() {
         </div>
       </header>
 
-      <CreateTeamDialog open={createTeamOpen} onOpenChange={setCreateTeamOpen} />
+      <CreateTeamDialog
+        open={createTeamOpen}
+        onOpenChange={setCreateTeamOpen}
+      />
       <JoinTeamDialog open={joinTeamOpen} onOpenChange={setJoinTeamOpen} />
     </>
   )

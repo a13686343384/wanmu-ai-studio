@@ -5,7 +5,13 @@ import Link from "next/link"
 import { ListVideo, Package, Sparkles, Video, Wand2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { AssetSetupDialog, type AssetSetup } from "./AssetSetupDialog"
 import { ScriptDetailHeader } from "@/components/creation/film-factory/detail/ScriptDetailHeader"
 import { WorkflowTabs } from "@/components/creation/film-factory/detail/WorkflowTabs"
 import { EpisodeStrip } from "@/components/creation/film-factory/detail/EpisodeStrip"
@@ -17,7 +23,10 @@ import { SplitStoryboardDialog } from "@/components/creation/film-factory/detail
 import { StoryboardEditor } from "@/components/creation/film-factory/detail/StoryboardEditor"
 import { StoryboardGenerateDialog } from "@/components/creation/film-factory/detail/StoryboardGenerateDialog"
 import { ConsultDialog } from "@/components/creation/film-factory/detail/ConsultDialog"
-import { RecapDialog, type RecapResult } from "@/components/creation/film-factory/detail/RecapDialog"
+import {
+  RecapDialog,
+  type RecapResult,
+} from "@/components/creation/film-factory/detail/RecapDialog"
 import { VideoBatchDialog } from "@/components/creation/film-factory/video/VideoBatchDialog"
 import { PostProductionPanel } from "@/components/creation/film-factory/post/PostProductionPanel"
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
@@ -38,7 +47,11 @@ const NEXT_STEP_LABEL: Record<string, string> = {
  * 顶部返回条 → 工作流步骤条 → 分集胶片条 → 剧本内容 | 分镜 左右分栏 → 右侧资产栏 → 底部状态条。
  * 负责协调会诊、复述理解、拆分镜与分镜产物生成等全部交互。
  */
-export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetail }) {
+export function ScriptDetailView({
+  initialScript,
+}: {
+  initialScript: ScriptDetail
+}) {
   const [script, setScript] = useState(initialScript)
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(
     initialScript.episodes[0]?.id ?? null,
@@ -52,6 +65,7 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
   const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState("")
 
+  const [assetSetupOpen, setAssetSetupOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [consultOpen, setConsultOpen] = useState(false)
   const [recapOpen, setRecapOpen] = useState(false)
@@ -68,7 +82,8 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
   const [episodesSheetOpen, setEpisodesSheetOpen] = useState(false)
   const [assetsSheetOpen, setAssetsSheetOpen] = useState(false)
 
-  const activeEpisode = script.episodes.find((e) => e.id === activeEpisodeId) ?? null
+  const activeEpisode =
+    script.episodes.find((e) => e.id === activeEpisodeId) ?? null
 
   /* ---------------------------- 数据加载 ---------------------------- */
 
@@ -109,7 +124,10 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
 
   /* ---------------------------- 交互 ---------------------------- */
 
-  async function generateForStoryboard(storyboard: StoryboardDTO, kind: "image" | "video") {
+  async function generateForStoryboard(
+    storyboard: StoryboardDTO,
+    kind: "image" | "video",
+  ) {
     setBusyId(storyboard.id)
     try {
       const res = await fetch(`/api/storyboards/${storyboard.id}/generate`, {
@@ -181,22 +199,88 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
     setRecapResult(null)
     setRecapOpen(true)
   }, [])
-  const handleSelectEpisode = useCallback(
-    (id: string) => {
-      setActiveEpisodeId(id)
-      setEpisodesSheetOpen(false)
-    },
-    [],
-  )
+  const handleSelectEpisode = useCallback((id: string) => {
+    setActiveEpisodeId(id)
+    setEpisodesSheetOpen(false)
+  }, [])
+
+  async function generateAssets(config: AssetSetup) {
+    setGenerating(true)
+    setProgress(5)
+    setProgressLabel("正在提取全剧资产…")
+    const poll = window.setInterval(() => void reloadScript(), 1500)
+    try {
+      const kinds = (["characters", "scenes", "props"] as const).filter(
+        (kind) => !script[kind].length,
+      )
+      let assets = script
+      if (kinds.length) {
+        const res = await fetch(`/api/scripts/${script.id}/assets`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kinds, model: config.textModel }),
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "提取失败")
+        assets = { ...script, ...payload.data }
+      }
+      const queue = (["characters", "scenes", "props"] as const).flatMap(
+        (kind) =>
+          assets[kind]
+            .filter((item) => !item.imageUrl)
+            .map((item) => ({
+              kind:
+                kind === "characters"
+                  ? "character"
+                  : kind === "scenes"
+                    ? "scene"
+                    : "prop",
+              item,
+            })),
+      )
+      for (const [index, entry] of queue.entries()) {
+        setProgressLabel(
+          `正在生成 ${entry.item.name}（${index + 1}/${queue.length}）`,
+        )
+        const res = await fetch(`/api/scripts/${script.id}/assets/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: entry.kind,
+            ids: [entry.item.id],
+            model: config.imageModel,
+            aspectRatio: config.aspectRatio,
+            resolution: config.resolution,
+          }),
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "资产生成失败")
+        setProgress(Math.round(((index + 1) / queue.length) * 100))
+      }
+      await reloadScript()
+      toast.success("全剧资产已生成，可以继续拆分镜")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "资产生成失败")
+    } finally {
+      window.clearInterval(poll)
+      setGenerating(false)
+      setProgress(0)
+    }
+  }
 
   function runNextStep() {
     switch (script.status) {
       case "intake":
       case "outlining":
       case "assets":
-        void reloadScript()
-        toast.info("资产提取", { description: "点击右上角刷新按钮从剧本提取人物/场景/道具" })
-        setAssetsSheetOpen(false)
+        if (
+          totalAssets > 0 &&
+          [...script.characters, ...script.scenes, ...script.props].every(
+            (item) => item.imageUrl,
+          )
+        )
+          setSplitOpen(true)
+        else setAssetSetupOpen(true)
         break
       case "storyboarding":
         setSplitOpen(true)
@@ -211,6 +295,12 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
 
   return (
     <div className="flex h-screen flex-col">
+      <AssetSetupDialog
+        open={assetSetupOpen}
+        onOpenChange={setAssetSetupOpen}
+        aspectRatio={script.targetAspect}
+        onStart={(config) => void generateAssets(config)}
+      />
       <ScriptDetailHeader
         script={script}
         onConsult={() => setConsultOpen(true)}
@@ -221,7 +311,11 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
       <WorkflowTabs
         script={script}
         processing={script.processingStatus}
-        counts={{ episodes: script.episodes.length, assets: totalAssets, storyboards: storyboards.length }}
+        counts={{
+          episodes: script.episodes.length,
+          assets: totalAssets,
+          storyboards: storyboards.length,
+        }}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -237,9 +331,23 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
               </span>
 
               <div className="ml-auto flex items-center gap-1.5">
-                <Button variant="brand" size="sm" className="h-7" onClick={runNextStep}>
+                <Button
+                  variant="brand"
+                  size="sm"
+                  className="h-7"
+                  disabled={generating}
+                  onClick={runNextStep}
+                >
                   <Wand2 className="h-3.5 w-3.5" />
-                  {NEXT_STEP_LABEL[script.status] ?? "下一步"}
+                  {script.status === "assets" &&
+                  totalAssets > 0 &&
+                  [
+                    ...script.characters,
+                    ...script.scenes,
+                    ...script.props,
+                  ].every((item) => item.imageUrl)
+                    ? "下一步 · 拆分镜"
+                    : (NEXT_STEP_LABEL[script.status] ?? "下一步")}
                 </Button>
                 <Button variant="outline" size="sm" className="h-7" asChild>
                   <Link href="/canvas">打通到画布</Link>
@@ -259,7 +367,10 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
           {/* 内容区：剧本内容 | 分镜 */}
           <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)] xl:grid-rows-1">
             <section className="min-h-0 border-b border-zinc-800/80 xl:border-b-0 xl:border-r">
-              <ScriptContent episode={activeEpisode} onSaved={() => void reloadScript()} />
+              <ScriptContent
+                episode={activeEpisode}
+                onSaved={() => void reloadScript()}
+              />
             </section>
             <section className="min-h-0">
               <StoryboardSection
@@ -301,9 +412,13 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
         <span>目标画幅 {script.targetAspect}</span>
         <span>
           {script.processingStatus === "processing" ? (
-            <span className="text-amber-400">{script.progressLabel ?? "处理中"}</span>
+            <span className="text-amber-400">
+              {script.progressLabel ?? "处理中"}
+            </span>
           ) : (
-            <span className="text-emerald-400">{script.progressLabel ?? "就绪"}</span>
+            <span className="text-emerald-400">
+              {script.progressLabel ?? "就绪"}
+            </span>
           )}
         </span>
 
@@ -318,7 +433,12 @@ export function ScriptDetailView({ initialScript }: { initialScript: ScriptDetai
             <Video className="h-3.5 w-3.5" />
             下一步 · 出视频
           </Button>
-          <Button variant="outline" size="sm" className="h-7" onClick={() => setPostOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={() => setPostOpen(true)}
+          >
             <Sparkles className="h-3.5 w-3.5" />
             后期合成
           </Button>

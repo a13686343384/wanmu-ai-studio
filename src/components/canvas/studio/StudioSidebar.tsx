@@ -17,6 +17,7 @@ import {
   User,
   Video,
 } from "lucide-react"
+import { StudioAssets } from "./StudioAssets"
 import { cn } from "@/lib/utils"
 import type { Node } from "@xyflow/react"
 import type { StudioNodeData } from "./types"
@@ -120,12 +121,16 @@ export function StudioSidebar({
               onClick={() => onTabChange(item.key)}
               className={cn(
                 "flex-1 rounded-md px-2 py-1 text-xs transition-colors",
-                tab === item.key ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300",
+                tab === item.key
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300",
               )}
             >
               {item.label}
               {item.key === "assets" && nodes.length > 0 && (
-                <span className="ml-1 text-[10px] text-zinc-600">{nodes.length}</span>
+                <span className="ml-1 text-[10px] text-zinc-600">
+                  {nodes.length}
+                </span>
               )}
             </button>
           ))}
@@ -189,8 +194,12 @@ export function StudioSidebar({
                     {KIND_ICON[item.kind as keyof typeof KIND_ICON]}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs text-zinc-300">{item.label}</span>
-                    <span className="block truncate text-[10px] text-zinc-600">{item.hint}</span>
+                    <span className="block truncate text-xs text-zinc-300">
+                      {item.label}
+                    </span>
+                    <span className="block truncate text-[10px] text-zinc-600">
+                      {item.hint}
+                    </span>
                   </span>
                 </button>
               ))
@@ -198,90 +207,7 @@ export function StudioSidebar({
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2 pt-2">
-          <div className="flex items-center justify-end gap-1.5">
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
-            >
-              <Sparkles className="h-3 w-3" />
-              AI 角色
-            </button>
-            <button
-              type="button"
-              aria-label="新建资产"
-              className="flex h-6 w-6 items-center justify-center rounded-lg border border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
-            >
-              +
-            </button>
-          </div>
-
-          <div className="mt-2 flex rounded-lg bg-zinc-900/70 p-0.5">
-            {(
-              [
-                { key: "personal", label: "个人" },
-                { key: "team", label: "团队" },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setAssetScope(item.key)}
-                className={cn(
-                  "flex-1 rounded-md px-2 py-1 text-xs transition-colors",
-                  assetScope === item.key ? "bg-zinc-800 text-zinc-100" : "text-zinc-500",
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative mt-2">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-600" />
-            <input
-              placeholder="搜索"
-              className="h-7 w-full rounded-lg border border-zinc-800 bg-zinc-900/50 pl-7 pr-2 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-700"
-            />
-          </div>
-
-          <p className="mt-3 px-1 text-[10px] uppercase tracking-wider text-zinc-600">文件夹</p>
-
-          <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-            {ASSET_FOLDERS.map((folder) => {
-              const Icon = folder.icon
-              const open = openFolders.includes(folder.name)
-              return (
-                <div key={folder.name}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenFolders((current) =>
-                        current.includes(folder.name)
-                          ? current.filter((name) => name !== folder.name)
-                          : [...current, folder.name],
-                      )
-                    }
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-900"
-                  >
-                    {open ? (
-                      <ChevronDown className="h-3 w-3 shrink-0 text-zinc-600" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
-                    )}
-                    <Icon className="h-3 w-3 shrink-0 text-zinc-500" />
-                    {folder.name}
-                  </button>
-                  {open && (
-                    <p className="px-8 py-1.5 text-[10px] text-zinc-700">
-                      {folder.name === "未分类" ? "暂无未分类的素材" : "空"}
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <StudioAssets />
       )}
     </aside>
   )

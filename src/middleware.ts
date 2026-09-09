@@ -19,6 +19,6 @@ export const config = {
      * - /api/auth/*（NextAuth 接口）
      * - Next.js 静态资源
      */
-    "/((?!login|register|api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!login|register|api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 }

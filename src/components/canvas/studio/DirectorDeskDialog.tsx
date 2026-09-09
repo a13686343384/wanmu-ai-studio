@@ -45,7 +45,11 @@ export function DirectorDeskDialog({
     }
 
     function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== iframeRef.current?.contentWindow
+      )
+        return
       const type = event.data?.type
       if (type === MSG_READY) {
         readyRef.current = true
@@ -65,7 +69,10 @@ export function DirectorDeskDialog({
         const captures = raw
           .map((item: { dataUrl?: unknown; fileName?: unknown }) => ({
             dataUrl: typeof item?.dataUrl === "string" ? item.dataUrl : "",
-            fileName: typeof item?.fileName === "string" ? item.fileName : "capture.png",
+            fileName:
+              typeof item?.fileName === "string"
+                ? item.fileName
+                : "capture.png",
           }))
           .filter((item: DirectorDeskCapture) => Boolean(item.dataUrl))
         if (captures.length) onCaptures(captures)

@@ -30,19 +30,22 @@ async function createFreshScript(page: Page): Promise<string> {
   expect(created.ok()).toBeTruthy()
   const { data } = await created.json()
 
-  const finalized = await page.request.post(`/api/scripts/${data.id}/finalize`, {
-    data: {
-      title,
-      genre: "科幻/废土/复仇爽剧",
-      narrativeStyle: "主角单线快节奏升级",
-      visualStyle: "真人写实电影感",
-      costumeStyle: "废土机能风",
-      era: "近未来废土",
-      totalEpisodes: 2,
-      episodeDuration: 90,
-      targetAspect: "9:16",
+  const finalized = await page.request.post(
+    `/api/scripts/${data.id}/finalize`,
+    {
+      data: {
+        title,
+        genre: "科幻/废土/复仇爽剧",
+        narrativeStyle: "主角单线快节奏升级",
+        visualStyle: "真人写实电影感",
+        costumeStyle: "废土机能风",
+        era: "近未来废土",
+        totalEpisodes: 2,
+        episodeDuration: 90,
+        targetAspect: "9:16",
+      },
     },
-  })
+  )
   expect(finalized.ok()).toBeTruthy()
 
   return data.id as string
@@ -82,15 +85,23 @@ test.describe("影视工厂", () => {
 
     // 作品类型：4 个 pill
     for (const label of ["竖屏短剧", "横屏短剧", "微电影", "动漫"]) {
-      await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible()
+      await expect(
+        page.getByRole("button", { name: label, exact: true }),
+      ).toBeVisible()
     }
 
     // 剧集类型 / 加工方式 / 执行方式
-    await expect(page.getByRole("button", { name: /限定剧/ }).first()).toBeVisible()
-    await expect(page.getByRole("button", { name: /会诊 \+ 台词优化/ })).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: /限定剧/ }).first(),
+    ).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: /会诊 \+ 台词优化/ }),
+    ).toBeVisible()
     await expect(page.getByRole("button", { name: /原样保留/ })).toBeVisible()
     await expect(page.getByRole("button", { name: /^逐步确认/ })).toBeVisible()
-    await expect(page.getByRole("button", { name: /^全自动一步到位/ })).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: /^全自动一步到位/ }),
+    ).toBeVisible()
   })
 
   test("完整走通 INTAKE → 分析 → 审阅 → 创建剧本", async ({ page }) => {
@@ -102,14 +113,20 @@ test.describe("影视工厂", () => {
 
     await page.getByRole("button", { name: /AI 智能立项/ }).click()
 
-    await expect(page.getByText("正在通读全本，理解剧情脉络")).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByText("审阅并创建剧本")).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText("正在通读全本，理解剧情脉络")).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText("审阅并创建剧本")).toBeVisible({
+      timeout: 60_000,
+    })
     await expect(page.getByText("AI 推理结果")).toBeVisible()
     await expect(page.getByText("AI 立项方案")).toBeVisible()
 
     await page.getByRole("button", { name: "创建剧本" }).click()
 
-    await expect(page).toHaveURL(/\/creation\/film-factory\/[a-z0-9]+/i, { timeout: 60_000 })
+    await expect(page).toHaveURL(/\/creation\/film-factory\/[a-z0-9]+/i, {
+      timeout: 60_000,
+    })
     await expect(page.getByText(title, { exact: true })).toBeVisible()
     await expect(page.getByText("分集", { exact: true })).toBeVisible()
     await expect(page.getByText("全剧资产")).toBeVisible()
@@ -126,7 +143,9 @@ test.describe("影视工厂", () => {
     await expect(page.getByText("先让 AI 复述理解本集").first()).toBeVisible()
     await expect(page.getByText(/单集时长/)).toBeVisible()
     await expect(page.getByText("全剧资产")).toBeVisible()
-    await expect(page.getByRole("button", { name: /下一步/ }).first()).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: /下一步/ }).first(),
+    ).toBeVisible()
   })
 
   test("剧本会诊弹窗可以出具诊断报告", async ({ page }) => {
@@ -137,7 +156,9 @@ test.describe("影视工厂", () => {
     await page.getByRole("button", { name: /^会诊/ }).click()
     await page.getByRole("button", { name: /开始会诊/ }).click()
 
-    await expect(page.getByText("诊断报告", { exact: true }).first()).toBeVisible({ timeout: 40_000 })
+    await expect(
+      page.getByText("诊断报告", { exact: true }).first(),
+    ).toBeVisible({ timeout: 40_000 })
     await expect(page.getByText("建议清单（勾选要改的项）")).toBeVisible()
   })
 
@@ -146,7 +167,10 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await page.getByRole("button", { name: /批量生成分镜/ }).first().click()
+    await page
+      .getByRole("button", { name: /批量生成分镜/ })
+      .first()
+      .click()
 
     for (const tab of ["出图", "仅拆分镜", "出视频", "后期 BGM"]) {
       await expect(page.getByRole("tab", { name: tab })).toBeVisible()
@@ -158,13 +182,20 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await page.getByRole("button", { name: /批量生成分镜/ }).first().click()
+    await page
+      .getByRole("button", { name: /批量生成分镜/ })
+      .first()
+      .click()
     await page.getByRole("tab", { name: "仅拆分镜" }).click()
     await page.getByRole("button", { name: "开始" }).click()
 
-    await expect(page.getByText(/个镜头/).first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText(/个镜头/).first()).toBeVisible({
+      timeout: 60_000,
+    })
     // 拆分完成后卡片出现
-    await expect(page.getByText(/分镜 1/).first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText(/分镜 1/).first()).toBeVisible({
+      timeout: 60_000,
+    })
   })
 
   test("AI 复述理解本集", async ({ page }) => {
@@ -172,7 +203,10 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await page.getByRole("button", { name: /先让 AI 复述理解本集/ }).first().click()
+    await page
+      .getByRole("button", { name: /先让 AI 复述理解本集/ })
+      .first()
+      .click()
     await page.getByRole("button", { name: /让 AI 复述理解/ }).click()
 
     await expect(page.getByText("AI 的理解")).toBeVisible({ timeout: 40_000 })
@@ -185,9 +219,42 @@ test.describe("影视工厂", () => {
     await page.waitForLoadState("networkidle")
 
     await page.getByRole("button", { name: "重新提取资产" }).click()
-    await expect(page.getByText(/资产已提取/).first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText(/资产已提取/).first()).toBeVisible({
+      timeout: 60_000,
+    })
 
     await page.getByRole("tab", { name: /场景/ }).click()
-    await expect(page.getByText(/拾荒|伊甸园|数据深渊/).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/拾荒|伊甸园|数据深渊/).first()).toBeVisible({
+      timeout: 20_000,
+    })
+  })
+  test("下一步打开资产模型配置，分镜展示出片前检查", async ({ page }) => {
+    const id = await createFreshScript(page)
+    try {
+      await page.goto(`/creation/film-factory/${id}`)
+      await page.getByRole("button", { name: /下一步 · 出人物/ }).click()
+      await expect(
+        page.getByRole("dialog", { name: "生成人物 / 场景资产" }),
+      ).toBeVisible()
+      await page
+        .getByLabel("资产文本模型", { exact: true })
+        .selectOption("ovlm-5.6")
+      await page.getByRole("button", { name: "取消", exact: true }).click()
+      const detail = (
+        await (await page.request.get(`/api/scripts/${id}`)).json()
+      ).data
+      await page.request.post(
+        `/api/scripts/${id}/episodes/${detail.episodes[0].id}/storyboards`,
+        { data: { mode: "text", model: "ovlm-6" } },
+      )
+      await page.reload()
+      await expect(page.getByText("出片前检查", { exact: true })).toBeVisible()
+      await page.getByText("出片前检查", { exact: true }).click()
+      await expect(
+        page.getByRole("button", { name: "补首帧图" }).first(),
+      ).toBeVisible()
+    } finally {
+      await page.request.delete(`/api/scripts/${id}`)
+    }
   })
 })

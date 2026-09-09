@@ -39,12 +39,16 @@ export interface StudioNodeData {
 
 /** 跨组件能力：打开导演台、切换侧栏 Tab、提示。 */
 export interface StudioContextValue {
+  projectId: string
+  beforeChange: () => void
   openDirectorDesk: (nodeId: string) => void
   setSidebarTab: (tab: "canvas" | "assets") => void
   notify: (message: string, description?: string) => void
 }
 
 export const StudioContext = createContext<StudioContextValue>({
+  projectId: "",
+  beforeChange: () => {},
   openDirectorDesk: () => {},
   setSidebarTab: () => {},
   notify: () => {},

@@ -22,30 +22,30 @@ export const POST = withErrorHandling(async (req: Request) => {
           model: input.modelId,
         })
       : input.mediaType === "video"
-      ? await ai.generateVideo({
-          prompt: input.prompt,
-          model: input.modelId,
-          aspectRatio: input.aspectRatio,
-          resolution: input.resolution,
-          duration: input.duration,
-          references: input.references,
-        })
-      : input.mediaType === "audio"
-        ? await ai.generateAudio({
+        ? await ai.generateVideo({
             prompt: input.prompt,
             model: input.modelId,
+            aspectRatio: input.aspectRatio,
+            resolution: input.resolution,
             duration: input.duration,
-            smartLyrics: true,
+            references: input.references,
           })
-      : await ai.generateImage({
-          prompt: input.prompt,
-          model: input.modelId,
-          aspectRatio: input.aspectRatio,
-          resolution: input.resolution,
-          count: input.count,
-          style: input.style,
-          references: input.references,
-        })
+        : input.mediaType === "audio"
+          ? await ai.generateAudio({
+              prompt: input.prompt,
+              model: input.modelId,
+              duration: input.duration,
+              smartLyrics: input.smartLyrics ?? true,
+            })
+          : await ai.generateImage({
+              prompt: input.prompt,
+              model: input.modelId,
+              aspectRatio: input.aspectRatio,
+              resolution: input.resolution,
+              count: input.count,
+              style: input.style,
+              references: input.references,
+            })
 
   const cost = result.usage.tapies
 
@@ -54,9 +54,13 @@ export const POST = withErrorHandling(async (req: Request) => {
   }
 
   // 扣减积分（原子操作，避免并发下超扣）
-  const updated = await prisma.user.update({
-    where: { id: user.id },
+  const charged = await prisma.user.updateMany({
+    where: { id: user.id, tapies: { gte: cost } },
     data: { tapies: { decrement: cost } },
+  })
+  if (!charged.count) return jsonError("积分不足，请刷新余额后重试", 402)
+  const updated = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
     select: { tapies: true },
   })
 
@@ -64,10 +68,18 @@ export const POST = withErrorHandling(async (req: Request) => {
     input.mediaType === "text"
       ? { text: (result.data as { text: string }).text }
       : input.mediaType === "video"
-      ? (result.data as { video: { url: string; poster?: string; duration?: number } }).video
-      : input.mediaType === "audio"
-        ? (result.data as { audio: { url: string; poster?: string; duration?: number } }).audio
-        : (result.data as { images: { url: string }[] }).images[0]!
+        ? (
+            result.data as {
+              video: { url: string; poster?: string; duration?: number }
+            }
+          ).video
+        : input.mediaType === "audio"
+          ? (
+              result.data as {
+                audio: { url: string; poster?: string; duration?: number }
+              }
+            ).audio
+          : (result.data as { images: { url: string }[] }).images[0]!
 
   return jsonOk(
     {

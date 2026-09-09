@@ -275,21 +275,70 @@ export interface SplitStoryboardsResult {
 /* ---------------------------- 服务接口 ---------------------------- */
 
 export interface AIService {
+  writeScript(input: WriteScriptInput): Promise<AIResult<WriteScriptResult>>
   analyzeScript(input: AnalyzeScriptInput): Promise<AIResult<ScriptAnalysis>>
   generateText(input: GenerateTextInput): Promise<AIResult<GenerateTextResult>>
-  consultScript(input: ConsultScriptInput): Promise<AIResult<ConsultScriptResult>>
+  consultScript(
+    input: ConsultScriptInput,
+  ): Promise<AIResult<ConsultScriptResult>>
   consultChat(input: ConsultChatInput): Promise<AIResult<ConsultChatResult>>
-  optimizeDialogue(input: OptimizeDialogueInput): Promise<AIResult<OptimizeDialogueResult>>
-  generateOutline(input: GenerateOutlineInput): Promise<AIResult<GenerateOutlineResult>>
-  summarizeEpisode(input: SummarizeEpisodeInput): Promise<AIResult<SummarizeEpisodeResult>>
+  optimizeDialogue(
+    input: OptimizeDialogueInput,
+  ): Promise<AIResult<OptimizeDialogueResult>>
+  generateOutline(
+    input: GenerateOutlineInput,
+  ): Promise<AIResult<GenerateOutlineResult>>
+  summarizeEpisode(
+    input: SummarizeEpisodeInput,
+  ): Promise<AIResult<SummarizeEpisodeResult>>
 
-  extractCharacters(input: ExtractCharactersInput): Promise<AIResult<CharacterDraft[]>>
+  extractCharacters(
+    input: ExtractCharactersInput,
+  ): Promise<AIResult<CharacterDraft[]>>
   extractScenes(input: ExtractScenesInput): Promise<AIResult<SceneDraft[]>>
   extractProps(input: ExtractPropsInput): Promise<AIResult<PropDraft[]>>
 
-  generateImage(input: GenerateImageInput): Promise<AIResult<GenerateImageResult>>
-  generateVideo(input: GenerateVideoInput): Promise<AIResult<GenerateVideoResult>>
-  generateAudio(input: GenerateAudioInput): Promise<AIResult<GenerateAudioResult>>
+  generateImage(
+    input: GenerateImageInput,
+  ): Promise<AIResult<GenerateImageResult>>
+  generateVideo(
+    input: GenerateVideoInput,
+  ): Promise<AIResult<GenerateVideoResult>>
+  generateAudio(
+    input: GenerateAudioInput,
+  ): Promise<AIResult<GenerateAudioResult>>
 
-  splitStoryboards(input: SplitStoryboardsInput): Promise<AIResult<SplitStoryboardsResult>>
+  splitStoryboards(
+    input: SplitStoryboardsInput,
+  ): Promise<AIResult<SplitStoryboardsResult>>
+}
+
+export interface WriteScriptInput {
+  title: string
+  idea: string
+  genre: string
+  totalEpisodes: number
+  episodeDuration: number
+  model: string
+  blueprint: string
+  instruction?: string
+  episodeNumber?: number
+  characters: { name: string; description: string }[]
+  episodes: {
+    number: number
+    title: string
+    summary: string
+    content: string
+  }[]
+}
+export interface WriteScriptResult {
+  blueprint: string
+  characters: { name: string; description: string }[]
+  episodes: {
+    number: number
+    title: string
+    summary: string
+    content: string
+  }[]
+  reply: string
 }

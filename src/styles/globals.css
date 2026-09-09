@@ -36,7 +36,9 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
   }
   /* 深色滚动条 */
   ::-webkit-scrollbar {
@@ -71,60 +73,95 @@
   }
 }
 
-/* 画布操作页：小地图约束尺寸并避开缩放控件 */
-.react-flow .react-flow__panel.react-flow__minimap {
-  margin: 0 0 44px 12px;
+/* MiniMap 尺寸由组件 style 同时驱动 SVG 与外框，避免只缩外框造成裁切。 */
+.studio-root .react-flow__panel.react-flow__minimap {
+  margin: 12px;
   overflow: hidden;
-  border: 1px solid #27272a;
   border-radius: 10px;
-  background: rgba(24, 24, 27, 0.85);
+  outline: 1px solid #3f3f46;
 }
-.react-flow .react-flow__minimap {
-  width: 176px;
-  height: 96px;
+/* 实际端点固定在卡片边缘；可见加号和热区独立，悬停只改变颜色。 */
+.studio-root .studio-handle {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
 }
-
-/* 画布操作页：连接点（吸附跟随由 JS 驱动；这里管显隐、贴外侧定位与配色） */
-.react-flow .studio-handle {
-  opacity: 0;
-  transition:
-    transform 0.16s ease-out,
-    opacity 0.18s ease,
-    border-color 0.12s ease,
-    box-shadow 0.12s ease,
-    background 0.12s ease;
+.studio-root .studio-handle.react-flow__handle-left {
+  left: 0;
 }
-/* 悬停节点 / 选中节点 / 连线中时显示 */
-.react-flow__node:hover .studio-handle,
-.react-flow__node.selected .studio-handle,
-.react-flow .studio-handle.react-flow__handle-connecting,
-.react-flow .studio-handle.react-flow__handle-connectingfrom,
-.react-flow .studio-handle.react-flow__handle-connectingto,
-.react-flow .studio-handle.react-flow__handle-valid {
-  opacity: 1;
+.studio-root .studio-handle.react-flow__handle-right {
+  right: 0;
 }
-/* 透明扩热区：把手有效命中范围比可见圆大 9px */
-.react-flow .studio-handle::after {
+.studio-root .studio-handle::after {
   content: "";
   position: absolute;
-  inset: -9px;
-  border-radius: 9999px;
+  inset: -14px;
+  border-radius: 50%;
 }
-/* 挂在卡片外侧，压住边线 */
-.react-flow .studio-handle.react-flow__handle-left {
-  left: -14px;
+.studio-handle > span {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #52525b;
+  border-radius: 50%;
+  background: #18181b;
+  color: #a1a1aa;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 120ms,
+    border-color 120ms;
 }
-.react-flow .studio-handle.react-flow__handle-right {
-  right: -14px;
+.react-flow__node:hover .studio-handle > span,
+.react-flow__node.selected .studio-handle > span,
+.studio-handle:hover > span,
+.studio-handle.connectingfrom > span,
+.studio-handle.connectingto > span {
+  opacity: 1;
 }
-.react-flow .studio-handle:hover,
-.react-flow .studio-handle.react-flow__handle-connecting {
-  border-color: #f97316 !important;
+.studio-handle:hover > span {
+  border-color: #f97316;
   color: #f97316;
-  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15);
 }
-.react-flow .studio-handle.react-flow__handle-valid {
-  background: #f97316;
-  border-color: #f97316 !important;
-  box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.25);
+.studio-root .react-flow__edge-path {
+  stroke: #a1a1aa;
+  stroke-width: 1.5;
+}
+.studio-root .react-flow__edge.selected .react-flow__edge-path {
+  stroke: #f97316;
+}
+.studio-footer > div {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.studio-workspace {
+  container-type: inline-size;
+}
+@container (max-width: 640px) {
+  .studio-footer {
+    justify-content: center;
+  }
+}
+@media (max-width: 640px) {
+  .studio-root > header {
+    overflow-x: auto;
+  }
+  .studio-root aside {
+    position: absolute;
+    z-index: 30;
+    top: 44px;
+    bottom: 0;
+    height: auto;
+    max-width: 85vw;
+    background: #09090b;
+  }
 }

@@ -93,6 +93,8 @@ model Workspace {
   scripts Script[]
   canvases Canvas[]
   joinRequests TeamJoinRequest[]
+  writingProjects WritingProject[]
+  mediaFiles MediaFile[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -386,4 +388,34 @@ model Consultation {
   updatedAt DateTime @updatedAt
 
   @@index([scriptId])
+}
+
+/// 编剧工作区：创意、蓝图、分集正文、版本和对话独立于影视工厂。
+model WritingProject {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  genre       String
+  idea        String   @db.Text
+  totalEpisodes Int    @default(30)
+  episodeDuration Int  @default(90)
+  document    Json     @default("{}")
+  revision    Int      @default(0)
+  importedScriptId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
+}
+
+/// 本地部署的持久化素材，读取时必须校验工作区成员。
+model MediaFile {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  mimeType    String
+  bytes       Bytes
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
 }

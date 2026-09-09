@@ -1,99 +1,110 @@
 "use client"
-
 import { useState } from "react"
-import { ArrowUp, AudioLines, ChevronDown, Coins, Image as ImageIcon, Mic, Video, Wand2 } from "lucide-react"
+import { ArrowUp, Loader2 } from "lucide-react"
+import { useNodesData, useReactFlow } from "@xyflow/react"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
+  ASPECT_RATIOS,
   AUDIO_MODELS,
+  DURATIONS,
   IMAGE_MODELS,
+  RESOLUTIONS,
   TEXT_MODELS,
   VIDEO_MODELS,
-  type AIModel,
 } from "@/lib/constants"
-import { cn } from "@/lib/utils"
-import type { StudioNodeKind } from "./types"
-import { useReactFlow } from "@xyflow/react"
+import { Progress } from "@/components/ui/progress"
+import { useStudio, type StudioNodeData, type StudioNodeKind } from "./types"
 
-const MODEL_LIST: Record<"text" | "image" | "video" | "audio", readonly AIModel[]> = {
+import { useStudioRequest } from "./useStudioRequest"
+
+const MODELS = {
   text: TEXT_MODELS,
   image: IMAGE_MODELS,
   video: VIDEO_MODELS,
   audio: AUDIO_MODELS,
 }
-
-const DEFAULT_MODEL: Record<"text" | "image" | "video" | "audio", string> = {
-  text: TEXT_MODELS[0]!.id,
-  image: IMAGE_MODELS[0]!.id,
-  video: VIDEO_MODELS[0]!.id,
-  audio: AUDIO_MODELS[0]!.id,
-}
-
-const PLACEHOLDER =
-  "描述任何你想要生成的内容，按 @ 引用素材，/ 呼出指令"
-
-/**
- * 画布操作页的 AI Composer：选中节点时出现在节点下方，
- * 按节点类型提供模型清单与参数行，发送调用统一生成接口并把产物写回节点。
- */
 export function StudioComposer({
   nodeId,
   kind,
-  prompt,
-  modelId,
 }: {
   nodeId: string
   kind: StudioNodeKind
   prompt?: string
   modelId?: string
 }) {
-  const composerKind = kind === "director" || kind === "action" || kind === "sticky" ? "text" : kind
-  const models = MODEL_LIST[composerKind]
-  const [draft, setDraft] = useState(prompt ?? "")
-  const [model, setModel] = useState(modelId ?? DEFAULT_MODEL[composerKind])
-  const [running, setRunning] = useState(false)
-  const { updateNodeData } = useReactFlow()
-
-  const current = models.find((item) => item.id === model) ?? models[0]!
-
+  const mediaType =
+    kind === "director" || kind === "action" || kind === "sticky"
+      ? "text"
+      : kind
+  const { getNodes, getEdges, updateNodeData, getNode } = useReactFlow()
+  const { beforeChange } = useStudio()
+  const data = useNodesData(nodeId)?.data as StudioNodeData | undefined
+  const [progress, setProgress] = useState(0)
+  const request = useStudioRequest(nodeId)
+  if (!data) return null
+  const draft = data.prompt ?? ""
+  const model = data.modelId ?? MODELS[mediaType][0]!.id
+  const current =
+    MODELS[mediaType].find((item) => item.id === model) ?? MODELS[mediaType][0]!
+  const running = request.running
+  const params = {
+    aspectRatio: String(data.aspectRatio ?? "16:9"),
+    resolution: String(
+      data.resolution ?? (mediaType === "image" ? "1K" : "480p"),
+    ),
+    duration: String(data.duration ?? (mediaType === "audio" ? "15s" : "5s")),
+    smartLyrics: data.smartLyrics !== false,
+  }
   async function send() {
-    if (!draft.trim() || running) return
-    setRunning(true)
+    if (!draft.trim() || !getNode(nodeId)) return
+    const token = request.begin()
+    if (!token) return
+    const sourceIds = getEdges()
+      .filter((edge) => edge.target === nodeId)
+      .map((edge) => edge.source)
+    const inputs = getNodes().filter((node) => sourceIds.includes(node.id))
+    const text = inputs
+      .map((node) => node.data.text)
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 1000)
+    beforeChange()
+    setProgress(10)
+    const timer = window.setInterval(
+      () => setProgress((value) => Math.min(90, value + 10)),
+      500,
+    )
     try {
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          mediaType: composerKind,
-          prompt: draft.trim(),
+          mediaType,
+          prompt: (text
+            ? `参考文本：${text}\n创作要求：${draft}`
+            : draft
+          ).slice(0, 2000),
           modelId: model,
-          aspectRatio: "16:9",
-          resolution: composerKind === "image" ? "1K" : "480p",
-          duration: "5s",
+          ...params,
           count: 1,
-          references: [],
+          references: inputs
+            .filter((node) =>
+              ["image", "video", "audio"].includes(String(node.type)),
+            )
+            .slice(0, 12)
+            .map((node) => ({
+              name: String(node.data.label),
+              kind: node.type,
+            })),
         }),
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error ?? "生成失败")
-
-      if (composerKind === "text") {
+      if (getNode(nodeId))
         updateNodeData(nodeId, {
-          text: payload.data.text,
-          prompt: draft.trim(),
-          modelId: model,
+          ...(mediaType === "text"
+            ? { text: payload.data.text }
+            : { url: payload.data.url }),
         })
-      } else {
-        updateNodeData(nodeId, {
-          url: payload.data.url,
-          prompt: draft.trim(),
-          modelId: model,
-        })
-      }
       window.dispatchEvent(new CustomEvent("studio:generated"))
     } catch (error) {
       window.dispatchEvent(
@@ -102,114 +113,134 @@ export function StudioComposer({
         }),
       )
     } finally {
-      setRunning(false)
+      request.end(token)
+      window.clearInterval(timer)
+      setProgress(100)
     }
   }
-
-  const KindIcon =
-    composerKind === "image" ? ImageIcon : composerKind === "video" ? Video : composerKind === "audio" ? AudioLines : Wand2
-
+  const selectClass =
+    "max-w-full rounded-md border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-[11px] text-zinc-300"
   return (
-    <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/90 p-2.5 shadow-xl backdrop-blur">
+    <div className="nodrag nowheel mt-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 shadow-xl">
       <textarea
+        aria-label="节点生成提示词"
+        rows={3}
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault()
+        maxLength={2000}
+        disabled={running}
+        onFocus={beforeChange}
+        onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault()
             void send()
           }
         }}
-        rows={2}
-        placeholder={PLACEHOLDER}
-        className="w-full resize-none bg-transparent text-xs leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
+        placeholder="描述要生成的内容，连入的文本节点会作为上下文"
+        className="w-full resize-none bg-transparent text-xs leading-6 text-zinc-200 outline-none placeholder:text-zinc-600"
       />
-
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        {/* 模型选择 */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex max-w-[180px] items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-700"
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="节点模型"
+          value={model}
+          disabled={running}
+          onChange={(e) => updateNodeData(nodeId, { modelId: e.target.value })}
+          className={selectClass}
+        >
+          {MODELS[mediaType].map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        {(mediaType === "image" || mediaType === "video") && (
+          <>
+            <select
+              aria-label="节点画幅"
+              value={params.aspectRatio}
+              disabled={running}
+              onChange={(e) =>
+                updateNodeData(nodeId, { aspectRatio: e.target.value })
+              }
+              className={selectClass}
             >
-              <KindIcon className="h-3 w-3 shrink-0 text-orange-400" />
-              <span className="truncate">{current.name}</span>
-              <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            {models.map((item) => (
-              <DropdownMenuItem
-                key={item.id}
-                onSelect={() => setModel(item.id)}
-                className={cn("flex-col items-start gap-0.5 py-2", item.id === model && "bg-zinc-800")}
-              >
-                <span className="flex w-full items-center gap-2 text-sm text-zinc-100">
-                  {item.name}
-                  {item.builtIn && (
-                    <span className="rounded border border-zinc-700 px-1 text-[10px] text-zinc-500">内置</span>
-                  )}
-                  {item.id === model && <span className="ml-auto text-orange-400">✓</span>}
-                </span>
-                <span className="flex items-center gap-1 pl-6 text-[11px] text-zinc-500">
-                  <Coins className="h-3 w-3 text-amber-400" />
-                  {item.cost} 起 · {item.note}
-                </span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* 类型化参数行（展示为主，与设计稿一致） */}
-        {composerKind === "image" && (
-          <span className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-400">
-            16:9 · 低画质 · 2K · 不透明
-          </span>
+              {ASPECT_RATIOS.map((item) => (
+                <option key={item.value}>{item.value}</option>
+              ))}
+            </select>
+            <select
+              aria-label="节点分辨率"
+              value={params.resolution}
+              disabled={running}
+              onChange={(e) =>
+                updateNodeData(nodeId, { resolution: e.target.value })
+              }
+              className={selectClass}
+            >
+              {RESOLUTIONS.filter((item) =>
+                mediaType === "image" ? item.includes("K") : item.includes("p"),
+              ).map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </select>
+          </>
         )}
-        {composerKind === "video" && (
-          <span className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-400">
-            全能参考 · 16:9 · 480p · 5s
-          </span>
-        )}
-        {composerKind === "audio" && (
-          <span className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-400">
-            音乐 · 自适应
-          </span>
-        )}
-        {composerKind === "text" && (
-          <span className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-400">
-            <Wand2 className="h-3 w-3" />
-            续写 / 改写
-          </span>
-        )}
-        {composerKind === "audio" && (
-          <span className="ml-1 flex h-6 w-6 items-center justify-center rounded-full border border-zinc-800 text-zinc-500">
-            <Mic className="h-3 w-3" />
-          </span>
-        )}
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="flex items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-1.5 py-1 text-[11px] text-amber-300">
-            <Coins className="h-3 w-3" />
-            {current.cost}
-          </span>
-          <button
-            type="button"
-            aria-label="生成"
-            data-testid="studio-composer-send"
-            onClick={() => void send()}
-            disabled={running || !draft.trim()}
-            className="flex h-6 w-8 items-center justify-center rounded-md bg-zinc-700 text-zinc-200 transition-colors hover:bg-orange-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        {(mediaType === "video" || mediaType === "audio") && (
+          <select
+            aria-label="节点时长"
+            value={params.duration}
+            disabled={running}
+            onChange={(e) =>
+              updateNodeData(nodeId, { duration: e.target.value })
+            }
+            className={selectClass}
           >
-            {running ? (
-              <span className="h-3 w-3 animate-spin rounded-full border border-zinc-400 border-t-transparent" />
-            ) : (
-              <ArrowUp className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </div>
+            {DURATIONS.map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        )}
+        {mediaType === "audio" && (
+          <select
+            aria-label="音频模式"
+            value={params.smartLyrics ? "lyrics" : "music"}
+            disabled={running}
+            onChange={(e) =>
+              updateNodeData(nodeId, {
+                smartLyrics: e.target.value === "lyrics",
+              })
+            }
+            className={selectClass}
+          >
+            <option value="lyrics">智能歌词</option>
+            <option value="music">纯音乐</option>
+          </select>
+        )}
+        <span className="ml-auto text-xs text-orange-300">
+          {current.cost} 积分
+        </span>
+        <button
+          type="button"
+          aria-label="生成"
+          data-testid="studio-composer-send"
+          onClick={() => void send()}
+          disabled={running || !draft.trim()}
+          className="flex h-7 w-8 items-center justify-center rounded-md bg-orange-500 text-white disabled:opacity-40"
+        >
+          {running ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ArrowUp className="h-4 w-4" />
+          )}
+        </button>
       </div>
+      {running && (
+        <Progress
+          value={progress}
+          className="mt-2 h-1"
+          indicatorClassName="bg-orange-500"
+        />
+      )}
     </div>
   )
 }

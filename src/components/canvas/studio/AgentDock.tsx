@@ -1,181 +1,179 @@
 "use client"
-
-import { useState } from "react"
-import {
-  AudioLines,
-  ChevronDown,
-  Coins,
-  Image as ImageIcon,
-  PanelRightClose,
-  Plus,
-  Send,
-  Sparkles,
-  TextQuote,
-  Video,
-  Workflow,
-} from "lucide-react"
+import { useRef, useState } from "react"
+import { Loader2, PanelRightClose, Send, Sparkles } from "lucide-react"
+import { useReactFlow } from "@xyflow/react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
-import type { StudioNodeKind } from "./types"
-
-const MODEL_TABS: { key: StudioNodeKind; label: string; icon: typeof ImageIcon }[] = [
-  { key: "image", label: "图片", icon: ImageIcon },
-  { key: "video", label: "视频", icon: Video },
-  { key: "text", label: "文本", icon: TextQuote },
-  { key: "audio", label: "音频", icon: AudioLines },
-]
-
-const SUGGESTIONS = ["来点灵感", "写段文案", "拆个分镜", "这段有点平", "梳理一下叙事"]
-
-/**
- * 右侧 Manvo Agent 栈（可展开 / 收起）。
- * 默认模型选择、问候与建议、对引用节点的操作输入。
- */
+  TEXT_MODELS,
+  IMAGE_MODELS,
+  VIDEO_MODELS,
+  AUDIO_MODELS,
+} from "@/lib/constants"
+import { useStudio } from "./types"
+const MODELS = {
+  text: TEXT_MODELS,
+  image: IMAGE_MODELS,
+  video: VIDEO_MODELS,
+  audio: AUDIO_MODELS,
+}
 export function AgentDock({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<StudioNodeKind>("image")
+  const [kind, setKind] = useState<keyof typeof MODELS>("text")
+  const [model, setModel] = useState(TEXT_MODELS[0]!.id)
   const [draft, setDraft] = useState("")
-
-  function send() {
-    setDraft("")
+  const [running, setRunning] = useState(false)
+  const [messages, setMessages] = useState<string[]>([])
+  const lock = useRef(false)
+  const { getNodes, setNodes, screenToFlowPosition } = useReactFlow()
+  const { beforeChange } = useStudio()
+  async function send() {
+    if (!draft.trim() || lock.current) return
+    lock.current = true
+    setRunning(true)
+    const request = draft
+    try {
+      const context = getNodes()
+        .filter((node) => node.selected)
+        .map((node) => node.data.text ?? node.data.label)
+        .join("\n")
+        .slice(0, 1000)
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mediaType: kind,
+          modelId: model,
+          prompt: `${context ? `参考：${context}\n` : ""}${request}`.slice(
+            0,
+            2000,
+          ),
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      const position = screenToFlowPosition({
+        x: window.innerWidth / 2 - 160,
+        y: window.innerHeight / 2 - 100,
+      })
+      beforeChange()
+      setNodes((nodes) => [
+        ...nodes,
+        {
+          id: crypto.randomUUID(),
+          type: kind,
+          position,
+          data: {
+            kind,
+            label: `Agent · ${request.slice(0, 16)}`,
+            prompt: request,
+            modelId: model,
+            ...(kind === "text"
+              ? { text: payload.data.text }
+              : { url: payload.data.url }),
+          },
+        },
+      ])
+      setMessages((items) => [
+        ...items,
+        request,
+        kind === "text"
+          ? payload.data.text
+          : "生成结果已添加到画布，可在侧栏定位。",
+      ])
+      setDraft((current) => (current === request ? "" : current))
+      window.dispatchEvent(new CustomEvent("studio:generated"))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "生成失败")
+    } finally {
+      lock.current = false
+      setRunning(false)
+    }
   }
-
   return (
-    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-zinc-800/80 bg-zinc-950/85 backdrop-blur">
-      {/* 头部 */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-800/80 px-3 py-2">
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-zinc-300">
-          <Workflow className="h-3.5 w-3.5" />
-          工作流
-          <span className="rounded bg-emerald-500/15 px-1 text-[9px] text-emerald-400">NEW</span>
-        </Button>
-
-        <div className="ml-auto flex items-center gap-1">
-          {/* 默认模型 */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2 py-1 text-[11px] text-zinc-300 hover:border-zinc-600"
-              >
-                <Sparkles className="h-3 w-3 text-rose-400" />
-                默认模型
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 p-2">
-              <p className="px-1 pb-1 text-[11px] text-zinc-500">
-                默认生成模型 · 选择即设为默认
-              </p>
-              <div className="flex rounded-lg bg-zinc-900 p-0.5">
-                {MODEL_TABS.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setTab(item.key)}
-                      className={cn(
-                        "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
-                        tab === item.key ? "bg-zinc-800 text-zinc-100" : "text-zinc-500",
-                      )}
-                    >
-                      <Icon className="h-3 w-3" />
-                      {item.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="mt-2 border-t border-zinc-800/70 pt-2">
-                <p className="px-1 pb-1 text-[10px] text-zinc-600">自动执行计划</p>
-                <p className="px-1 text-[10px] leading-relaxed text-zinc-600">
-                  agent 执行计划后自动批准，无需每次点确认
-                </p>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <button
-            type="button"
-            aria-label="收起 Agent"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200"
+    <aside className="right-0 flex h-full w-80 shrink-0 flex-col border-l border-zinc-800 bg-zinc-950">
+      <header className="flex items-center gap-2 border-b border-zinc-800 p-3 text-sm text-zinc-200">
+        <Sparkles className="h-4 w-4 text-orange-500" />
+        Manvo Agent
+        <button
+          aria-label="关闭 Agent"
+          onClick={onClose}
+          className="ml-auto text-zinc-500"
+        >
+          <PanelRightClose className="h-4 w-4" />
+        </button>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {messages.length ? (
+          messages.map((text, i) => (
+            <p
+              key={i}
+              className={`whitespace-pre-wrap rounded-xl p-3 text-xs leading-6 ${i % 2 ? "bg-zinc-900 text-zinc-300" : "bg-orange-500/10 text-orange-200"}`}
+            >
+              {text}
+            </p>
+          ))
+        ) : (
+          <p className="my-auto text-sm leading-7 text-zinc-500">
+            描述要创作的内容。选中的文本节点会作为上下文，生成结果会添加到画布。
+          </p>
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void send()
+        }}
+        className="space-y-3 border-t border-zinc-800 p-3"
+      >
+        <div className="flex gap-2">
+          <select
+            aria-label="Agent 媒体类型"
+            value={kind}
+            disabled={running}
+            onChange={(e) => {
+              const next = e.target.value as keyof typeof MODELS
+              setKind(next)
+              setModel(MODELS[next][0]!.id)
+            }}
+            className="rounded border border-zinc-800 bg-zinc-900 p-1 text-xs"
           >
-            <PanelRightClose className="h-3.5 w-3.5" />
-          </button>
+            <option value="text">文本</option>
+            <option value="image">图片</option>
+            <option value="video">视频</option>
+            <option value="audio">音频</option>
+          </select>
+          <select
+            aria-label="Agent 模型"
+            value={model}
+            disabled={running}
+            onChange={(e) => setModel(e.target.value)}
+            className="min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-900 p-1 text-xs"
+          >
+            {MODELS[kind].map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
-
-      {/* 问候 + 建议 */}
-      <div className="flex min-h-0 flex-1 flex-col justify-end p-4">
-        <div className="mb-3">
-          <p className="text-[11px] text-zinc-600">· Hi 用户0272!</p>
-          <p className="mt-0.5 text-lg font-medium text-zinc-100">今天一起创作点什么？</p>
-        </div>
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setDraft(item)}
-              className="rounded-full border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        {/* 输入区 */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
-          <div className="mb-2 flex items-center gap-1.5">
-            <span className="flex h-7 w-9 flex-col items-center justify-center overflow-hidden rounded-md border border-zinc-700 text-zinc-500">
-              <Video className="h-3 w-3" />
-              <span className="text-[7px] leading-none">Video</span>
-            </span>
-            <button
-              type="button"
-              aria-label="添加引用"
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-800 text-zinc-500 hover:text-zinc-200"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            rows={2}
-            placeholder="描述你想对引用节点执行的操作"
-            className="w-full resize-none bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-600"
-          />
-          <div className="mt-1 flex items-center gap-2">
-            <button
-              type="button"
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300"
-            >
-              <Sparkles className="h-3 w-3" />
-              风格
-            </button>
-            <button
-              type="button"
-              aria-label="发送"
-              onClick={send}
-              disabled={!draft.trim()}
-              className="ml-auto flex h-6 w-8 items-center justify-center rounded-md bg-zinc-700 text-zinc-200 transition-colors hover:bg-orange-500 hover:text-white disabled:opacity-40"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <p className="mt-2 flex items-center gap-1 text-[10px] text-zinc-700">
-          <Coins className="h-3 w-3" />
-          生成会按模型计费
-        </p>
-      </div>
+        <textarea
+          aria-label="Agent 创作要求"
+          rows={3}
+          maxLength={1000}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900 p-2 text-xs"
+          placeholder="今天想创作什么？"
+        />
+        <Button
+          type="submit"
+          variant="brand"
+          className="w-full"
+          disabled={running || !draft.trim()}
+        >
+          {running ? <Loader2 className="animate-spin" /> : <Send />}生成到画布
+        </Button>
+      </form>
     </aside>
   )
 }

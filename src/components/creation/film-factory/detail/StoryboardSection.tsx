@@ -1,13 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import { Clapperboard, ImageIcon, Loader2, Scissors, Sparkles, Video, Wand2 } from "lucide-react"
+import {
+  Clapperboard,
+  ImageIcon,
+  Loader2,
+  Scissors,
+  Sparkles,
+  Video,
+  Wand2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { StoryboardCard, type StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
+import {
+  StoryboardCard,
+  type StoryboardDTO,
+} from "@/components/creation/film-factory/detail/StoryboardCard"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
+import { StoryboardChecks } from "./StoryboardChecks"
 import { cn } from "@/lib/utils"
 
 /**
@@ -57,7 +69,9 @@ export function StoryboardSection({
           分镜 · 镜组
         </span>
         {storyboards.length > 0 && (
-          <span className="text-[11px] tabular-nums text-zinc-600">{storyboards.length} 个镜头</span>
+          <span className="text-[11px] tabular-nums text-zinc-600">
+            {storyboards.length} 个镜头
+          </span>
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -80,7 +94,9 @@ export function StoryboardSection({
                     aria-label={`筛选${option.label}`}
                     className={cn(
                       "flex items-center gap-1 rounded p-1.5 text-[10px] transition-colors",
-                      active ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300",
+                      active
+                        ? "bg-zinc-800 text-zinc-100"
+                        : "text-zinc-500 hover:text-zinc-300",
                     )}
                   >
                     <Icon className="h-3 w-3" />
@@ -91,11 +107,23 @@ export function StoryboardSection({
             </div>
           )}
 
-          <Button variant="ghost" size="sm" className="h-7" onClick={onRecap} disabled={!hasEpisode}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7"
+            onClick={onRecap}
+            disabled={!hasEpisode}
+          >
             <Sparkles className="h-3.5 w-3.5" />
             先让 AI 复述理解本集
           </Button>
-          <Button variant="inverse" size="sm" className="h-7" onClick={onSplit} disabled={!hasEpisode}>
+          <Button
+            variant="inverse"
+            size="sm"
+            className="h-7"
+            onClick={onSplit}
+            disabled={!hasEpisode}
+          >
             <Scissors className="h-3.5 w-3.5" />
             {storyboards.length > 0 ? "重新拆分镜" : "批量生成"}
           </Button>
@@ -109,15 +137,28 @@ export function StoryboardSection({
               <Loader2 className="h-3 w-3 animate-spin" />
               {progressLabel || "处理中…"}
             </span>
-            <span className="tabular-nums text-zinc-500">{Math.round(progress)}%</span>
+            <span className="tabular-nums text-zinc-500">
+              {Math.round(progress)}%
+            </span>
           </div>
           <Progress value={progress} indicatorClassName="bg-orange-500" />
         </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {!loading && storyboards.length > 0 && (
+          <StoryboardChecks
+            items={storyboards}
+            onEdit={onEdit}
+            onGenerateImage={onGenerateImage}
+            busy={generating || !!busyId}
+          />
+        )}
         {loading ? (
-          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-3" aria-busy="true">
+          <div
+            className="grid grid-cols-2 gap-2.5 xl:grid-cols-3"
+            aria-busy="true"
+          >
             {Array.from({ length: 6 }).map((_, index) => (
               <Skeleton key={index} className="aspect-video rounded-xl" />
             ))}
@@ -134,11 +175,21 @@ export function StoryboardSection({
             className="h-full min-h-[220px] justify-center"
             action={
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button variant="brand" size="sm" onClick={onSplit} disabled={!hasEpisode}>
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={onSplit}
+                  disabled={!hasEpisode}
+                >
                   <Wand2 className="h-3.5 w-3.5" />
                   批量生成分镜
                 </Button>
-                <Button variant="outline" size="sm" onClick={onRecap} disabled={!hasEpisode}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRecap}
+                  disabled={!hasEpisode}
+                >
                   <Sparkles className="h-3.5 w-3.5" />
                   先让 AI 复述理解本集（推荐）
                 </Button>

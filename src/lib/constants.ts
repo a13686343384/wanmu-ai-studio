@@ -62,21 +62,37 @@ export const CREATION_CENTER_ITEMS: readonly CreationCenterItem[] = [
 
 /* ---------------------------- 影视工厂枚举 ---------------------------- */
 
-export type WorkType = "vertical_short" | "horizontal_short" | "micro_film" | "anime"
+export type WorkType =
+  | "vertical_short"
+  | "horizontal_short"
+  | "micro_film"
+  | "anime"
 export type SeriesType = "limited" | "serial"
 export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:3" | "3:4"
 export type ScriptProcessingMode = "consult_optimize" | "keep_original"
 export type ExecutionMode = "step_by_step" | "full_auto"
 
-export const WORK_TYPES: readonly { value: WorkType; label: string; note: string }[] = [
+export const WORK_TYPES: readonly {
+  value: WorkType
+  label: string
+  note: string
+}[] = [
   { value: "vertical_short", label: "竖屏短剧", note: "9:16 · 单集 60-120s" },
   { value: "horizontal_short", label: "横屏短剧", note: "16:9 · 单集 60-120s" },
   { value: "micro_film", label: "微电影", note: "16:9 · 单集 5-15min" },
   { value: "anime", label: "动漫", note: "9:16 / 16:9" },
 ] as const
 
-export const SERIES_TYPES: readonly { value: SeriesType; label: string; description: string }[] = [
-  { value: "limited", label: "限定剧", description: "固定集数，拍完即完结（之后仍可手动续写）" },
+export const SERIES_TYPES: readonly {
+  value: SeriesType
+  label: string
+  description: string
+}[] = [
+  {
+    value: "limited",
+    label: "限定剧",
+    description: "固定集数，拍完即完结（之后仍可手动续写）",
+  },
   { value: "serial", label: "连载剧", description: "可持续续集，集数不设上限" },
 ] as const
 
@@ -104,7 +120,8 @@ export const SCRIPT_PROCESSING_MODES: readonly {
   {
     value: "keep_original",
     label: "原样保留",
-    description: "完全不动你的原文，直接按集切开，最快，但内容就是你贴进来的样子。",
+    description:
+      "完全不动你的原文，直接按集切开，最快，但内容就是你贴进来的样子。",
   },
 ] as const
 
@@ -141,32 +158,116 @@ export interface AIModel {
 
 /** 文本推理模型（INTAKE / 大纲 / 会诊 / 台词） */
 export const TEXT_MODELS: readonly AIModel[] = [
-  { id: "ovlm-6", name: "OVLM 6", cost: 5, builtIn: true, note: "免配置直接用" },
-  { id: "ovlm-5.6", name: "OVLM 5.6", cost: 3, builtIn: true, note: "免配置直接用" },
-  { id: "gvlm-3.1-pro", name: "GVLM 3.1 Pro", cost: 3, builtIn: true, note: "免配置直接用" },
+  {
+    id: "ovlm-6",
+    name: "OVLM 6",
+    cost: 5,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "ovlm-5.6",
+    name: "OVLM 5.6",
+    cost: 3,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "gvlm-3.1-pro",
+    name: "GVLM 3.1 Pro",
+    cost: 3,
+    builtIn: true,
+    note: "免配置直接用",
+  },
 ] as const
 
 /** 图片生成模型（工作台 / 资产 / 分镜出图） */
 export const IMAGE_MODELS: readonly AIModel[] = [
-  { id: "all-in-one", name: "全能图片", cost: 14, builtIn: true, note: "免配置直接用" },
-  { id: "all-in-one-low", name: "全能图片（低画质）", cost: 2, builtIn: true, note: "免配置直接用" },
-  { id: "seedream-5.0-pro", name: "Seedream 5.0 Pro", cost: 4, builtIn: true, note: "免配置直接用" },
-  { id: "man-image-pro", name: "Man Image Pro", cost: 20, builtIn: true, note: "免配置直接用" },
-  { id: "man-image-v2", name: "Man Image V2", cost: 10, builtIn: true, note: "免配置直接用" },
-  { id: "man-image-v2-lite", name: "Man Image V2 Lite", cost: 2, builtIn: true, note: "免配置直接用" },
+  {
+    id: "all-in-one",
+    name: "全能图片",
+    cost: 14,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "all-in-one-low",
+    name: "全能图片（低画质）",
+    cost: 2,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "seedream-5.0-pro",
+    name: "Seedream 5.0 Pro",
+    cost: 4,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "man-image-pro",
+    name: "Man Image Pro",
+    cost: 20,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "man-image-v2",
+    name: "Man Image V2",
+    cost: 10,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "man-image-v2-lite",
+    name: "Man Image V2 Lite",
+    cost: 2,
+    builtIn: true,
+    note: "免配置直接用",
+  },
 ] as const
 
 /** 视频生成模型 */
 export const VIDEO_MODELS: readonly AIModel[] = [
-  { id: "seedance-2.0", name: "Seedance 2.0 (HuoShan)", cost: 50, builtIn: true, note: "免配置直接用" },
-  { id: "seedance-2.0-fast", name: "Seedance 2.0 Fast (HuoShan)", cost: 18, builtIn: true, note: "免配置直接用" },
-  { id: "seedance-2.0-mini", name: "Seedance 2.0 Mini (HuoShan)", cost: 9, builtIn: true, note: "免配置直接用" },
-  { id: "minimax-h3-768p", name: "MiniMax H3 (768P 9图3视频)", cost: 105, builtIn: true, note: "免配置直接用" },
+  {
+    id: "seedance-2.0",
+    name: "Seedance 2.0 (HuoShan)",
+    cost: 50,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "seedance-2.0-fast",
+    name: "Seedance 2.0 Fast (HuoShan)",
+    cost: 18,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "seedance-2.0-mini",
+    name: "Seedance 2.0 Mini (HuoShan)",
+    cost: 9,
+    builtIn: true,
+    note: "免配置直接用",
+  },
+  {
+    id: "minimax-h3-768p",
+    name: "MiniMax H3 (768P 9图3视频)",
+    cost: 105,
+    builtIn: true,
+    note: "免配置直接用",
+  },
 ] as const
 
 /** 音频生成模型 */
 export const AUDIO_MODELS: readonly AIModel[] = [
-  { id: "mv-audio-5.5", name: "MV Audio 5.5", cost: 50, builtIn: true, note: "免配置直接用" },
+  {
+    id: "mv-audio-5.5",
+    name: "MV Audio 5.5",
+    cost: 50,
+    builtIn: true,
+    note: "免配置直接用",
+  },
 ] as const
 
 /** 视频生成能力（功能下拉） */
@@ -238,3 +339,20 @@ export const RESOLUTIONS = ["480p", "720p", "1080p", "1K", "2K"] as const
 export const DURATIONS = ["5s", "10s", "15s"] as const
 export const IMAGE_COUNTS = [1, 2, 3, 4] as const
 export const MAX_TEAMS_PER_USER = 5
+
+/** 剧本创作：题材配方与预设时长。 */
+export const WRITING_GENRES: string[] = [
+  "霸总",
+  "都市爽文",
+  "古装权谋",
+  "婚姻",
+  "萌宝",
+  "逆袭",
+  "年代家庭",
+  "悬疑",
+  "亲子",
+  "玄幻",
+  "科幻",
+]
+export const WRITING_EPISODE_PRESETS = [20, 30, 60, 80] as const
+export const WRITING_DURATION_PRESETS = [60, 90, 120, 180] as const
