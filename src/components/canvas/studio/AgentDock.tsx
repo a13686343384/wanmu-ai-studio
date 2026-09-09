@@ -267,7 +267,7 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
             </span>
             <button
               type="submit"
-              aria-label="发送"
+              aria-label="生成到画布"
               disabled={running || !draft.trim()}
               className="ml-auto flex h-6 w-8 items-center justify-center rounded-md bg-zinc-700 text-zinc-200 transition-colors hover:bg-orange-500 hover:text-white disabled:opacity-40"
             >
