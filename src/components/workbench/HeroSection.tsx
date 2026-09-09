@@ -183,7 +183,7 @@ export function HeroSection() {
         <HeroBackdrop />
       </div>
 
-      <div className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-14 sm:pt-20 lg:px-6">
+      <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-14 sm:pt-20 lg:px-6">
         <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
           你好，今天想生成点什么？
         </h1>
