@@ -56,7 +56,7 @@ export const CREATION_CENTER_ITEMS: readonly CreationCenterItem[] = [
     label: "电商设计室",
     href: "/creation/ecommerce",
     icon: "ShoppingBag",
-    description: "商品图、套图、场景图批量产出",
+    description: "商品套图 · A+ 详情页 · 上架文案",
   },
 ] as const
 
