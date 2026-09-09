@@ -411,6 +411,7 @@ export function ScriptDetailView({
             characters={script.characters}
             scenes={script.scenes}
             props={script.props}
+            assetPromptTemplate={script.assetPromptTemplate}
             onRefresh={() => void reloadScript()}
           />
         </aside>
@@ -490,6 +491,7 @@ export function ScriptDetailView({
                   characters={script.characters}
                   scenes={script.scenes}
                   props={script.props}
+                  assetPromptTemplate={script.assetPromptTemplate}
                   onRefresh={() => void reloadScript()}
                 />
               </div>

@@ -22,6 +22,7 @@ const patchScriptSchema = z.object({
   episodeDuration: z.number().int().min(5).max(3600).optional(),
   targetAspect: z.enum(["9:16", "16:9", "1:1", "4:3", "3:4"]).optional(),
   pacingProfile: z.record(z.unknown()).nullable().optional(),
+  assetPromptTemplate: z.string().trim().max(2000).nullable().optional(),
 })
 
 /** GET /api/scripts/[id] — 剧本详情（含分集与资产计数） */
@@ -33,7 +34,10 @@ export const GET = withErrorHandling(
       include: {
         workspace: { select: { name: true, isPersonal: true } },
         episodes: { orderBy: { number: "asc" } },
-        characters: { orderBy: { createdAt: "asc" } },
+        characters: {
+          orderBy: { createdAt: "asc" },
+          include: { costumes: { orderBy: { createdAt: "asc" } } },
+        },
         scenes: { orderBy: { createdAt: "asc" } },
         props: { orderBy: { createdAt: "asc" } },
         consultations: { orderBy: { createdAt: "desc" } },

@@ -8,7 +8,7 @@ import { z } from "zod"
 const schema = z.object({
   aspectRatio: z.string().optional(),
   resolution: z.string().default("1K"),
-  kind: z.enum(["character", "scene", "prop"]),
+  kind: z.enum(["character", "scene", "prop", "outfit"]),
   /** 为空则生成该类全部资产 */
   ids: z.array(z.string()).optional(),
   model: z.string().default("man-image-v2-lite"),
@@ -32,6 +32,11 @@ export const POST = withErrorHandling(
       costumeStyle: script.costumeStyle,
       era: script.era,
     }
+    // 剧本级提示词模板（查看全部信息 / 资产坞「提示词模板」设置），所有资产出图统一置入
+    const template = script.assetPromptTemplate?.trim()
+
+    const withTemplate = (prompt: string) =>
+      template ? `${template}\n${prompt}` : prompt
 
     if (input.kind === "character") {
       const items = await prisma.character.findMany({
@@ -48,12 +53,14 @@ export const POST = withErrorHandling(
           where: { id: item.id },
           data: { status: "generating" },
         })
-        const prompt = buildAssetPrompt(
-          context,
-          "character",
-          item.name,
-          item.description,
-          item.appearance,
+        const prompt = withTemplate(
+          buildAssetPrompt(
+            context,
+            "character",
+            item.name,
+            item.description,
+            item.appearance,
+          ),
         )
         const { data } = await ai.generateImage({
           prompt,
@@ -84,12 +91,14 @@ export const POST = withErrorHandling(
           where: { id: item.id },
           data: { status: "generating" },
         })
-        const prompt = buildAssetPrompt(
-          context,
-          "scene",
-          item.name,
-          item.description,
-          [item.environment, item.lighting].filter(Boolean).join("，"),
+        const prompt = withTemplate(
+          buildAssetPrompt(
+            context,
+            "scene",
+            item.name,
+            item.description,
+            [item.environment, item.lighting].filter(Boolean).join("，"),
+          ),
         )
         const { data } = await ai.generateImage({
           prompt,
@@ -105,37 +114,77 @@ export const POST = withErrorHandling(
       return jsonOk({ kind: "scene", generated: items.length })
     }
 
-    const items = await prisma.prop.findMany({
-      where: {
-        scriptId: script.id,
-        ...(input.ids?.length ? { id: { in: input.ids } } : {}),
-      },
-    })
-    if (items.length === 0)
-      return jsonError("没有可生成的道具，请先提取资产", 400)
+    if (input.kind === "prop") {
+      const items = await prisma.prop.findMany({
+        where: {
+          scriptId: script.id,
+          ...(input.ids?.length ? { id: { in: input.ids } } : {}),
+        },
+      })
+      if (items.length === 0)
+        return jsonError("没有可生成的道具，请先提取资产", 400)
 
-    for (const item of items) {
-      await prisma.prop.update({
-        where: { id: item.id },
-        data: { status: "generating" },
-      })
-      const prompt = buildAssetPrompt(
-        context,
-        "prop",
-        item.name,
-        item.description,
-      )
-      const { data } = await ai.generateImage({
-        prompt,
-        model: input.model,
-        aspectRatio: "1:1",
-        resolution: input.resolution,
-      })
-      await prisma.prop.update({
-        where: { id: item.id },
-        data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
-      })
+      for (const item of items) {
+        await prisma.prop.update({
+          where: { id: item.id },
+          data: { status: "generating" },
+        })
+        const prompt = withTemplate(
+          buildAssetPrompt(context, "prop", item.name, item.description),
+        )
+        const { data } = await ai.generateImage({
+          prompt,
+          model: input.model,
+          aspectRatio: "1:1",
+          resolution: input.resolution,
+        })
+        await prisma.prop.update({
+          where: { id: item.id },
+          data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
+        })
+      }
+      return jsonOk({ kind: "prop", generated: items.length })
     }
-    return jsonOk({ kind: "prop", generated: items.length })
+
+    if (input.kind === "outfit") {
+      const costumes = await prisma.costume.findMany({
+        where: {
+          ...(input.ids?.length ? { id: { in: input.ids } } : {}),
+          character: { scriptId: script.id },
+        },
+        include: { character: { select: { name: true } } },
+      })
+      if (costumes.length === 0)
+        return jsonError("没有可生成的造型，请先创建造型", 400)
+
+      for (const item of costumes) {
+        await prisma.costume.update({
+          where: { id: item.id },
+          data: { status: "generating" },
+        })
+        const prompt = withTemplate(
+          buildAssetPrompt(
+            context,
+            "character",
+            `${item.character.name} · 造型「${item.name}」`,
+            item.description,
+            item.situation,
+          ),
+        )
+        const { data } = await ai.generateImage({
+          prompt,
+          model: input.model,
+          aspectRatio: script.targetAspect,
+          resolution: input.resolution,
+        })
+        await prisma.costume.update({
+          where: { id: item.id },
+          data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
+        })
+      }
+      return jsonOk({ kind: "outfit", generated: costumes.length })
+    }
+
+    return jsonError("未知的资产生成类型", 400)
   },
 )

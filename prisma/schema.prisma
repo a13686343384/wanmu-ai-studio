@@ -228,6 +228,7 @@ model Script {
 
   createdAt DateTime @default(now())
   pacingProfile Json?
+  assetPromptTemplate String? @db.Text
   updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
@@ -276,6 +277,7 @@ model Character {
 
   script   Script    @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   costumes Costume[]
+  props    Prop[]    @relation("PropParent")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -287,6 +289,7 @@ model Costume {
   id          String  @id @default(cuid())
   characterId String
   name        String
+  situation   String?
   description String  @db.Text
   imageUrl    String?
   prompt      String? @db.Text
@@ -324,11 +327,13 @@ model Prop {
   scriptId    String
   name        String
   description String  @db.Text
+  parentCharacterId String?
   imageUrl    String?
   prompt      String? @db.Text
   status      String  @default("pending")
 
   script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  parentCharacter Character? @relation("PropParent", fields: [parentCharacterId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

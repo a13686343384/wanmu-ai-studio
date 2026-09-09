@@ -92,6 +92,16 @@ export interface EpisodeDTO {
   bgmPrompt: string | null
 }
 
+export interface CostumeDTO {
+  id: string
+  characterId: string
+  name: string
+  situation?: string | null
+  description: string
+  imageUrl: string | null
+  status: string
+}
+
 export interface AssetDTO {
   id: string
   name: string
@@ -102,6 +112,10 @@ export interface AssetDTO {
   /** 角色专有 */
   appearance?: string | null
   personality?: string | null
+  /** 角色专有：妆造造型（人物子集） */
+  costumes?: CostumeDTO[]
+  /** 道具专有：关联人物锚点 */
+  parentCharacterId?: string | null
   /** 场景专有 */
   environment?: string | null
   lighting?: string | null
@@ -126,6 +140,8 @@ export interface ConsultationDTO {
 
 export interface ScriptDetail extends ScriptSummary {
   content: string
+  assetPromptTemplate?: string | null
+  pacingProfile?: { [key: string]: unknown } | null
   era: string | null
   tone: string | null
   narrativeStyle: string | null

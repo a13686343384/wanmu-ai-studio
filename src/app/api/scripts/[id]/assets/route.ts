@@ -8,12 +8,16 @@ const extractSchema = z.object({
   model: z.string().optional(),
   /** 仅提取指定类别；不传则三类都提取 */
   kinds: z.array(z.enum(["characters", "scenes", "props"])).optional(),
+  /** 补缺漏模式：只新增缺失名称的资产，不删除已有内容 */
+  merge: z.boolean().optional(),
+  /** 补缺漏时的捕捉关键词，逗号分隔，会附加到提取提示词里重点找 */
+  keyword: z.string().trim().max(200).optional(),
 })
 
 /**
  * POST /api/scripts/[id]/assets
  * 从剧本中提取角色 / 场景 / 道具（不生成图片，图片由 assets/generate 负责）。
- * 重复调用会覆盖同类资产。
+ * merge=false（默认）：清空并覆盖同类资产；merge=true：只补缺失名称，不动已有内容。
  */
 export const POST = withErrorHandling(
   async (req: Request, { params }: { params: { id: string } }) => {
@@ -21,7 +25,7 @@ export const POST = withErrorHandling(
     const script = await requireScriptAccess(params.id, user.id)
 
     const body = await req.json().catch(() => ({}))
-    const { kinds, model } = extractSchema.parse(body)
+    const { kinds, model, merge, keyword } = extractSchema.parse(body)
     const targets = kinds ?? ["characters", "scenes", "props"]
 
     const ai = getAIService()
@@ -31,15 +35,42 @@ export const POST = withErrorHandling(
       props: number
     } = { characters: 0, scenes: 0, props: 0 }
 
+    const keywordHint = keyword
+      ? `重点捕捉这些关键词相关的内容：${keyword}。`
+      : ""
+
+    const pickNew = <T extends { name: string }>(
+      drafts: T[],
+      existingNames: Set<string>,
+    ): T[] =>
+      merge
+        ? drafts.filter((draft) => !existingNames.has(draft.name))
+        : drafts
+
     await prisma.$transaction(async (tx) => {
       if (targets.includes("characters")) {
+        const existingNames = new Set(
+          (
+            await tx.character.findMany({
+              where: { scriptId: script.id },
+              select: { name: true },
+            })
+          ).map((item) => item.name),
+        )
         const { data } = await ai.extractCharacters({
-          content: script.content,
+          content: merge
+            ? `${script.content}\n\n[补缺漏提示] ${keywordHint}已存在角色：${[
+                ...existingNames,
+              ].join("、")}。只输出遗漏的新角色，不要重复已有的。`
+            : script.content,
           model: model ?? script.textModel,
         })
-        await tx.character.deleteMany({ where: { scriptId: script.id } })
+        const fresh = merge
+          ? data.filter((draft) => !existingNames.has(draft.name))
+          : data
+        if (!merge) await tx.character.deleteMany({ where: { scriptId: script.id } })
         await tx.character.createMany({
-          data: data.map((draft) => ({
+          data: fresh.map((draft) => ({
             scriptId: script.id,
             name: draft.name,
             description: draft.description,
@@ -48,7 +79,7 @@ export const POST = withErrorHandling(
             status: "pending",
           })),
         })
-        result.characters = data.length
+        result.characters = fresh.length
       }
 
       if (targets.includes("scenes")) {
@@ -56,7 +87,7 @@ export const POST = withErrorHandling(
           content: script.content,
           model: model ?? script.textModel,
         })
-        await tx.scene.deleteMany({ where: { scriptId: script.id } })
+        if (!merge) await tx.scene.deleteMany({ where: { scriptId: script.id } })
         await tx.scene.createMany({
           data: data.map((draft) => ({
             scriptId: script.id,
@@ -75,7 +106,7 @@ export const POST = withErrorHandling(
           content: script.content,
           model: model ?? script.textModel,
         })
-        await tx.prop.deleteMany({ where: { scriptId: script.id } })
+        if (!merge) await tx.prop.deleteMany({ where: { scriptId: script.id } })
         await tx.prop.createMany({
           data: data.map((draft) => ({
             scriptId: script.id,
