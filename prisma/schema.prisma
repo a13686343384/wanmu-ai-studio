@@ -95,6 +95,8 @@ model Workspace {
   joinRequests TeamJoinRequest[]
   writingProjects WritingProject[]
   mediaFiles MediaFile[]
+  customModels CustomModel[]
+  credentials Credential[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -423,5 +425,53 @@ model MediaFile {
   bytes       Bytes
   createdAt   DateTime @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
+}
+
+/* ---------------------------- 插件：自定义模型接入 ---------------------------- */
+
+/// 用户通过插件接入的自定义上游模型（16 类模板之一实例化）。
+model CustomModel {
+  id          String  @id @default(cuid())
+  workspaceId String
+  name        String
+  kind        String // text | image | video | audio
+  lifecycle   String  @default("sync") // sync | async
+  baseUrl     String
+  apiKey      String?
+  credentialId String?
+  auth        Json    @default("{}") // { header, scheme, extra_headers }
+  constraints Json    @default("{}") // ratios/resolutions/duration/max_references/inputs/size_table...
+  submit      Json    @default("{}") // { method, path, timeout_sec, body, encoding?, file_field? }
+  edits       Json?
+  firstLast   Json?
+  refRegister Json?
+  poll        Json?
+  extract     Json    @default("{}")
+  result      Json    @default("{}")
+  templateKey String? // 来源模板（chat-openai 等）
+  enabled     Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
+/// 凭据：一份接口地址 + API Key，可被多个自定义模型复用。
+model Credential {
+  id          String  @id @default(cuid())
+  workspaceId String
+  name        String
+  baseUrl     String?
+  apiKey      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  models    CustomModel[]
+
   @@index([workspaceId])
 }
