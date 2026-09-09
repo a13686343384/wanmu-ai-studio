@@ -97,6 +97,7 @@ model Workspace {
   mediaFiles MediaFile[]
   customModels CustomModel[]
   credentials Credential[]
+  ecomProjects EcomProject[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -474,4 +475,23 @@ model Credential {
   models    CustomModel[]
 
   @@index([workspaceId])
+}
+
+/* ---------------------------- 电商设计室 ---------------------------- */
+
+/// 电商设计室项目：商品套图 / A+ 详情页的配置与产物。
+model EcomProject {
+  id          String   @id @default(cuid())
+  workspaceId String
+  module      String   @default("set") // set（商品套图）| aplus（A+ 详情页）
+  name        String
+  config      Json     @default("{}")
+  items       Json     @default("[]")
+  status      String   @default("draft") // draft | generating | done | failed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, module])
 }
