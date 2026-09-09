@@ -25,7 +25,7 @@ test.describe("画布", () => {
 
     await expect(page).toHaveURL(/\/canvas\/[a-z0-9]+/i, { timeout: 30_000 })
     await expect(page.getByText(name, { exact: true })).toBeVisible()
-    await expect(page.getByText("画布是空的")).toBeVisible()
+    await expect(page.getByText(/画布是空的/)).toBeVisible()
   })
 
   test("添加节点并保存后可持久化", async ({ page }) => {
@@ -36,18 +36,19 @@ test.describe("画布", () => {
     await page.getByRole("button", { name: "创建项目" }).click()
     await expect(page).toHaveURL(/\/canvas\/[a-z0-9]+/i)
 
-    // 从左侧节点库添加一个文本节点
-    await page.getByRole("button", { name: /文本 输入提示词或说明/ }).click()
+    // 从底部工具条添加一个文本节点
+    await page.getByRole("button", { name: "新建文本", exact: true }).first().click()
     await expect(page.getByText("画布是空的")).toBeHidden()
+    await page.getByPlaceholder("开启你的创作…").first().fill("E2E 画布节点内容")
 
     // 保存
-    await page.getByRole("button", { name: "保存" }).click()
-    await expect(page.getByRole("button", { name: "已保存" })).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId("studio-save").click()
+    await expect(page.getByTestId("studio-save")).toContainText("已保存", { timeout: 15_000 })
 
     // 重新加载后节点仍在
     await page.reload()
     await page.waitForLoadState("networkidle")
-    await expect(page.getByText("画布是空的")).toBeHidden()
+    await expect(page.getByPlaceholder("开启你的创作…").first()).toHaveValue(/E2E 画布节点内容/)
   })
 
   test("可以切换团队项目 Tab 并打开创建团队弹窗", async ({ page }) => {

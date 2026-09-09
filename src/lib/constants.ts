@@ -159,6 +159,9 @@ export const IMAGE_MODELS: readonly AIModel[] = [
 /** 视频生成模型 */
 export const VIDEO_MODELS: readonly AIModel[] = [
   { id: "seedance-2.0", name: "Seedance 2.0 (HuoShan)", cost: 50, builtIn: true, note: "免配置直接用" },
+  { id: "seedance-2.0-fast", name: "Seedance 2.0 Fast (HuoShan)", cost: 18, builtIn: true, note: "免配置直接用" },
+  { id: "seedance-2.0-mini", name: "Seedance 2.0 Mini (HuoShan)", cost: 9, builtIn: true, note: "免配置直接用" },
+  { id: "minimax-h3-768p", name: "MiniMax H3 (768P 9图3视频)", cost: 105, builtIn: true, note: "免配置直接用" },
 ] as const
 
 /** 音频生成模型 */

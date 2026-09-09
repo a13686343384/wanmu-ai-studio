@@ -4,6 +4,8 @@ import type {
   AnalyzeScriptInput,
   CharacterDraft,
   ConsultChatInput,
+  GenerateTextInput,
+  GenerateTextResult,
   ConsultScriptInput,
   ConsultChatResult,
   ConsultScriptResult,
@@ -111,6 +113,15 @@ export const mockAIService: AIService = {
   },
 
   /* ---------------------------- 会诊 ---------------------------- */
+
+  async generateText(input: GenerateTextInput): Promise<AIResult<GenerateTextResult>> {
+    await mockDelay(500, 1100)
+
+    const topic = input.prompt.trim().slice(0, 60) || "一段新的创作"
+    const text = `围绕「${topic}」展开：开场先给出一个具体的画面或动作，把观众拉进情境；中段抛出核心冲突，让人物的动机与代价同时成立；结尾留一个钩子——未说出口的那句话，或刚刚走进画面的那个身影。保持节奏紧凑，每一段都向前推进。`
+
+    return { data: { text }, usage: usage(input.model, costOf(TEXT_MODELS, input.model)) }
+  },
 
   async consultChat(input: ConsultChatInput): Promise<AIResult<ConsultChatResult>> {
     await mockDelay(600, 1200)

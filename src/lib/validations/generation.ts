@@ -7,7 +7,7 @@ const referenceSchema = z.object({
 
 /** 工作台生成请求。 */
 export const generateRequestSchema = z.object({
-  mediaType: z.enum(["video", "image", "audio"]),
+  mediaType: z.enum(["video", "image", "audio", "text"]),
   prompt: z.string().trim().min(1, "请输入提示词").max(2000, "提示词最多 2000 字"),
   modelId: z.string().min(1),
   aspectRatio: z.string().default("16:9"),

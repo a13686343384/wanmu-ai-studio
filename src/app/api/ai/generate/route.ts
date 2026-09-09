@@ -16,7 +16,12 @@ export const POST = withErrorHandling(async (req: Request) => {
   const ai = getAIService()
 
   const result =
-    input.mediaType === "video"
+    input.mediaType === "text"
+      ? await ai.generateText({
+          prompt: input.prompt,
+          model: input.modelId,
+        })
+      : input.mediaType === "video"
       ? await ai.generateVideo({
           prompt: input.prompt,
           model: input.modelId,
@@ -32,15 +37,15 @@ export const POST = withErrorHandling(async (req: Request) => {
             duration: input.duration,
             smartLyrics: true,
           })
-        : await ai.generateImage({
-            prompt: input.prompt,
-            model: input.modelId,
-            aspectRatio: input.aspectRatio,
-            resolution: input.resolution,
-            count: input.count,
-            style: input.style,
-            references: input.references,
-          })
+      : await ai.generateImage({
+          prompt: input.prompt,
+          model: input.modelId,
+          aspectRatio: input.aspectRatio,
+          resolution: input.resolution,
+          count: input.count,
+          style: input.style,
+          references: input.references,
+        })
 
   const cost = result.usage.tapies
 
@@ -56,7 +61,9 @@ export const POST = withErrorHandling(async (req: Request) => {
   })
 
   const media =
-    input.mediaType === "video"
+    input.mediaType === "text"
+      ? { text: (result.data as { text: string }).text }
+      : input.mediaType === "video"
       ? (result.data as { video: { url: string; poster?: string; duration?: number } }).video
       : input.mediaType === "audio"
         ? (result.data as { audio: { url: string; poster?: string; duration?: number } }).audio
@@ -66,7 +73,8 @@ export const POST = withErrorHandling(async (req: Request) => {
     {
       id: `gen_${Date.now().toString(36)}`,
       mediaType: input.mediaType,
-      url: media.url,
+      url: "url" in media ? media.url : undefined,
+      text: "text" in media ? media.text : undefined,
       poster: "poster" in media ? media.poster : undefined,
       duration: "duration" in media ? media.duration : undefined,
       model: result.usage.model,

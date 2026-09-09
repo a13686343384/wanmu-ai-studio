@@ -35,7 +35,7 @@ export function NavBar() {
   const [createTeamOpen, setCreateTeamOpen] = useState(false)
   const [joinTeamOpen, setJoinTeamOpen] = useState(false)
 
-  const immersive = /^\/creation\/film-factory\/[^/]+$/.test(pathname)
+  const immersive = /^(\/creation\/film-factory\/[^/]+|\/canvas\/[^/]+)$/.test(pathname)
   if (immersive) return null
 
   return (
