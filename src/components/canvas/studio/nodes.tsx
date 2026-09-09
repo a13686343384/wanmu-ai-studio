@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Handle,
   Position,
@@ -91,24 +91,52 @@ export function StudioTextNode({ id, data, selected }: NodeProps) {
   const d = data as StudioNodeData
   const { updateNodeData } = useReactFlow()
   const { remove } = useNodeActions(id)
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  // 基于选区应用格式：有选区则包裹，无选区则对当前行加前缀
+  function applyFormat(kind: "wrap" | "line" | "insert", marker: string, closeMarker?: string) {
+    const el = taRef.current
+    const value = d.text ?? ""
+    if (!el) {
+      updateNodeData(id, { text: value + marker })
+      return
+    }
+    const s = el.selectionStart ?? value.length
+    const e = el.selectionEnd ?? value.length
+
+    if (kind === "wrap") {
+      const next = value.slice(0, s) + marker + value.slice(s, e) + (closeMarker ?? "") + value.slice(e)
+      updateNodeData(id, { text: next })
+      requestAnimationFrame(() => {
+        el.focus()
+        el.setSelectionRange(s + marker.length, e + marker.length)
+      })
+      return
+    }
+    if (kind === "line") {
+      const lineStart = value.lastIndexOf("\n", Math.max(s - 1, 0)) + 1
+      updateNodeData(id, { text: value.slice(0, lineStart) + marker + value.slice(lineStart) })
+      requestAnimationFrame(() => {
+        el.focus()
+        el.setSelectionRange(s + marker.length, s + marker.length)
+      })
+      return
+    }
+    // insert
+    updateNodeData(id, { text: value.slice(0, s) + marker + value.slice(s) })
+  }
 
   const formatActions = [
-    { label: "H1", run: () => append("# ") },
-    { label: "H2", run: () => append("## ") },
-    { label: "H3", run: () => append("### ") },
-    { label: "❝", run: () => append("> ") },
-    { label: "B", run: () => append("**") },
-    { label: "I", run: () => append("*") },
-    { label: "•", run: () => append("- ") },
-    { label: "1.", run: () => append("1. ") },
-    { label: "—", run: () => append("\n---\n") },
+    { label: "H1", run: () => applyFormat("line", "# ") },
+    { label: "H2", run: () => applyFormat("line", "## ") },
+    { label: "H3", run: () => applyFormat("line", "### ") },
+    { label: "❝", run: () => applyFormat("line", "> ") },
+    { label: "B", run: () => applyFormat("wrap", "**", "**") },
+    { label: "I", run: () => applyFormat("wrap", "*", "*") },
+    { label: "•", run: () => applyFormat("line", "- ") },
+    { label: "1.", run: () => applyFormat("line", "1. ") },
+    { label: "—", run: () => applyFormat("insert", "\n---\n") },
   ]
-
-  function append(marker: string) {
-    updateNodeData(id, {
-      text: `${(d.text ?? "").endsWith(" ") ? d.text : `${d.text ?? ""} `}${marker}`,
-    })
-  }
 
   return (
     <div className="w-[380px]">
@@ -176,6 +204,7 @@ export function StudioTextNode({ id, data, selected }: NodeProps) {
           )}
 
           <textarea
+            ref={taRef}
             value={d.text ?? ""}
             onChange={(event) =>
               updateNodeData(id, { text: event.target.value })
@@ -293,6 +322,53 @@ export function StudioImageNode({ id, data, selected }: NodeProps) {
 
 /* ---------------------------- 视频节点 ---------------------------- */
 
+/** 视频播放器：无原生 controls，点击画面播放/暂停（原生条会把拖动变成文件拖出）。 */
+function VideoPlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  function toggle() {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      void video.play()
+      setPlaying(true)
+    } else {
+      video.pause()
+      setPlaying(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <video
+        ref={videoRef}
+        src={src}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onClick={toggle}
+        className="nodrag nowheel block aspect-video w-full cursor-pointer"
+      />
+      {!playing && (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="播放"
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-lg transition-transform hover:scale-105">
+            <Play className="ml-0.5 h-4 w-4 fill-current" />
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function StudioVideoNode({ id, data, selected }: NodeProps) {
   const d = data as StudioNodeData
   const { updateNodeData } = useReactFlow()
@@ -323,11 +399,7 @@ export function StudioVideoNode({ id, data, selected }: NodeProps) {
           )}
 
           {d.url ? (
-            <video
-              src={d.url}
-              controls
-              className="nodrag nowheel block aspect-video w-full"
-            />
+            <VideoPlayer src={d.url} />
           ) : (
             <div className="flex aspect-video items-center justify-center bg-zinc-900/80">
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700">
@@ -587,7 +659,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
               : "border-zinc-800 hover:border-zinc-700",
           )}
         >
-          <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 p-0.5">
+          <div className="flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-950/80 p-0.5">
             {SCENE_TYPES.map((type) => (
               <button
                 key={type}
@@ -617,11 +689,11 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
               }
               rows={3}
               placeholder="例如：@主角 目标接近 @对手，利用空地位置贴近到对手身前，最后直发攻击动作并保证伤害轨迹准确"
-              className="nodrag nowheel w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950/60 p-2 text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-700"
+              className="nodrag nowheel w-full resize-none rounded-lg border border-zinc-700 bg-zinc-950/80 p-2 text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-700"
             />
           </div>
 
-          <label className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-2.5 py-1.5 text-[11px] text-zinc-400">
+          <label className="flex items-center justify-between rounded-lg border border-zinc-700 bg-zinc-950/80 px-2.5 py-1.5 text-[11px] text-zinc-400">
             识别历史优化
             <input
               type="checkbox"
@@ -643,7 +715,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
               onChange={(event) =>
                 patchMeta({ clipDuration: Number(event.target.value) || 15 })
               }
-              className="h-7 w-16 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 text-xs text-zinc-300 outline-none"
+              className="h-7 w-16 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-xs text-zinc-300 outline-none"
             />
             <span className="text-[11px] text-zinc-500">秒</span>
           </div>
@@ -655,7 +727,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
               onChange={(event) =>
                 updateNodeData(id, { modelId: event.target.value })
               }
-              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 text-[11px] text-zinc-300 outline-none"
+              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-[11px] text-zinc-300 outline-none"
             >
               <option value="ovlm-6">OVLM 6</option>
               <option value="ovlm-5.6">OVLM 5.6</option>
@@ -667,7 +739,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
               onChange={(event) =>
                 patchMeta({ outputAspect: event.target.value })
               }
-              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 text-[11px] text-zinc-300 outline-none"
+              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-[11px] text-zinc-300 outline-none"
             >
               <option value="9:16">竖屏 · 9:16</option>
               <option value="16:9">横屏 · 16:9</option>
@@ -693,7 +765,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
             />
           )}
           {meta.plan && (
-            <div className="max-h-28 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950/60 p-2 text-[11px] leading-relaxed text-zinc-400">
+            <div className="max-h-28 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950/80 p-2 text-[11px] leading-relaxed text-zinc-400">
               {meta.plan}
             </div>
           )}
