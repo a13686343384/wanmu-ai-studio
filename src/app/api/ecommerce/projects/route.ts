@@ -10,8 +10,8 @@ const listSchema = z.object({
 /** GET /api/ecommerce/projects — 当前工作区的电商项目（可按 module 过滤）。 */
 export const GET = withErrorHandling(async (req: Request) => {
   const user = await requireUser()
-  const module = new URL(req.url).searchParams.get("module") ?? undefined
-  const parsed = listSchema.parse(module ? { module } : {})
+  const moduleFilter = new URL(req.url).searchParams.get("module") ?? undefined
+  const parsed = listSchema.parse(moduleFilter ? { module: moduleFilter } : {})
 
   const projects = await prisma.ecomProject.findMany({
     where: {
