@@ -70,3 +70,16 @@
     @apply bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 bg-clip-text text-transparent;
   }
 }
+
+/* 画布操作页：小地图约束尺寸并避开缩放控件 */
+.react-flow .react-flow__panel.react-flow__minimap {
+  margin: 0 0 44px 12px;
+  overflow: hidden;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  background: rgba(24, 24, 27, 0.85);
+}
+.react-flow .react-flow__minimap {
+  width: 176px;
+  height: 96px;
+}

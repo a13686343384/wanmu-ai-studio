@@ -49,6 +49,7 @@ import {
 import { StudioSidebar } from "./StudioSidebar"
 import { AgentDock } from "./AgentDock"
 import { DirectorDeskDialog, type DirectorDeskCapture } from "./DirectorDeskDialog"
+import { StudioContextMenu } from "./StudioContextMenu"
 import {
   StudioActionNode,
   StudioAudioNode,
@@ -108,6 +109,8 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
   const [directorNodeId, setDirectorNodeId] = useState("")
   const [snapToGrid, setSnapToGrid] = useState(false)
   const [credits, setCredits] = useState<number | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const historyPast = useRef<GraphSnapshot[]>([])
   const historyFuture = useRef<GraphSnapshot[]>([])
@@ -253,18 +256,29 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
 
   /* ---------------------------- 节点操作 ---------------------------- */
 
+  const spawnNode = useCallback(
+    (kind: StudioNodeKind, flowPosition: { x: number; y: number }) => {
+      pushHistory()
+      const offset = (stateRef.current.nodes.length % 5) * 36
+      const node = makeNode(
+        kind,
+        { x: flowPosition.x + offset, y: flowPosition.y + offset },
+        Date.now() % 1000,
+      )
+      setNodes((current) => [...current, node])
+    },
+    [pushHistory, setNodes],
+  )
+
   const addNode = useCallback(
     (kind: StudioNodeKind) => {
-      pushHistory()
       const center = reactFlow.screenToFlowPosition({
         x: window.innerWidth / 2,
         y: window.innerHeight / 2,
       })
-      const offset = (stateRef.current.nodes.length % 5) * 36
-      const node = makeNode(kind, { x: center.x - 180 + offset, y: center.y - 140 + offset }, Date.now() % 1000)
-      setNodes((current) => [...current, node])
+      spawnNode(kind, { x: center.x - 180, y: center.y - 140 })
     },
-    [pushHistory, reactFlow, setNodes],
+    [reactFlow, spawnNode],
   )
 
   const onConnect = useCallback(
@@ -278,6 +292,38 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
     },
     [pushHistory, setEdges],
   )
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+  const onPaneContextMenu = useCallback(
+    (event: React.MouseEvent | MouseEvent) => {
+      event.preventDefault()
+      const { clientX, clientY } = event as MouseEvent
+      const flow = reactFlow.screenToFlowPosition({ x: clientX, y: clientY })
+      setContextMenu({ x: clientX, y: clientY, flowX: flow.x, flowY: flow.y })
+    },
+    [reactFlow],
+  )
+
+  function handleContextUpload(file: File) {
+    if (!contextMenu) return
+    const kind: StudioNodeKind = file.type.startsWith("video")
+      ? "video"
+      : file.type.startsWith("audio")
+        ? "audio"
+        : "image"
+    spawnNode(kind, { x: contextMenu.flowX, y: contextMenu.flowY })
+    const created = stateRef.current.nodes[stateRef.current.nodes.length - 1]
+    if (created) {
+      setNodes((current) =>
+        current.map((node) =>
+          node.id === created.id
+            ? { ...node, data: { ...node.data, url: URL.createObjectURL(file), fileName: file.name } }
+            : node,
+        ),
+      )
+    }
+  }
 
   const openDirectorDesk = useCallback((nodeId: string) => {
     setDirectorNodeId(nodeId)
@@ -538,6 +584,9 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
               onConnect={onConnect}
               onNodeDragStop={pushHistory}
               onNodesDelete={pushHistory}
+              onPaneContextMenu={onPaneContextMenu}
+              onPaneClick={closeContextMenu}
+              onMoveStart={closeContextMenu}
               nodeTypes={nodeTypes}
               deleteKeyCode={["Backspace", "Delete"]}
               snapToGrid={snapToGrid}
@@ -557,9 +606,9 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
                 pannable
                 zoomable
                 position="bottom-left"
-                className="!bottom-12 !left-3 !h-24 !w-44 !rounded-lg !border !border-zinc-800 !bg-zinc-900/80"
                 maskColor="rgba(0,0,0,0.55)"
                 nodeColor="#52525b"
+                nodeStrokeWidth={0}
               />
 
               {/* 缩放控制 */}
@@ -657,6 +706,27 @@ function CanvasStudioInner({ projectId, projectName }: { projectId: string; proj
 
           {agentOpen && <AgentDock onClose={() => setAgentOpen(false)} />}
         </div>
+
+        {contextMenu && (
+          <StudioContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onSelect={(kind) => spawnNode(kind, { x: contextMenu.flowX, y: contextMenu.flowY })}
+            onUpload={() => uploadInputRef.current?.click()}
+            onClose={closeContextMenu}
+          />
+        )}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) handleContextUpload(file)
+            event.target.value = ""
+          }}
+        />
 
         <DirectorDeskDialog
           open={directorOpen}
