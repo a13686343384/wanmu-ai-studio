@@ -776,7 +776,7 @@ function CanvasStudioInner({
             >
               <Workflow className="h-3 w-3" />
               工作流
-              <span className="rounded bg-emerald-500/15 px-1 text-[9px] text-emerald-400">
+              <span className="rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-400">
                 NEW
               </span>
             </button>
@@ -792,7 +792,7 @@ function CanvasStudioInner({
               )}
             >
               Agent
-              <span className="rounded bg-emerald-500/15 px-1 text-[9px] text-emerald-400">
+              <span className="rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-400">
                 NEW
               </span>
             </button>

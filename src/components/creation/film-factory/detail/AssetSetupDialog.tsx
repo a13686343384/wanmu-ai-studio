@@ -34,7 +34,7 @@ export function AssetSetupDialog({
   const [resolution, setResolution] = useState("1K")
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>生成人物 / 场景资产</DialogTitle>
           <DialogDescription>

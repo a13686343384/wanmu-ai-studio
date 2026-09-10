@@ -58,7 +58,7 @@ export function CreateTeamDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>创建团队</DialogTitle>
           <DialogDescription>

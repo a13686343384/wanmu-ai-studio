@@ -120,7 +120,7 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
         >
           <Workflow className="h-3 w-3" />
           工作流
-          <span className="rounded bg-emerald-500/15 px-1 text-[9px] text-emerald-400">NEW</span>
+          <span className="rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-400">NEW</span>
         </button>
 
         <span className="ml-auto flex items-center gap-1 text-xs font-medium text-zinc-200">
@@ -242,7 +242,7 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
           <div className="mb-2 flex items-center gap-1.5">
             <span className="flex h-7 w-9 flex-col items-center justify-center overflow-hidden rounded-md border border-zinc-700 text-zinc-500">
               <Video className="h-3 w-3" />
-              <span className="text-[7px] leading-none">Video</span>
+              <span className="text-[10px] leading-none">Video</span>
             </span>
             <button
               type="button"

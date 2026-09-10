@@ -63,7 +63,7 @@ export function NewProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>新建项目</DialogTitle>
           <DialogDescription>创建一个空白画布，稍后可拖入节点编排创作流程。</DialogDescription>

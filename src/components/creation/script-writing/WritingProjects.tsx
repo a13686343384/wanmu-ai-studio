@@ -216,7 +216,7 @@ export function WritingProjects() {
           if (!creating) setOpen(value)
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>新建剧本</DialogTitle>
             <DialogDescription>

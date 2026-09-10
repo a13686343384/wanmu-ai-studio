@@ -25,7 +25,7 @@ export function Logo({ className, compact = false }: { className?: string; compa
         </svg>
       </span>
       {!compact && (
-        <span className="text-[15px] font-semibold tracking-tight text-zinc-100">
+        <span className="text-sm font-semibold tracking-tight text-zinc-100">
           Manvo<span className="text-orange-500"> TV</span>
         </span>
       )}

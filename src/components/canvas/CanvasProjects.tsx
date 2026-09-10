@@ -445,7 +445,7 @@ export function CanvasProjects() {
       </AlertDialog>
 
       <Dialog open={Boolean(moving)} onOpenChange={(open) => !open && setMoving(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>移动到其它工作区</DialogTitle>
             <DialogDescription>项目及其画布内容会一起迁移。</DialogDescription>

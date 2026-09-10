@@ -414,7 +414,7 @@ function CredentialPanel({
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingId ? "编辑凭据" : "新建凭据"}</DialogTitle>
             <DialogDescription>
@@ -558,7 +558,7 @@ function ModelConfigDialog({
 
   return (
     <Dialog open onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>模型配置</DialogTitle>
           <DialogDescription>

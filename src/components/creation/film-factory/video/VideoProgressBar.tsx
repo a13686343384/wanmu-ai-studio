@@ -56,7 +56,7 @@ export function VideoProgressBar({
           <span
             key={stage}
             className={cn(
-              "flex-1 rounded-sm px-1 py-0.5 text-center text-[9px] transition-colors",
+              "flex-1 rounded-sm px-1 py-0.5 text-center text-[10px] transition-colors",
               index < stageIndex
                 ? "bg-emerald-500/15 text-emerald-400"
                 : index === stageIndex

@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ─────────────────────── 全局字号规范（7 级） ───────────────────────
+ * 级别        字号            用途
+ * D1 展示级   text-3xl/4xl    仅登录 / 注册大标题
+ * L1 页面标题 text-2xl        页面级 h1（创作中心、剧本创作…）
+ * L2 区块标题 text-lg         弹窗主标题、区块标题、大数字
+ * T1 卡片标题 text-base       卡片主标题
+ * B1 正文     text-sm         默认正文、表单控件
+ * B2 辅助     text-xs         次要信息、紧凑表单
+ * C1 注释     text-[11px]     侧栏 / 卡片辅助说明（行高 1.45）
+ * C2 徽标     text-[10px]     最小字号下限，徽标与角标（行高 1.4）
+ * 禁止使用其它任意字号（text-[Npx]）。
+ *
+ * ─────────────────────── 弹窗 / 浮层尺寸规范 ───────────────────────
+ * S  确认框     DialogContent  sm:max-w-sm
+ * M  标准表单   DialogContent  sm:max-w-md
+ * L  复杂表单   DialogContent  sm:max-w-lg
+ * XL 大内容     DialogContent  sm:max-w-2xl ~ 4xl + max-h-[88vh] overflow-y-auto
+ * 浮层 PopoverContent：w-48（菜单）/ w-64（紧凑表单）/ w-72（标准表单）
+ */
+@layer base {
+  /* C1 / C2 两档小字的全局行高，保证密集面板的可读性一致 */
+  .text-\[11px\] {
+    line-height: 1.45;
+  }
+  .text-\[10px\] {
+    line-height: 1.4;
+  }
+}
+
 @layer base {
   :root {
     --background: 240 10% 3.9%;

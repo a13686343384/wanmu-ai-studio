@@ -398,7 +398,7 @@ export function EcommerceStudio() {
                   className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5"
                 >
                   <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-300">{group.label}</span>
-                  <span className="truncate text-[9px] text-zinc-600">{group.hint}</span>
+                  <span className="truncate text-[10px] text-zinc-600">{group.hint}</span>
                   <span className="rounded bg-zinc-800 px-1.5 text-[10px] tabular-nums text-zinc-300">
                     {group.count}
                   </span>
@@ -494,7 +494,7 @@ export function EcommerceStudio() {
 
       {/* 大图预览 */}
       <Dialog open={Boolean(previewUrl)} onOpenChange={(open) => !open && setPreviewUrl(null)}>
-        <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+        <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="预览" className="w-full rounded-lg" />
@@ -522,7 +522,7 @@ export function EcommerceStudio() {
 
       {/* 生成记录 */}
       <Dialog open={recordsOpen} onOpenChange={setRecordsOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>生成记录</DialogTitle>
           </DialogHeader>
@@ -640,14 +640,14 @@ function ResultPanel({
                   {item.status === "failed" ? (
                     <>
                       <span className="text-[10px] text-rose-300">生成失败</span>
-                      <span className="text-[9px] text-zinc-600">点此重试</span>
+                      <span className="text-[10px] text-zinc-600">点此重试</span>
                     </>
                   ) : (
                     <span className="text-[10px] text-zinc-600">{item.label}</span>
                   )}
                 </div>
               )}
-              <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1 py-0.5 text-[9px] text-zinc-200">
+              <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1 py-0.5 text-[10px] text-zinc-200">
                 {item.label}
               </span>
             </button>

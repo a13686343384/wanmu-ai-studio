@@ -190,7 +190,7 @@ export function SplitStoryboardDialog({
 
   return (
     <Dialog open={open} onOpenChange={(value) => !running && onOpenChange(value)}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scissors className="h-4 w-4 text-orange-400" />

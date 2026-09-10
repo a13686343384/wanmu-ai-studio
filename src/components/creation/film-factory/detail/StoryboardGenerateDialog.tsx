@@ -117,7 +117,7 @@ export function StoryboardGenerateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(value) => !running && onOpenChange(value)}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {kind === "image" ? (

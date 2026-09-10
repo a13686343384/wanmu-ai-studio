@@ -120,6 +120,8 @@ const { data, usage } = await ai.generateImage({ ... })
 - **仅深色模式**，色阶用 zinc，品牌色 `orange-500`。
 - 卡片：`bg-zinc-900/40 border-zinc-800 rounded-xl`；主按钮用 `variant="brand"`（橙）/ `variant="inverse"`（白底黑字）。
 - 禁止引入亮色主题或第二套色板。新增颜色前先看 `src/styles/globals.css` 与 `tailwind.config.ts`。
+- **字号 7 级规范**（完整定义见 `globals.css` 头部注释）：展示级 `text-3xl/4xl`（仅登录页）→ 页面标题 `text-2xl` → 区块/弹窗标题 `text-lg` → 卡片标题 `text-base` → 正文 `text-sm` → 辅助 `text-xs` → 注释 `text-[11px]` → 徽标 `text-[10px]`（最小下限）。禁止其它任意字号。
+- **弹窗 4 档规范**：确认框 `sm:max-w-sm`、标准表单 `sm:max-w-md`、复杂表单 `sm:max-w-lg`、大内容 `sm:max-w-2xl~4xl` + `max-h-[88vh] overflow-y-auto`。浮层 `PopoverContent` 宽度：菜单 `w-48` / 紧凑表单 `w-64` / 标准表单 `w-72`。
 
 ### 4.6 枚举集中在 `src/lib/constants.ts`
 作品类型、剧集类型、画幅、模型清单（`TEXT_MODELS` / `IMAGE_MODELS` / `VIDEO_MODELS` / `AUDIO_MODELS`）、状态标签与配色，全部在此定义。

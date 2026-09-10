@@ -319,7 +319,7 @@ export function AssetSidebar({
                 variant="outline"
                 size="sm"
                 className="ml-auto h-7"
-                onClick={() => void generate("characters", "角色")}
+                onClick={() => void generate("character", "角色")}
                 disabled={generating !== null || characters.length === 0}
               >
                 {generating === "characters" ? (
@@ -361,7 +361,7 @@ export function AssetSidebar({
               variant="outline"
               size="sm"
               className="mb-2"
-              onClick={() => void generate("outfits", "造型")}
+              onClick={() => void generate("outfit", "造型")}
               disabled={generating !== null || costumes.length === 0}
             >
               {generating === "outfits" ? (
@@ -387,7 +387,7 @@ export function AssetSidebar({
               variant="outline"
               size="sm"
               className="mb-2"
-              onClick={() => void generate("props", "道具")}
+              onClick={() => void generate("prop", "道具")}
               disabled={generating !== null || props.length === 0}
             >
               {generating === "props" ? (
@@ -428,7 +428,7 @@ export function AssetSidebar({
               variant="outline"
               size="sm"
               className="mb-2"
-              onClick={() => void generate("scenes", "场景")}
+              onClick={() => void generate("scene", "场景")}
               disabled={generating !== null || scenes.length === 0}
             >
               {generating === "scenes" ? (
@@ -601,7 +601,7 @@ function CharacterCard({
           )}
           <span
             className={cn(
-              "rounded px-1.5 py-0.5 text-[9px] font-medium",
+              "rounded px-1.5 py-0.5 text-[10px] font-medium",
               character.status === "completed"
                 ? "bg-emerald-500/20 text-emerald-300"
                 : character.status === "generating"
@@ -1034,7 +1034,7 @@ function AssetGenerateDialog({
                     type="button"
                     aria-label="移除参考图"
                     onClick={() => setRefs((current) => current.filter((item) => item !== url))}
-                    className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-zinc-950 text-[9px] text-zinc-400 ring-1 ring-zinc-700 hover:text-rose-300"
+                    className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-zinc-950 text-[10px] text-zinc-400 ring-1 ring-zinc-700 hover:text-rose-300"
                   >
                     ×
                   </button>
@@ -1165,7 +1165,7 @@ function AssetCard({ asset }: { asset: AssetDTO }) {
               {asset.status === "generating" ? (
                 <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
               ) : (
-                <span className="text-[9px] text-zinc-600">待生成</span>
+                <span className="text-[10px] text-zinc-600">待生成</span>
               )}
             </div>
           )}
@@ -1175,7 +1175,7 @@ function AssetCard({ asset }: { asset: AssetDTO }) {
           <div className="flex items-center gap-1.5">
             <span className="truncate text-xs text-zinc-200">{asset.name}</span>
             {asset.imageUrl && (
-              <Badge variant="success" className="h-4 px-1 text-[9px]">
+              <Badge variant="success" className="h-4 px-1 text-[10px]">
                 已出图
               </Badge>
             )}
@@ -1376,12 +1376,12 @@ function CostumeCard({
         )}
 
         {/* 名字徽标（左上）+ 状态徽标（右上） */}
-        <span className="absolute left-1.5 top-1.5 rounded bg-zinc-950/85 px-1.5 py-0.5 text-[9px] text-zinc-300 ring-1 ring-zinc-800">
+        <span className="absolute left-1.5 top-1.5 rounded bg-zinc-950/85 px-1.5 py-0.5 text-[10px] text-zinc-300 ring-1 ring-zinc-800">
           {costume.name}
         </span>
         <span
           className={cn(
-            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
+            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium",
             costume.status === "completed"
               ? "bg-emerald-500/20 text-emerald-300"
               : costume.status === "generating"
@@ -1591,12 +1591,12 @@ function PropCard({
         )}
 
         {/* 类目徽标（左上橙）+ 状态徽标（右上） */}
-        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-medium text-orange-300 ring-1 ring-orange-500/40">
+        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-medium text-orange-300 ring-1 ring-orange-500/40">
           道具
         </span>
         <span
           className={cn(
-            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
+            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium",
             prop.status === "completed"
               ? "bg-emerald-500/20 text-emerald-300"
               : prop.status === "generating"
@@ -1955,7 +1955,7 @@ function SceneCard({
           </div>
         )}
 
-        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-medium text-orange-300 ring-1 ring-orange-500/40">
+        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-medium text-orange-300 ring-1 ring-orange-500/40">
           场景
         </span>
         <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
@@ -1969,7 +1969,7 @@ function SceneCard({
           )}
           <span
             className={cn(
-              "rounded px-1.5 py-0.5 text-[9px] font-medium",
+              "rounded px-1.5 py-0.5 text-[10px] font-medium",
               scene.status === "completed"
                 ? "bg-emerald-500/20 text-emerald-300"
                 : scene.status === "generating"
@@ -2365,7 +2365,7 @@ function SpatialDialog({
                       <span className="text-zinc-700">—</span>
                     )}
                   </span>
-                  <span className="py-1 text-center text-[9px] text-zinc-500">{angle.label}</span>
+                  <span className="py-1 text-center text-[10px] text-zinc-500">{angle.label}</span>
                 </button>
               )
             })}

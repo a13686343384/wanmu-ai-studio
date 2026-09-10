@@ -36,7 +36,7 @@ export function FeaturedGallery() {
               Created on Manvo TV
             </p>
 
-            <h2 className="mt-3 text-[28px] font-semibold leading-snug tracking-tight text-zinc-50">
+            <h2 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-zinc-50">
               让作品，成为最有力的表达
             </h2>
             <p className="mt-3 text-xs leading-relaxed text-zinc-500">
