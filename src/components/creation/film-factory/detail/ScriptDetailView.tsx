@@ -72,6 +72,11 @@ export function ScriptDetailView({
 
   const [assetSetupOpen, setAssetSetupOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
+  const [splitPhase, setSplitPhase] = useState<{
+    active: boolean
+    label: string
+    mode: string
+  } | null>(null)
   const [splitMode, setSplitMode] = useState<"text" | "image" | "video" | "bgm">("image")
   const [consultOpen, setConsultOpen] = useState(false)
   const [recapOpen, setRecapOpen] = useState(false)
@@ -206,6 +211,43 @@ export function ScriptDetailView({
     setGenerateTarget({ storyboard, kind: "video" })
   }, [])
   const handleSplit = useCallback(() => setSplitOpen(true), [])
+  const [batchVideoBusy, setBatchVideoBusy] = useState(false)
+  async function handleBatchVideo() {
+    const pending = storyboards.filter((item) => item.imageUrl && !item.videoUrl)
+    if (pending.length === 0) {
+      toast.info("没有可生成的镜头：请先补齐首帧图")
+      return
+    }
+    setBatchVideoBusy(true)
+    try {
+      for (const [index, storyboard] of pending.entries()) {
+        setSplitPhase({
+          active: true,
+          label: `正在生成视频 ${index + 1}/${pending.length}`,
+          mode: "video",
+        })
+        const res = await fetch(`/api/storyboards/${storyboard.id}/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: "video",
+            model: "auto",
+            prompt: "按分镜描述生成视频",
+            aspectRatio: script.targetAspect,
+          }),
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "视频生成失败")
+      }
+      await loadStoryboards()
+      toast.success(`批量视频生成完成（${pending.length} 个）`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "批量生成失败")
+    } finally {
+      setBatchVideoBusy(false)
+      setSplitPhase(null)
+    }
+  }
   const handleRecap = useCallback(() => {
     setRecapResult(null)
     setRecapOpen(true)
@@ -215,64 +257,38 @@ export function ScriptDetailView({
     setEpisodesSheetOpen(false)
   }, [])
 
+  /** 第一步：只提取资产描述词（不出图）。出图由右栏「重新出图」一次性完成。 */
   async function generateAssets(config: AssetSetup) {
     setGenerating(true)
     setProgress(5)
-    setProgressLabel("正在提取全剧资产…")
+    setProgressLabel("正在提取全剧资产描述词…")
     const poll = window.setInterval(() => void reloadScript(), 1500)
     try {
       const kinds = (["characters", "scenes", "props"] as const).filter(
         (kind) => !script[kind].length,
       )
-      let assets = script
       if (kinds.length) {
+        setProgress(30)
         const res = await fetch(`/api/scripts/${script.id}/assets`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ kinds, model: config.textModel }),
-        })
-        const payload = await res.json()
-        if (!res.ok) throw new Error(payload.error ?? "提取失败")
-        assets = { ...script, ...payload.data }
-      }
-      const queue = (["characters", "scenes", "props"] as const).flatMap(
-        (kind) =>
-          assets[kind]
-            .filter((item) => !item.imageUrl)
-            .map((item) => ({
-              kind:
-                kind === "characters"
-                  ? "character"
-                  : kind === "scenes"
-                    ? "scene"
-                    : "prop",
-              item,
-            })),
-      )
-      for (const [index, entry] of queue.entries()) {
-        setProgressLabel(
-          `正在生成 ${entry.item.name}（${index + 1}/${queue.length}）`,
-        )
-        const res = await fetch(`/api/scripts/${script.id}/assets/generate`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            kind: entry.kind,
-            ids: [entry.item.id],
-            model: config.imageModel,
-            aspectRatio: config.aspectRatio,
-            resolution: config.resolution,
+            kinds,
+            model: config.textModel,
+            imageModel: config.imageModel,
           }),
         })
         const payload = await res.json()
-        if (!res.ok) throw new Error(payload.error ?? "资产生成失败")
-        setProgress(Math.round(((index + 1) / queue.length) * 100))
+        if (!res.ok) throw new Error(payload.error ?? "提取失败")
       }
+      setProgress(100)
       await reloadScript()
       setAssetSetupOpen(false)
-      toast.success("全剧资产已生成，可以继续拆分镜")
+      toast.success("资产描述词已提取", {
+        description: "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
+      })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "资产生成失败")
+      toast.error(error instanceof Error ? error.message : "提取失败")
     } finally {
       window.clearInterval(poll)
       setGenerating(false)
@@ -325,6 +341,12 @@ export function ScriptDetailView({
       <WorkflowTabs
         script={script}
         processing={script.processingStatus}
+        assetsReady={
+          totalAssets > 0 &&
+          [...script.characters, ...script.scenes, ...script.props].every(
+            (item) => item.imageUrl,
+          )
+        }
         counts={{
           episodes: script.episodes.length,
           assets: totalAssets,
@@ -334,6 +356,37 @@ export function ScriptDetailView({
 
       <div className="flex min-h-0 flex-1">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* 分镜提示词时间轴（需求10：顶部 chip 条，可折叠） */}
+          {storyboards.length > 0 && (
+            <details className="border-b border-zinc-800/80 bg-zinc-950/40">
+              <summary className="cursor-pointer select-none px-3 py-1.5 text-[11px] text-zinc-500">
+                分镜提示词 · {storyboards.length} 个镜头（点击展开时间轴）
+              </summary>
+              <div className="flex gap-1.5 overflow-x-auto px-3 pb-2">
+                {storyboards.map((item, index) => {
+                  const start = storyboards
+                    .slice(0, index)
+                    .reduce((sum, s) => sum + (s.duration ?? 0), 0)
+                  const end = start + (item.duration ?? 0)
+                  const fmt = (sec: number) =>
+                    `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.round(sec % 60)).padStart(2, "0")}`
+                  return (
+                    <span
+                      key={item.id}
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-1 text-[10px] text-zinc-400"
+                      title={item.description}
+                    >
+                      <span className="text-zinc-300">{item.shotType}</span>
+                      <span className="tabular-nums text-zinc-600">
+                        {fmt(start)}-{fmt(end)}
+                      </span>
+                    </span>
+                  )
+                })}
+              </div>
+            </details>
+          )}
+
           {/* 分集胶片条 */}
           <section className="border-b border-zinc-800/80 bg-zinc-950/40 px-3 pb-1 pt-2">
             <div className="flex items-center gap-2 pb-1">
@@ -396,6 +449,41 @@ export function ScriptDetailView({
                 progressLabel={progressLabel}
                 hasEpisode={Boolean(activeEpisode)}
                 onSplit={handleSplit}
+                splitPhase={splitPhase}
+                aspectRatio={script.targetAspect}
+                videoMode={splitPhase?.mode === "video" || (!splitPhase && script.status === "video")}
+                onBatchVideo={() => void handleBatchVideo()}
+                batchVideoBusy={batchVideoBusy}
+                assets={{
+                  characters: script.characters.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    imageUrl: c.imageUrl,
+                    costumes: (c.costumes ?? []).map((k) => ({ id: k.id, name: k.name })),
+                  })),
+                  scenes: script.scenes.map((s) => ({ id: s.id, name: s.name, imageUrl: s.imageUrl })),
+                  props: script.props.map((p) => ({ id: p.id, name: p.name, imageUrl: p.imageUrl })),
+                }}
+                onSegmentFill={async (items) => {
+                  for (const item of items) {
+                    const res = await fetch(`/api/storyboards/${item.id}/generate`, {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        kind: "image",
+                        model: "auto",
+                        prompt: "按分镜描述生成分镜首帧图",
+                        aspectRatio: script.targetAspect,
+                      }),
+                    })
+                    if (!res.ok) {
+                      const payload = await res.json().catch(() => ({}))
+                      throw new Error(payload.error ?? "首帧图生成失败")
+                    }
+                  }
+                  await loadStoryboards()
+                }}
+                onRefsSaved={() => void loadStoryboards()}
                 onRecap={handleRecap}
                 onGenerateImage={handleGenerateImage}
                 onGenerateVideo={handleGenerateVideo}
@@ -517,6 +605,7 @@ export function ScriptDetailView({
             episodeId={activeEpisode.id}
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
             initialMode={splitMode}
+            onSplitPhase={setSplitPhase}
             onDone={() => {
               void loadStoryboards()
               void reloadScript()

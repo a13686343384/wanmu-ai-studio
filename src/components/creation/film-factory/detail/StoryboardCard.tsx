@@ -22,6 +22,8 @@ export interface StoryboardDTO {
   negativePrompt: string | null
   model: string | null
   status: string
+  segmentTitle?: string | null
+  segmentNote?: string | null
 }
 
 /**
@@ -33,12 +35,18 @@ export interface StoryboardDTO {
 export const StoryboardCard = memo(function StoryboardCard({
   storyboard,
   busy,
+  aspectRatio = "16:9",
+  videoMode = false,
   onGenerateImage,
   onGenerateVideo,
   onEdit,
 }: {
   storyboard: StoryboardDTO
   busy: boolean
+  /** 画幅（占位框按它动态决定，如 9:16） */
+  aspectRatio?: string
+  /** 视频阶段：未出视频时显示「生成视频」占位框 */
+  videoMode?: boolean
   onGenerateImage: (storyboard: StoryboardDTO) => void
   onGenerateVideo: (storyboard: StoryboardDTO) => void
   onEdit: (storyboard: StoryboardDTO) => void
@@ -57,8 +65,11 @@ export const StoryboardCard = memo(function StoryboardCard({
             : "border-zinc-800 hover:border-zinc-700",
       )}
     >
-      {/* 画面 */}
-      <div className="relative aspect-video overflow-hidden bg-zinc-950">
+      {/* 画面（占位框按画幅动态决定） */}
+      <div
+        className="relative overflow-hidden bg-zinc-950"
+        style={{ aspectRatio: aspectRatio.replace(":", " / ") }}
+      >
         {storyboard.imageUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -81,17 +92,34 @@ export const StoryboardCard = memo(function StoryboardCard({
             </button>
           </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-zinc-600">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-600">
             {storyboard.status === "generating" ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
                 <span className="text-[10px]">生成中…</span>
               </>
+            ) : videoMode ? (
+              <button
+                type="button"
+                aria-label="生成视频"
+                disabled={busy}
+                onClick={() => onGenerateVideo(storyboard)}
+                className="flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[11px] text-zinc-200 transition-colors hover:border-orange-500/60 hover:text-orange-300"
+              >
+                <Video className="h-3.5 w-3.5" />
+                生成视频
+              </button>
             ) : (
-              <>
-                <ImageIcon className="h-4 w-4" />
-                <span className="text-[10px]">尚未出图</span>
-              </>
+              <button
+                type="button"
+                aria-label="生成首帧图"
+                disabled={busy}
+                onClick={() => onGenerateImage(storyboard)}
+                className="flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[11px] text-zinc-200 transition-colors hover:border-orange-500/60 hover:text-orange-300"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                生成首帧图
+              </button>
             )}
           </div>
         )}
@@ -116,6 +144,20 @@ export const StoryboardCard = memo(function StoryboardCard({
             <Video className="mr-0.5 h-2.5 w-2.5" />
             已出视频
           </Badge>
+        )}
+        {videoMode && !hasVideo && storyboard.imageUrl && (
+          <button
+            type="button"
+            aria-label="生成视频"
+            disabled={busy}
+            onClick={() => onGenerateVideo(storyboard)}
+            className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover:opacity-100"
+          >
+            <span className="flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-950/90 px-3 py-1.5 text-[11px] text-zinc-100">
+              <Video className="h-3.5 w-3.5" />
+              生成视频
+            </span>
+          </button>
         )}
       </div>
 

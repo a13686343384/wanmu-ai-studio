@@ -39,7 +39,14 @@ import {
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
 import { TaskQueueDialog, StopAllDialog } from "@/components/creation/film-factory/TaskQueueDialog"
 import { RenameDialog } from "@/components/canvas/RenameDialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { FactoryHeader } from "@/components/creation/film-factory/FactoryHeader"
+import { IntakeForm } from "@/components/creation/film-factory/intake/IntakeForm"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -67,6 +74,7 @@ export function ScriptList() {
   const [editing, setEditing] = useState<ScriptSummary | null>(null)
   const [hintOpen, setHintOpen] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
   const [stopAllOpen, setStopAllOpen] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return []
@@ -292,11 +300,9 @@ export function ScriptList() {
             <Upload className="h-3.5 w-3.5" />
             导入
           </Button>
-          <Button variant="inverse" size="sm" className="h-8" asChild>
-            <Link href="/creation/film-factory/new">
-              <Plus />
-              新建剧本
-            </Link>
+          <Button variant="inverse" size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            新建剧本
           </Button>
         </div>
       </div>
@@ -391,6 +397,16 @@ export function ScriptList() {
           void load()
         }}
       />
+
+      {/* 新建剧本（INTAKE 弹窗） */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>新建剧本</DialogTitle>
+          </DialogHeader>
+          <IntakeForm embedded />
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>

@@ -31,7 +31,15 @@ const DEFAULT_CONFIG: IntakeConfig = {
  * 2. POST /api/scripts/[id]/analyze AI 通读
  * 3. ReviewDialog → POST /api/scripts/[id]/finalize 生成分集大纲
  */
-export function IntakeForm() {
+export function IntakeForm({
+  embedded = false,
+  onFinished,
+}: {
+  /** embedded：在弹窗中渲染，隐藏外层留白与返回按钮 */
+  embedded?: boolean
+  /** 创建完成后回调（弹窗模式用于关闭弹窗） */
+  onFinished?: () => void
+} = {}) {
   const router = useRouter()
 
   const [title, setTitle] = useState("")
@@ -125,16 +133,18 @@ export function IntakeForm() {
 
   return (
     <>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
+      <main className={embedded ? "" : "mx-auto w-full max-w-6xl px-4 py-6 lg:px-6"}>
         {/* 头部 */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon-sm" asChild aria-label="返回影视工厂">
-                <Link href="/creation/film-factory">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
+              {!embedded && (
+                <Button variant="ghost" size="icon-sm" asChild aria-label="返回影视工厂">
+                  <Link href="/creation/film-factory">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
               <h1 className="text-lg font-semibold tracking-tight text-zinc-50">新建剧本</h1>
               <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
                 Intake

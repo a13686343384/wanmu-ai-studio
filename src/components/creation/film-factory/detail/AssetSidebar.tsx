@@ -15,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Shirt,
+  Search,
   Sparkles,
   Trash2,
   Upload,
@@ -184,12 +185,9 @@ export function AssetSidebar({
   }
 
   async function generate(kind: string, label: string) {
+    // 真实进度：单次请求无法量化时展示不确定态（旋转 + 文案），不再用假百分比
     setGenerating(kind)
-    setProgress(6)
-
-    const timer = window.setInterval(() => {
-      setProgress((value) => (value >= 92 ? value : value + 7 + Math.random() * 8))
-    }, 500)
+    setProgress(0)
 
     try {
       const res = await fetch(`/api/scripts/${scriptId}/assets/generate`, {
@@ -200,7 +198,6 @@ export function AssetSidebar({
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error ?? "生成失败")
 
-      setProgress(100)
       toast.success(`${label}图已生成`, {
         description: `共 ${payload.data.generated} 个`,
       })
@@ -208,11 +205,41 @@ export function AssetSidebar({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "生成失败")
     } finally {
-      window.clearInterval(timer)
-      window.setTimeout(() => {
-        setGenerating(null)
-        setProgress(0)
-      }, 400)
+      setGenerating(null)
+      setProgress(0)
+    }
+  }
+
+  /** 一次性重出全剧资产图（需求3 第二步）：角色 → 场景 → 道具 → 造型，逐类生成 */
+  const [regenAll, setRegenAll] = useState(false)
+  async function regenerateAllImages() {
+    setRegenAll(true)
+    try {
+      for (const [kind, label] of [
+        ["character", "角色"],
+        ["scene", "场景"],
+        ["prop", "道具"],
+        ["outfit", "造型"],
+      ] as const) {
+        const res = await fetch(`/api/scripts/${scriptId}/assets/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind }),
+        })
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}))
+          // 该类没有可生成的资产时跳过继续
+          if (!/没有可生成/.test(payload.error ?? "")) {
+            throw new Error(payload.error ?? `${label}图生成失败`)
+          }
+        }
+      }
+      toast.success("全剧资产图已重新生成")
+      onRefresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "重新出图失败")
+    } finally {
+      setRegenAll(false)
     }
   }
 
@@ -245,8 +272,13 @@ export function AssetSidebar({
           {TAB_TITLE[tab]}
         </span>
         <div className="flex items-center gap-1.5">
-          <TipButton label="重新出一遍" tip={TIP.refresh} disabled={extracting} onClick={() => void extract()}>
-            <RefreshCw className={cn("h-3.5 w-3.5", extracting && "animate-spin")} />
+          <TipButton
+            label="重新出图"
+            tip={TIP.refresh}
+            disabled={extracting || regenAll}
+            onClick={() => void regenerateAllImages()}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", regenAll && "animate-spin")} />
           </TipButton>
           <TipButton label="打包下载" tip={TIP.download} onClick={downloadAll}>
             <Download className="h-3.5 w-3.5" />
@@ -298,15 +330,9 @@ export function AssetSidebar({
         </div>
 
         {generating && (
-          <div className="space-y-1 border-b border-zinc-800/80 px-3 py-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="flex items-center gap-1.5 text-orange-300">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                正在生成…
-              </span>
-              <span className="tabular-nums text-zinc-500">{Math.round(progress)}%</span>
-            </div>
-            <Progress value={progress} indicatorClassName="bg-orange-500" />
+          <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-2 text-[11px] text-orange-300">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            正在生成{TAB_TITLE[tab]}…（单次请求完成后自动刷新）
           </div>
         )}
 
@@ -465,6 +491,28 @@ export function AssetSidebar({
   )
 }
 
+/* ---------------------------- 资产大图预览（需求4：放大镜查看整图） ---------------------------- */
+
+function AssetImagePreview({
+  url,
+  alt,
+  onClose,
+}: {
+  url: string
+  alt: string
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-8"
+      onClick={onClose}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={alt} className="max-h-full max-w-full object-contain" />
+    </div>
+  )
+}
+
 /* ---------------------------- 角色大图卡（img-05/09 + 更多菜单） ---------------------------- */
 
 const RESOLUTIONS = ["1K", "2K", "4K"] as const
@@ -486,6 +534,7 @@ function CharacterCard({
   const [resetOpen, setResetOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function patch(body: Record<string, unknown>, success?: string) {
@@ -620,6 +669,13 @@ function CharacterCard({
         {/* 悬浮操作条（图片右下角）：下载原图 / 上传本地替换 / 编辑 / 更多 */}
         {character.imageUrl && (
           <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <ImageActionButton
+              label="查看大图"
+              disabled={busy}
+              onClick={() => setPreviewUrl(character.imageUrl ?? null)}
+            >
+              <Search className="h-3 w-3" />
+            </ImageActionButton>
             <ImageActionButton label="下载原图" disabled={busy} onClick={downloadImage}>
               <Download className="h-3 w-3" />
             </ImageActionButton>
@@ -799,6 +855,14 @@ function CharacterCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {previewUrl && (
+        <AssetImagePreview
+          url={previewUrl}
+          alt={character.name}
+          onClose={() => setPreviewUrl(null)}
+        />
+      )}
 
       {/* 删除确认 */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -1303,6 +1367,7 @@ function CostumeCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   /** 替换：唤起系统文件选择框，上传后直接替换已出图 */
@@ -1406,8 +1471,18 @@ function CostumeCard({
               : "待生成"}
         </span>
 
-        {/* 悬浮操作条（右下）：重出 / 替换 */}
+        {/* 悬浮操作条（右下）：查看大图 / 重出 / 替换 */}
         <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <button
+            type="button"
+            aria-label="查看大图"
+            disabled={busy || !costume.imageUrl}
+            onClick={() => costume.imageUrl && setPreviewUrl(costume.imageUrl)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <Search className="h-3 w-3" />
+            大图
+          </button>
           <button
             type="button"
             aria-label="重出"
@@ -1450,6 +1525,14 @@ function CostumeCard({
         }}
       />
 
+      {previewUrl && (
+        <AssetImagePreview
+          url={previewUrl}
+          alt={costume.name}
+          onClose={() => setPreviewUrl(null)}
+        />
+      )}
+
       {/* 重新出这套造型（确认） */}
       <Dialog open={regenOpen} onOpenChange={setRegenOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1491,6 +1574,7 @@ function PropCard({
   const [regenOpen, setRegenOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function patch(body: Record<string, unknown>, success?: string) {
@@ -1655,6 +1739,16 @@ function PropCard({
           </button>
           <button
             type="button"
+            aria-label="查看大图"
+            disabled={busy || !prop.imageUrl}
+            onClick={() => prop.imageUrl && setPreviewUrl(prop.imageUrl)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <Search className="h-3 w-3" />
+            大图
+          </button>
+          <button
+            type="button"
             aria-label="删除"
             disabled={busy}
             onClick={() => setDeleteOpen(true)}
@@ -1721,6 +1815,14 @@ function PropCard({
         busy={busy}
         onSave={(body) => patch(body, "道具卡已保存")}
       />
+
+      {previewUrl && (
+        <AssetImagePreview
+          url={previewUrl}
+          alt={prop.name}
+          onClose={() => setPreviewUrl(null)}
+        />
+      )}
 
       {/* 删除确认 */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -297,6 +297,10 @@ export interface StoryboardDraft {
   action?: string
   camera?: string
   duration: number
+  /** 所属镜组标题（如 B01·闪回·有剧情镜），同组连续分镜为一段 */
+  segmentTitle?: string
+  /** 镜组说明 / 衔接建议 */
+  segmentNote?: string
 }
 
 export interface SplitStoryboardsResult {

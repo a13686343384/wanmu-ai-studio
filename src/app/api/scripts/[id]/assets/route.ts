@@ -12,6 +12,8 @@ const extractSchema = z.object({
   merge: z.boolean().optional(),
   /** 补缺漏时的捕捉关键词，逗号分隔，会附加到提取提示词里重点找 */
   keyword: z.string().trim().max(200).optional(),
+  /** 当前使用的图片模型名：拆分出的描述词将提供给该图片模型出图，让大语言模型适配它的表达 */
+  imageModel: z.string().trim().max(120).optional(),
 })
 
 /**
@@ -27,8 +29,12 @@ export const POST = withErrorHandling(
     const script = await requireScriptAccess(params.id, user.id)
 
     const body = await req.json().catch(() => ({}))
-    const { kinds, model, merge, keyword } = extractSchema.parse(body)
+    const { kinds, model, merge, keyword, imageModel } = extractSchema.parse(body)
     const targets = kinds ?? ["characters", "scenes", "props"]
+    // 描述词适配（需求6）：把图片模型名告知大语言模型，让描述词与出图模型匹配
+    const imageModelHint = imageModel
+      ? `\n\n[目标图片模型] 这些描述词将提供给图片模型「${imageModel}」用于生成参考图，请让每条描述词兼顾该类模型的出图习惯（具体的视觉关键词、材质 / 光线 / 构图描述，中英文关键概念并给出）。`
+      : ""
 
     const ai = getAIService()
     const result: {
@@ -60,10 +66,10 @@ export const POST = withErrorHandling(
       )
       const { data } = await ai.extractCharacters({
         content: merge
-          ? `${script.content}\n\n[补缺漏提示] ${keywordHint}已存在角色：${[
+          ? `${script.content}${imageModelHint}\n\n[补缺漏提示] ${keywordHint}已存在角色：${[
               ...existingNames,
             ].join("、")}。只输出遗漏的新角色，不要重复已有的。`
-          : script.content,
+          : `${script.content}${imageModelHint}`,
         model: model ?? script.textModel,
       })
       extracted.characters = merge
@@ -73,7 +79,7 @@ export const POST = withErrorHandling(
 
     if (targets.includes("scenes")) {
       const { data } = await ai.extractScenes({
-        content: script.content,
+        content: `${script.content}${imageModelHint}`,
         model: model ?? script.textModel,
       })
       extracted.scenes = data
@@ -81,7 +87,7 @@ export const POST = withErrorHandling(
 
     if (targets.includes("props")) {
       const { data } = await ai.extractProps({
-        content: script.content,
+        content: `${script.content}${imageModelHint}`,
         model: model ?? script.textModel,
       })
       extracted.props = data
@@ -132,6 +138,23 @@ export const POST = withErrorHandling(
         result.props = extracted.props.length
       }
     })
+
+    // 妆造兜底（需求：拆分资产后妆造库应有数据）：为没有造型的角色补「默认造型」
+    const charactersAll = await prisma.character.findMany({
+      where: { scriptId: script.id },
+      include: { costumes: { select: { id: true } } },
+    })
+    const missing = charactersAll.filter((c) => c.costumes.length === 0)
+    if (missing.length > 0) {
+      await prisma.costume.createMany({
+        data: missing.map((c) => ({
+          characterId: c.id,
+          name: "默认造型",
+          description: "角色的基础默认造型，可直接出图或在其上派生更多妆造。",
+          status: "pending",
+        })),
+      })
+    }
 
     const [characters, scenes, props] = await Promise.all([
       prisma.character.findMany({

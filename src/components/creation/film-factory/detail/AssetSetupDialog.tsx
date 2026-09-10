@@ -41,9 +41,10 @@ export function AssetSetupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>生成人物 / 场景资产</DialogTitle>
+          <DialogTitle>提取人物 / 场景资产</DialogTitle>
           <DialogDescription>
-            提取缺少的角色、场景和道具，为尚未出图的资产逐项生成图片。
+            第一步：用大模型从剧本中提取缺少的角色、场景、道具描述词（不生成图片）。
+            提取完成后，点右栏右上角的「重新出图」图标即可一次性生成全部资产图。
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
@@ -104,7 +105,7 @@ export function AssetSetupDialog({
               })
             }}
           >
-            生成人物 / 场景
+            提取资产描述词
           </Button>
         </div>
       </DialogContent>

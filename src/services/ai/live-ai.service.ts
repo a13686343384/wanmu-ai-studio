@@ -46,16 +46,27 @@ import { invokeCustomModel } from "@/lib/plugins/invoke"
 
 /* ---------------------------- 统一模型查找 ---------------------------- */
 
-/** 按 CustomModel.id 精确查找模型配置。 */
-async function loadCustomModel(modelId: string): Promise<{
+/**
+ * 查找模型配置：先按 id 精确匹配；查无（如前端仍传 mock 模型 id）时
+ * 回退到同 kind 的第一个启用模型，避免 live 模式下批量出图/出视频直接报错。
+ */
+async function loadCustomModel(
+  modelId: string,
+  kind?: "text" | "image" | "video" | "audio" | "subtitle",
+): Promise<{
   config: InvokeConfig
   providerType: string
   cost: number
   name: string
 } | null> {
-  const model = await prisma.customModel.findFirst({
-    where: { id: modelId, enabled: true },
-  })
+  const model =
+    (await prisma.customModel.findFirst({ where: { id: modelId, enabled: true } })) ??
+    (kind
+      ? await prisma.customModel.findFirst({
+          where: { kind, enabled: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : null)
   if (!model) return null
   const config: InvokeConfig = {
     lifecycle: model.lifecycle === "async" ? "async" : "sync",
@@ -648,6 +659,8 @@ export const liveAIService: AIService = {
         action?: string
         camera?: string
         duration: number
+        segmentTitle?: string
+        segmentNote?: string
       }[]
     }>(
       "你是短剧分镜师。按镜组把本集内容切成 8-12 个分镜。",
@@ -655,7 +668,7 @@ export const liveAIService: AIService = {
         集名: input.episodeTitle,
         本集正文: input.content.slice(0, 16000),
         输出要求: {
-          storyboards: "数组，每项 number(从1递增)/shotType(远景|全景|中景|近景|特写)/description(画面描述)/dialogue(台词，可空)/action(动作)/camera(运镜)/duration(秒数)",
+          storyboards: "数组，每项 number(从1递增)/shotType(远景|全景|中景|近景|特写)/description(画面描述)/dialogue(台词，可空)/action(动作)/camera(运镜)/duration(秒数)/segmentTitle(所属镜组标题，格式如 B01·闪回·有剧情镜，每 5-7 镜一组，组名体现情节拍)/segmentNote(本组衔接与出图建议，可空)",
         },
       }),
       { maxTokens: 8192 },
@@ -672,6 +685,10 @@ export const liveAIService: AIService = {
         action: item?.action ? String(item.action) : undefined,
         camera: item?.camera ? String(item.camera) : undefined,
         duration: asNumber(item?.duration, 3),
+        segmentTitle: item?.segmentTitle
+          ? String(item.segmentTitle)
+          : undefined,
+        segmentNote: item?.segmentNote ? String(item.segmentNote) : undefined,
       }),
     )
     return {
@@ -694,9 +711,11 @@ export const liveAIService: AIService = {
   /* ---------------------------- 图像 / 视频 / 音频 ---------------------------- */
 
   async generateImage(input: GenerateImageInput): Promise<AIResult<GenerateImageResult>> {
-    const loaded = await loadCustomModel(input.model)
+    const loaded = await loadCustomModel(input.model, "image")
     if (!loaded) {
-      throw new Error("live 模式未找到图片模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+      throw new Error(
+        "live 模式未找到图片模型：请前往 /ai-settings 接入图片模型（线上 API 或本地 ComfyUI）",
+      )
     }
     if (loaded.providerType === "comfyui") {
       const workflow = String((loaded.config.constraints ?? {}).workflow ?? "z-image-t2i")
@@ -718,9 +737,11 @@ export const liveAIService: AIService = {
   },
 
   async generateVideo(input: GenerateVideoInput): Promise<AIResult<GenerateVideoResult>> {
-    const loaded = await loadCustomModel(input.model)
+    const loaded = await loadCustomModel(input.model, "video")
     if (!loaded) {
-      throw new Error("live 模式未找到视频模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+      throw new Error(
+        "live 模式未找到视频模型：请前往 /ai-settings 接入视频模型（线上 API 或本地 ComfyUI）",
+      )
     }
     if (loaded.providerType === "comfyui") {
       const workflow = String((loaded.config.constraints ?? {}).workflow ?? "minimax-h3-r2v")
@@ -745,9 +766,11 @@ export const liveAIService: AIService = {
   },
 
   async generateAudio(input: GenerateAudioInput): Promise<AIResult<GenerateAudioResult>> {
-    const loaded = await loadCustomModel(input.model)
+    const loaded = await loadCustomModel(input.model, "audio")
     if (!loaded) {
-      throw new Error("live 模式未找到音频模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+      throw new Error(
+        "live 模式未找到音频模型：请前往 /ai-settings 接入音频模型（线上 API 或本地 ComfyUI）",
+      )
     }
     const invokeInput: InvokeInput = {
       prompt: input.prompt,

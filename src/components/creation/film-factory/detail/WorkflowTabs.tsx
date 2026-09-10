@@ -22,12 +22,21 @@ export function WorkflowTabs({
   script,
   processing,
   counts,
+  assetsReady,
 }: {
   script: Pick<ScriptDetail, "status" | "processingStatus" | "seriesType" | "totalEpisodes" | "updatedAt">
   processing: string
   counts: { episodes: number; assets: number; storyboards: number }
+  /** 全部资产已出图：进度显示推进到「拆分镜」；未出齐则停在「剧本大纲」（人物/场景灰显） */
+  assetsReady?: boolean
 }) {
-  const current = stageIndex(script.status)
+  let current = stageIndex(script.status)
+  // 需求9：人物/场景阶段的进度以「资产是否全部出图」为准
+  if (script.status === "assets" && assetsReady !== undefined) {
+    current = assetsReady
+      ? Math.min(current + 1, STAGE_ORDER.length - 1)
+      : Math.max(current - 1, 0)
+  }
 
   return (
     <div className="flex items-center gap-4 overflow-x-auto border-b border-zinc-800/80 bg-zinc-950/60 px-4 py-2">

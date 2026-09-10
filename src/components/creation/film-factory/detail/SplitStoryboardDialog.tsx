@@ -59,6 +59,7 @@ export function SplitStoryboardDialog({
   episodeTitle,
   initialMode,
   onDone,
+  onSplitPhase,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -68,6 +69,8 @@ export function SplitStoryboardDialog({
   /** 打开时定位到的 Tab（如「下一步 · 出视频」直开出视频） */
   initialMode?: Mode
   onDone: () => void
+  /** 拆分/生成阶段上报：分镜区据此展示「AI 正在拆分镜…」等居中状态 */
+  onSplitPhase?: (info: { active: boolean; label: string; mode: Mode } | null) => void
 }) {
   const { models: textModels } = useAiModels("text")
   const { models: imageModels } = useAiModels("image")
@@ -138,6 +141,7 @@ export function SplitStoryboardDialog({
         toast.success("BGM 已生成")
       } else {
         // 1) 拆分镜
+        onSplitPhase?.({ active: true, label: "AI 正在拆分镜…", mode: tab })
         const splitRes = await fetch(
           `/api/scripts/${scriptId}/episodes/${episodeId}/storyboards`,
           {
@@ -153,7 +157,9 @@ export function SplitStoryboardDialog({
 
         if (tab === "text") {
           setStep(`已拆出 ${storyboards.length} 个镜头`)
-          toast.success("拆分镜完成", { description: `共 ${storyboards.length} 个镜头` })
+          toast.success(`整剧拆分镜完成 (1 集)`, {
+            description: `共 ${storyboards.length} 个镜头`,
+          })
         } else {
           // 2) 逐镜生成产物
           for (let index = 0; index < storyboards.length; index++) {
@@ -161,6 +167,11 @@ export function SplitStoryboardDialog({
             setStep(
               `${tab === "image" ? "生成分镜图" : "生成视频"} ${index + 1}/${storyboards.length}（分镜 ${storyboard.number}）`,
             )
+            onSplitPhase?.({
+              active: true,
+              label: `${tab === "image" ? "正在生成分镜图" : "正在生成视频"} ${index + 1}/${storyboards.length}`,
+              mode: tab,
+            })
             setProgress(Math.round(((index + 1) / storyboards.length) * 90) + 5)
 
             const genRes = await fetch(`/api/storyboards/${storyboard.id}/generate`, {
@@ -195,6 +206,7 @@ export function SplitStoryboardDialog({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "执行失败")
     } finally {
+      onSplitPhase?.(null)
       window.clearInterval(timer)
       window.setTimeout(() => {
         setRunning(false)

@@ -368,6 +368,10 @@ model Storyboard {
   camera    String? // 运镜
   duration  Float?
 
+  // 镜组（段）归属：同 segmentTitle 的连续分镜为一段
+  segmentTitle String?
+  segmentNote  String?
+
   // 生成产物
   imageUrl String?
   videoUrl String?

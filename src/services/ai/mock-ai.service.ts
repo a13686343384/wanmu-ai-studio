@@ -554,6 +554,13 @@ export const mockAIService: AIService = {
 
     const shotTypes = ["远景", "全景", "中景", "近景", "特写"]
 
+    const segmentTitles = [
+      "B01·开场·有剧情镜",
+      "B02·发展·铺垫镜",
+      "B03·对抗·冲突镜",
+      "B04·高潮·情绪镜",
+      "B05·收束·留白镜",
+    ]
     const storyboards = (
       sentences.length ? sentences : ["开场建立环境", "主角入画"]
     ).map((sentence, index) => ({
@@ -569,6 +576,11 @@ export const mockAIService: AIService = {
             ? "横移跟拍"
             : "固定机位 + 轻微手持",
       duration: 2 + (index % 3),
+      segmentTitle: segmentTitles[Math.floor(index / 6)] ?? segmentTitles[0]!,
+      segmentNote:
+        index % 6 === 0
+          ? "建议出首帧图锁定空间；后续镜头沿用同景别衔接。"
+          : undefined,
     }))
 
     return {

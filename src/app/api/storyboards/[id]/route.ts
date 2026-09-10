@@ -10,6 +10,23 @@ const patchSchema = z.object({
   action: z.string().max(600).nullable().optional(),
   camera: z.string().max(120).nullable().optional(),
   duration: z.number().min(0.5).max(120).optional(),
+  /** 镜头引用（整段引用编辑保存）：场景 / 人物造型 / 道具 */
+  refs: z
+    .object({
+      sceneId: z.string().nullable().optional(),
+      cast: z
+        .array(
+          z.object({
+            characterId: z.string(),
+            costumeId: z.string().nullable().optional(),
+          }),
+        )
+        .max(12)
+        .optional(),
+      propIds: z.array(z.string()).max(12).optional(),
+    })
+    .nullable()
+    .optional(),
   prompt: z.string().max(2000).nullable().optional(),
   negativePrompt: z.string().max(1000).nullable().optional(),
 })
@@ -32,14 +49,25 @@ async function requireStoryboard(id: string, userId: string) {
 export const PATCH = withErrorHandling(
   async (req: Request, { params }: { params: { id: string } }) => {
     const user = await requireUser()
-    await requireStoryboard(params.id, user.id)
+    const storyboardCurrent = await requireStoryboard(params.id, user.id)
 
     const body = await req.json()
     const input = patchSchema.parse(body)
 
+    const { refs, ...rest } = input
     const storyboard = await prisma.storyboard.update({
       where: { id: params.id },
-      data: input,
+      data: {
+        ...rest,
+        ...(refs !== undefined
+          ? {
+              generationParams: {
+                ...((storyboardCurrent?.generationParams as Record<string, unknown>) ?? {}),
+                refs,
+              },
+            }
+          : {}),
+      },
     })
 
     return jsonOk(storyboard, "分镜已更新")

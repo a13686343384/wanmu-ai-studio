@@ -87,6 +87,8 @@ export const POST = withErrorHandling(
           action: item.action ?? null,
           camera: item.camera ?? null,
           duration: item.duration,
+          segmentTitle: item.segmentTitle ?? null,
+          segmentNote: item.segmentNote ?? null,
           status: "pending",
         })),
       })
