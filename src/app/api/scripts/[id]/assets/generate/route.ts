@@ -145,6 +145,7 @@ export const POST = withErrorHandling(
           scriptId: script.id,
           ...(input.ids?.length ? { id: { in: input.ids } } : {}),
         },
+        include: { parentCharacter: { select: { imageUrl: true } } },
       })
       const targets = input.ids?.length
         ? items
@@ -160,11 +161,16 @@ export const POST = withErrorHandling(
         const prompt = withTemplate(
           buildAssetPrompt(context, "prop", item.name, item.description),
         )
+        // 关联人物时自动挂造型脸，保证道具跨镜头一致
+        const anchorRefs = item.parentCharacter?.imageUrl
+          ? [{ name: item.parentCharacter.imageUrl, kind: "image" as const }]
+          : []
         const { data } = await ai.generateImage({
           prompt,
-          model: input.model,
+          model: resolveModel(input.model, input.quality),
           aspectRatio: "1:1",
           resolution: input.resolution,
+          ...(anchorRefs.length ? { references: anchorRefs } : {}),
         })
         await prisma.prop.update({
           where: { id: item.id },

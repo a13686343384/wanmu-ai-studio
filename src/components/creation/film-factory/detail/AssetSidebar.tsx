@@ -389,7 +389,15 @@ export function AssetSidebar({
                   className="border-none bg-transparent"
                 />
               ) : (
-                props.map((prop) => <AssetCard key={prop.id} asset={prop} />)
+                props.map((prop) => (
+                  <PropCard
+                    key={prop.id}
+                    prop={prop}
+                    characters={characters}
+                    scriptId={scriptId}
+                    onDone={onRefresh}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -1425,6 +1433,380 @@ function CostumeCard({
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/* ---------------------------- 道具大图卡（重出/替换/编辑/删除） ---------------------------- */
+
+function PropCard({
+  prop,
+  characters,
+  scriptId,
+  onDone,
+}: {
+  prop: AssetDTO
+  characters: AssetDTO[]
+  scriptId: string
+  onDone: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [regenOpen, setRegenOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function patch(body: Record<string, unknown>, success?: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${prop.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "操作失败")
+      if (success) toast.success(success)
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "操作失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function uploadReplace(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("图片大小须在 20MB 以内")
+      return
+    }
+    setBusy(true)
+    const notice = toast.loading("正在上传图片…")
+    try {
+      const form = new FormData()
+      form.set("scriptId", scriptId)
+      form.set("file", file)
+      const res = await fetch("/api/media", { method: "POST", body: form })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "上传失败")
+      await patch({ imageUrl: payload.data.url }, "已替换道具图")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "替换失败")
+    } finally {
+      toast.dismiss(notice)
+      setBusy(false)
+    }
+  }
+
+  async function regenerate() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "prop",
+          ids: [prop.id],
+          model: "all-in-one",
+          resolution: "1K",
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      toast.success(`「${prop.name}」已重新出图`)
+      onDone()
+      setRegenOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function doDelete() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${prop.id}`, {
+        method: "DELETE",
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "删除失败")
+      toast.success(`已删除「${prop.name}」`)
+      onDone()
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/50">
+      <div className="group relative aspect-[16/10] bg-zinc-900">
+        {prop.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={prop.imageUrl}
+            alt={prop.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {prop.status === "generating" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+            ) : (
+              <Package className="h-5 w-5 text-zinc-700" />
+            )}
+          </div>
+        )}
+
+        {/* 类目徽标（左上橙）+ 状态徽标（右上） */}
+        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-medium text-orange-300 ring-1 ring-orange-500/40">
+          道具
+        </span>
+        <span
+          className={cn(
+            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
+            prop.status === "completed"
+              ? "bg-emerald-500/20 text-emerald-300"
+              : prop.status === "generating"
+                ? "bg-orange-500/20 text-orange-300"
+                : "bg-zinc-800 text-zinc-400",
+          )}
+        >
+          {prop.status === "completed"
+            ? "已完成"
+            : prop.status === "generating"
+              ? "生成中"
+              : "待生成"}
+        </span>
+
+        {/* 悬浮操作条（右下）：重出 / 替换 / 编辑 / 删除 */}
+        <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <button
+            type="button"
+            aria-label="重出"
+            disabled={busy}
+            onClick={() => setRegenOpen(true)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <RefreshCw className="h-3 w-3" />
+            重出
+          </button>
+          <button
+            type="button"
+            aria-label="替换"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <Upload className="h-3 w-3" />
+            替换
+          </button>
+          <button
+            type="button"
+            aria-label="编辑"
+            disabled={busy}
+            onClick={() => setEditOpen(true)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <Pencil className="h-3 w-3" />
+            编辑
+          </button>
+          <button
+            type="button"
+            aria-label="删除"
+            disabled={busy}
+            onClick={() => setDeleteOpen(true)}
+            className="flex h-[22px] w-[22px] items-center justify-center rounded bg-rose-950/90 text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-0.5 p-2">
+        <p className="truncate text-xs font-medium text-zinc-200">
+          {prop.name}
+          {prop.parentCharacterId && (
+            <span className="ml-1 text-[10px] font-normal text-zinc-600">
+              关联 {characters.find((c) => c.id === prop.parentCharacterId)?.name ?? "人物"}
+            </span>
+          )}
+        </p>
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">
+          {prop.description || "无描述"}
+        </p>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void uploadReplace(file)
+          event.target.value = ""
+        }}
+      />
+
+      {/* 重新出这个道具（确认） */}
+      <Dialog open={regenOpen} onOpenChange={setRegenOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>重新出这个道具</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            会删掉当前道具图重新生成（清还旧图容量，重新计费），关联人物时自动挂造型脸保证一致，继续？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setRegenOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void regenerate()}>
+              重新出图
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑道具卡 */}
+      <PropEditDialog
+        prop={prop}
+        characters={characters}
+        scriptId={scriptId}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        busy={busy}
+        onSave={(body) => patch(body, "道具卡已保存")}
+      />
+
+      {/* 删除确认 */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除道具「{prop.name}」？</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            会同时删掉已出的道具图并退还存储容量。分镜中的旧引用会保留为失效项，方便在
+            「编辑引用」中明确替换。
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void doDelete()}>
+              删除
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+/** 编辑道具卡弹窗：所属人物 / 道具名称 / 外观与一致性细节。 */
+function PropEditDialog({
+  prop,
+  characters,
+  scriptId,
+  open,
+  onOpenChange,
+  busy,
+  onSave,
+}: {
+  prop: AssetDTO
+  characters: AssetDTO[]
+  scriptId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  busy: boolean
+  onSave: (body: Record<string, unknown>) => Promise<void>
+}) {
+  const [name, setName] = useState(prop.name)
+  const [description, setDescription] = useState(prop.description)
+  const [parentCharacterId, setParentCharacterId] = useState(prop.parentCharacterId ?? "")
+
+  async function save() {
+    if (!name.trim()) {
+      toast.error("请输入道具名称")
+      return
+    }
+    const body: Record<string, unknown> = {
+      name: name.trim(),
+      description: description.trim(),
+      parentCharacterId: parentCharacterId || null,
+    }
+    await onSave(body)
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-1.5">
+            <Package className="h-4 w-4" />
+            编辑道具卡
+          </DialogTitle>
+        </DialogHeader>
+        <p className="-mt-1 text-[11px] leading-relaxed text-zinc-500">
+          道具可独立管理，也可选关联一个人物，作为该人物跨造型的一致性锚点。
+        </p>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">所属人物（可选）</Label>
+          <CardSelect
+            ariaLabel="所属人物"
+            value={parentCharacterId}
+            onValueChange={setParentCharacterId}
+            placeholder="不关联人物（独立道具）"
+            options={[
+              { value: "", label: "不关联人物（独立道具）" },
+              ...characters.map((character) => ({
+                value: character.id,
+                label: character.name,
+              })),
+            ]}
+            className="w-full"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">道具名称</Label>
+          <Input
+            aria-label="道具名称"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="例如：玄铁长剑"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">外观与一致性细节（可选）</Label>
+          <Textarea
+            aria-label="外观与一致性细节"
+            rows={4}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="例如：电磁手枪：黑色金属材质、枪身带有幽蓝色充能纹路、枪口有轻微磨损，能指示对面明确镜头。"
+            className="text-xs"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button variant="inverse" size="sm" disabled={busy} onClick={() => void save()}>
+            保存
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

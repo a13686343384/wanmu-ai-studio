@@ -14,6 +14,12 @@ const patchSchema = z.object({
   reset: z.boolean().optional(),
   /** 上传图替换：直接把已出图换成新地址 */
   imageUrl: z.string().trim().max(2000).nullable().optional(),
+  /** 编辑道具卡：名称 */
+  name: z.string().trim().min(1, "请输入道具名称").max(60).optional(),
+  /** 编辑道具卡：外观与一致性细节 */
+  description: z.string().trim().max(2000).optional(),
+  /** 编辑道具卡：关联人物锚点（null = 取消关联） */
+  parentCharacterId: z.string().trim().nullable().optional(),
 })
 
 async function findAsset(scriptId: string, assetId: string) {
@@ -69,12 +75,26 @@ export const PATCH = withErrorHandling(
       })
     }
 
-    // 妆造 / 道具 / 场景：锁定与换图
+    // 妆造 / 道具 / 场景：锁定与换图；道具另支持编辑道具卡
     const data: Record<string, unknown> = {}
     if (input.locked !== undefined) data.locked = input.locked
     if (input.imageUrl !== undefined) {
       data.imageUrl = input.imageUrl
       data.status = input.imageUrl ? "completed" : "pending"
+    }
+    if (found.kind === "prop") {
+      if (input.name !== undefined) data.name = input.name
+      if (input.description !== undefined) data.description = input.description
+      if (input.parentCharacterId !== undefined) {
+        if (input.parentCharacterId) {
+          const parent = await prisma.character.findFirst({
+            where: { id: input.parentCharacterId, scriptId: script.id },
+            select: { id: true },
+          })
+          if (!parent) throw new AppError("关联的人物不存在", 400)
+        }
+        data.parentCharacterId = input.parentCharacterId
+      }
     }
     if (Object.keys(data).length === 0) throw new AppError("没有需要更新的内容", 400)
 
