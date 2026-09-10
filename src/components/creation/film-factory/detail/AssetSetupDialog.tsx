@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { CardSelect } from "@/components/ui/card-select"
 import { ASPECT_RATIOS, IMAGE_MODELS, TEXT_MODELS } from "@/lib/constants"
 export interface AssetSetup {
   textModel: string
@@ -30,8 +32,6 @@ export function AssetSetupDialog({
   const [imageModel, setImageModel] = useState(IMAGE_MODELS[0]!.id)
   const [aspect, setAspect] = useState(aspectRatio)
   const [resolution, setResolution] = useState("1K")
-  const cls =
-    "mt-2 h-10 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-200"
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -41,60 +41,48 @@ export function AssetSetupDialog({
             提取缺少的角色、场景和道具，为尚未出图的资产逐项生成图片。
           </DialogDescription>
         </DialogHeader>
-        <label className="text-sm text-zinc-400">
-          文本模型
-          <select
-            aria-label="资产文本模型"
-            className={cls}
+        <div className="space-y-1.5">
+          <Label className="text-sm text-zinc-400">文本模型</Label>
+          <CardSelect
+            ariaLabel="资产文本模型"
             value={textModel}
-            onChange={(e) => setTextModel(e.target.value)}
-          >
-            {TEXT_MODELS.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-zinc-400">
-          生图模型
-          <select
-            aria-label="资产生图模型"
-            className={cls}
+            onValueChange={setTextModel}
+            options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            triggerClassName="h-10 w-full text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm text-zinc-400">生图模型</Label>
+          <CardSelect
+            ariaLabel="资产生图模型"
             value={imageModel}
-            onChange={(e) => setImageModel(e.target.value)}
-          >
-            {IMAGE_MODELS.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            onValueChange={setImageModel}
+            options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            triggerClassName="h-10 w-full text-sm"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm text-zinc-400">
-            画幅
-            <select
-              className={cls}
+          <div className="space-y-1.5">
+            <Label className="text-sm text-zinc-400">画幅</Label>
+            <CardSelect
               value={aspect}
-              onChange={(e) => setAspect(e.target.value)}
-            >
-              {ASPECT_RATIOS.map((item) => (
-                <option key={item.value}>{item.value}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm text-zinc-400">
-            分辨率
-            <select
-              className={cls}
+              onValueChange={setAspect}
+              options={ASPECT_RATIOS.map((item) => ({ value: item.value, label: item.value }))}
+              triggerClassName="h-10 w-full text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm text-zinc-400">分辨率</Label>
+            <CardSelect
               value={resolution}
-              onChange={(e) => setResolution(e.target.value)}
-            >
-              <option>1K</option>
-              <option>2K</option>
-            </select>
-          </label>
+              onValueChange={setResolution}
+              options={[
+                { value: "1K", label: "1K" },
+                { value: "2K", label: "2K" },
+              ]}
+              triggerClassName="h-10 w-full text-sm"
+            />
+          </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -103,7 +91,6 @@ export function AssetSetupDialog({
           <Button
             variant="inverse"
             onClick={() => {
-              onOpenChange(false)
               onStart({
                 textModel,
                 imageModel,

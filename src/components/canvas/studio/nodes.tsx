@@ -29,6 +29,7 @@ import { useStudio, type StudioNodeData } from "./types"
 import { uploadStudioMedia } from "./upload"
 import { TEXT_MODELS, VIDEO_MODELS } from "@/lib/constants"
 import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 /** 节点标题（节点上方的灰色小标签）。 */
 function NodeLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
@@ -722,28 +723,32 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
 
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-[11px] text-zinc-500">通用模型</span>
-            <select
+            <Select
               value={d.modelId ?? "ovlm-6"}
-              onChange={(event) =>
-                updateNodeData(id, { modelId: event.target.value })
-              }
-              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-[11px] text-zinc-300 outline-none"
+              onValueChange={(value) => updateNodeData(id, { modelId: value })}
             >
-              <option value="ovlm-6">OVLM 6</option>
-              <option value="ovlm-5.6">OVLM 5.6</option>
-              <option value="gvlm-3.1-pro">GVLM 3.1 Pro</option>
-            </select>
+              <SelectTrigger className="h-7 min-w-0 flex-1 text-[11px]" aria-label="通用模型">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ovlm-6">OVLM 6</SelectItem>
+                <SelectItem value="ovlm-5.6">OVLM 5.6</SelectItem>
+                <SelectItem value="gvlm-3.1-pro">GVLM 3.1 Pro</SelectItem>
+              </SelectContent>
+            </Select>
             <span className="shrink-0 text-[11px] text-zinc-500">输出画幅</span>
-            <select
+            <Select
               value={meta.outputAspect ?? "9:16"}
-              onChange={(event) =>
-                patchMeta({ outputAspect: event.target.value })
-              }
-              className="h-7 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-[11px] text-zinc-300 outline-none"
+              onValueChange={(value) => patchMeta({ outputAspect: value })}
             >
-              <option value="9:16">竖屏 · 9:16</option>
-              <option value="16:9">横屏 · 16:9</option>
-            </select>
+              <SelectTrigger className="h-7 min-w-0 flex-1 text-[11px]" aria-label="输出画幅">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="9:16">竖屏 · 9:16</SelectItem>
+                <SelectItem value="16:9">横屏 · 16:9</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">

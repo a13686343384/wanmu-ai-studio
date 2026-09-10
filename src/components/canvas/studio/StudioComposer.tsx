@@ -12,6 +12,7 @@ import {
   VIDEO_MODELS,
 } from "@/lib/constants"
 import { Progress } from "@/components/ui/progress"
+import { CardSelect } from "@/components/ui/card-select"
 import { useStudio, type StudioNodeData, type StudioNodeKind } from "./types"
 
 import { useStudioRequest } from "./useStudioRequest"
@@ -140,81 +141,55 @@ export function StudioComposer({
         className="w-full resize-none bg-transparent text-xs leading-6 text-zinc-200 outline-none placeholder:text-zinc-600"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label="节点模型"
+        <CardSelect
+          ariaLabel="节点模型"
           value={model}
           disabled={running}
-          onChange={(e) => updateNodeData(nodeId, { modelId: e.target.value })}
-          className={selectClass}
-        >
-          {MODELS[mediaType].map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => updateNodeData(nodeId, { modelId: value })}
+          options={MODELS[mediaType].map((item) => ({ value: item.id, label: item.name }))}
+        />
         {(mediaType === "image" || mediaType === "video") && (
           <>
-            <select
-              aria-label="节点画幅"
+            <CardSelect
+              ariaLabel="节点画幅"
               value={params.aspectRatio}
               disabled={running}
-              onChange={(e) =>
-                updateNodeData(nodeId, { aspectRatio: e.target.value })
-              }
-              className={selectClass}
-            >
-              {ASPECT_RATIOS.map((item) => (
-                <option key={item.value}>{item.value}</option>
-              ))}
-            </select>
-            <select
-              aria-label="节点分辨率"
+              onValueChange={(value) => updateNodeData(nodeId, { aspectRatio: value })}
+              options={ASPECT_RATIOS.map((item) => item.value)}
+            />
+            <CardSelect
+              ariaLabel="节点分辨率"
               value={params.resolution}
               disabled={running}
-              onChange={(e) =>
-                updateNodeData(nodeId, { resolution: e.target.value })
-              }
-              className={selectClass}
-            >
-              {RESOLUTIONS.filter((item) =>
+              onValueChange={(value) => updateNodeData(nodeId, { resolution: value })}
+              options={RESOLUTIONS.filter((item) =>
                 mediaType === "image" ? item.includes("K") : item.includes("p"),
-              ).map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
+              )}
+            />
           </>
         )}
         {(mediaType === "video" || mediaType === "audio") && (
-          <select
-            aria-label="节点时长"
+          <CardSelect
+            ariaLabel="节点时长"
             value={params.duration}
             disabled={running}
-            onChange={(e) =>
-              updateNodeData(nodeId, { duration: e.target.value })
-            }
-            className={selectClass}
-          >
-            {DURATIONS.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
+            onValueChange={(value) => updateNodeData(nodeId, { duration: value })}
+            options={[...DURATIONS]}
+          />
         )}
         {mediaType === "audio" && (
-          <select
-            aria-label="音频模式"
+          <CardSelect
+            ariaLabel="音频模式"
             value={params.smartLyrics ? "lyrics" : "music"}
             disabled={running}
-            onChange={(e) =>
-              updateNodeData(nodeId, {
-                smartLyrics: e.target.value === "lyrics",
-              })
+            onValueChange={(value) =>
+              updateNodeData(nodeId, { smartLyrics: value === "lyrics" })
             }
-            className={selectClass}
-          >
-            <option value="lyrics">智能歌词</option>
-            <option value="music">纯音乐</option>
-          </select>
+            options={[
+              { value: "lyrics", label: "智能歌词" },
+              { value: "music", label: "纯音乐" },
+            ]}
+          />
         )}
         <span className="ml-auto text-xs text-orange-300">
           {current.cost} 积分

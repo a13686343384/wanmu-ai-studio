@@ -125,8 +125,10 @@ test("提示词和生成参数在取消选择及重载后保留", async ({ page 
     .locator('[data-id="b"].react-flow__node')
     .click({ position: { x: 30, y: 50 } })
   await page.getByLabel("节点生成提示词").fill("雨夜霓虹下的街道")
-  await page.getByLabel("节点画幅").selectOption("9:16")
-  await page.getByLabel("节点分辨率").selectOption("2K")
+  await page.getByLabel("节点画幅").click()
+  await page.getByRole("option", { name: "9:16" }).click()
+  await page.getByLabel("节点分辨率").click()
+  await page.getByRole("option", { name: "2K" }).click()
   await page.getByTestId("studio-save").click()
   await expect(page.getByTestId("studio-save")).toHaveText("已保存")
   await page.reload()
@@ -136,8 +138,8 @@ test("提示词和生成参数在取消选择及重载后保留", async ({ page 
   await expect(page.getByLabel("节点生成提示词")).toHaveValue(
     "雨夜霓虹下的街道",
   )
-  await expect(page.getByLabel("节点画幅")).toHaveValue("9:16")
-  await expect(page.getByLabel("节点分辨率")).toHaveValue("2K")
+  await expect(page.getByLabel("节点画幅")).toContainText("9:16")
+  await expect(page.getByLabel("节点分辨率")).toContainText("2K")
 })
 
 test("实际拖拽连接成功，选中节点后连线端点仍在卡片边缘", async ({ page }) => {

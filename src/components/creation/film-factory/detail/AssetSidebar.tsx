@@ -20,19 +20,78 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { Textarea } from "@/components/ui/textarea"
+import { CardSelect } from "@/components/ui/card-select"
 import { cn } from "@/lib/utils"
 import type { AssetDTO, CostumeDTO } from "@/lib/serializers/script"
 
 type AssetKind = "characters" | "outfits" | "props" | "scenes"
 
+const TAB_TITLE: Record<AssetKind, string> = {
+  characters: "全剧角色",
+  outfits: "妆造库",
+  props: "道具库",
+  scenes: "全剧场景",
+}
+
+/* 按钮排的 tooltip 文案（严格按需求图 img-10~13） */
+const TIP = {
+  refresh: "把全剧（含已出图的）重新出一遍——删除旧图重出，用最新提示词框架",
+  download: "打包下载本剧全部图（角色卡 + 妆造 + 道具）",
+  missing:
+    "觉得 AI 提取漏了？重新扫一遍全剧正文，把遗漏的角色/场景/妆造/道具自动补上——还能填「捕捉关键词」让它重点找。只补缺失，不动你已有的任何内容",
+  template:
+    "设置角色提示词模板——给一段示例 prompt，置入内置框架，所有角色模仿它生成",
+} as const
+
+/** 带悬停提示的图标按钮（按钮排统一用）。 */
+function TipButton({
+  label,
+  tip,
+  onClick,
+  disabled,
+  children,
+  variant = "outline",
+}: {
+  label: string
+  tip: string
+  onClick?: () => void
+  disabled?: boolean
+  children: React.ReactNode
+  variant?: "outline" | "inverse" | "ghost"
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={variant}
+          size="icon-sm"
+          aria-label={label}
+          onClick={onClick}
+          disabled={disabled}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-[220px] text-[11px] leading-relaxed">
+        {tip}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /**
- * 资产侧边栏（右栏，需求图 img-05/09/17）。
- * 四类 Tab：角色（仅提取）/ 妆造库（人物子集造型）/ 道具库 / 场景；
- * 标题行按钮排：重新提取 · 打包下载 · 补缺漏（关键词）· 提示词模板 · 添加。
+ * 资产侧边栏（右栏，严格按需求图 img-05/09/17）：
+ * 标题行（全剧角色 + 按钮排：重新出一遍 / 打包下载 / 补缺漏 / 提示词模板 / 添加）
+ * → Tab（角色 · 妆造库 · 道具库 · 场景）→ 内容。
  */
 export function AssetSidebar({
   scriptId,
@@ -141,33 +200,18 @@ export function AssetSidebar({
 
   return (
     <div className="flex h-full flex-col">
-      {/* 标题 + 按钮排（img-09） */}
+      {/* 标题行：全剧角色 + 按钮排（img-09 红框区） */}
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-2">
-        <span className="text-[11px] font-medium tracking-wider text-zinc-500">
-          全剧资产
+        <span className="text-[11px] font-medium tracking-wider text-zinc-400">
+          {TAB_TITLE[tab]}
         </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void extract()}
-            disabled={extracting}
-            aria-label="重新提取资产"
-          >
-            {extracting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={downloadAll}
-            aria-label="打包下载全部资产图"
-          >
+        <div className="flex items-center gap-1.5">
+          <TipButton label="重新出一遍" tip={TIP.refresh} disabled={extracting} onClick={() => void extract()}>
+            <RefreshCw className={cn("h-3.5 w-3.5", extracting && "animate-spin")} />
+          </TipButton>
+          <TipButton label="打包下载" tip={TIP.download} onClick={downloadAll}>
             <Download className="h-3.5 w-3.5" />
-          </Button>
+          </TipButton>
           <MissingFillPopover scriptId={scriptId} extracting={extracting} onExtract={extract} />
           <TemplatePopover scriptId={scriptId} initial={assetPromptTemplate ?? ""} onSaved={onRefresh} />
           {tab !== "characters" && (
@@ -176,6 +220,7 @@ export function AssetSidebar({
               kind={tab}
               characters={characters}
               onDone={onRefresh}
+              variant="inverse"
             />
           )}
         </div>
@@ -186,20 +231,18 @@ export function AssetSidebar({
         onValueChange={(value) => setTab(value as AssetKind)}
         className="flex min-h-0 flex-1 flex-col"
       >
+        {/* Tab：角色 N · 妆造库 N · 道具库 N · 场景 N */}
         <div className="px-2.5 pt-2.5">
           <TabsList className="w-full">
             <TabsTrigger value="characters" className="flex-1 gap-1 text-[11px]">
-              <Users className="h-3 w-3" />
               角色
               <span className="text-zinc-500">{characters.length}</span>
             </TabsTrigger>
             <TabsTrigger value="outfits" className="flex-1 gap-1 text-[11px]">
-              <Shirt className="h-3 w-3" />
               妆造库
               <span className="text-zinc-500">{costumes.length}</span>
             </TabsTrigger>
             <TabsTrigger value="props" className="flex-1 gap-1 text-[11px]">
-              <Package className="h-3 w-3" />
               道具库
               <span className="text-zinc-500">{props.length}</span>
             </TabsTrigger>
@@ -223,11 +266,11 @@ export function AssetSidebar({
           </div>
         )}
 
-        {/* 角色 */}
+        {/* 角色：大图角色卡（img-05/09） */}
         <TabsContent value="characters" className="min-h-0 flex-1 overflow-hidden px-2.5 pb-2.5">
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 py-2">
-              <span className="text-[10px] text-zinc-600">角色只能从剧本提取</span>
+              <span className="text-[10px] text-zinc-600">角色只能从剧本提取，不能手动添加</span>
               <Button
                 variant="outline"
                 size="sm"
@@ -254,14 +297,14 @@ export function AssetSidebar({
                 />
               ) : (
                 characters.map((character) => (
-                  <AssetCard key={character.id} asset={character} />
+                  <CharacterCard key={character.id} character={character} />
                 ))
               )}
             </div>
           </div>
         </TabsContent>
 
-        {/* 妆造库 */}
+        {/* 妆造库：按人物分组，+ 新建造型 */}
         <TabsContent value="outfits" className="min-h-0 flex-1 overflow-hidden px-2.5 pb-2.5">
           <OutfitList
             characters={characters}
@@ -296,7 +339,7 @@ export function AssetSidebar({
                   size="compact"
                   icon={Package}
                   title="还没有道具"
-                  description="点「+ 新建道具」手动添加，或从剧本提取"
+                  description="点右上角「+」新建道具，或从剧本提取"
                   className="border-none bg-transparent"
                 />
               ) : (
@@ -329,7 +372,7 @@ export function AssetSidebar({
                   size="compact"
                   icon={Package}
                   title="还没有场景"
-                  description="点「+ 添加场景」手动添加，或从剧本提取"
+                  description="点右上角「+」添加场景，或从剧本提取"
                   className="border-none bg-transparent"
                 />
               ) : (
@@ -343,14 +386,58 @@ export function AssetSidebar({
   )
 }
 
-const TAB_META: Record<AssetKind, { label: string }> = {
-  characters: { label: "角色" },
-  outfits: { label: "妆造" },
-  props: { label: "道具" },
-  scenes: { label: "场景" },
+/* ---------------------------- 角色大图卡（img-05/09） ---------------------------- */
+
+function CharacterCard({ character }: { character: AssetDTO }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/50">
+      <div className="relative aspect-[16/10] bg-zinc-900">
+        {character.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={character.imageUrl}
+            alt={character.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {character.status === "generating" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+            ) : (
+              <Users className="h-5 w-5 text-zinc-700" />
+            )}
+          </div>
+        )}
+        <span
+          className={cn(
+            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
+            character.status === "completed"
+              ? "bg-emerald-500/20 text-emerald-300"
+              : character.status === "generating"
+                ? "bg-orange-500/20 text-orange-300"
+                : "bg-zinc-800 text-zinc-400",
+          )}
+        >
+          {character.status === "completed"
+            ? "已完成"
+            : character.status === "generating"
+              ? "生成中"
+              : "待生成"}
+        </span>
+      </div>
+      <div className="space-y-0.5 p-2">
+        <p className="truncate text-xs font-medium text-zinc-200">{character.name}</p>
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">
+          {character.description}
+        </p>
+      </div>
+    </div>
+  )
 }
 
-/* ---------------------------- 单个资产卡 ---------------------------- */
+/* ---------------------------- 普通资产卡（妆造/道具/场景） ---------------------------- */
 
 function AssetCard({ asset }: { asset: AssetDTO }) {
   const [expanded, setExpanded] = useState(false)
@@ -546,6 +633,7 @@ function AddAssetButton({
   fixedCharacterId,
   onDone,
   label,
+  variant = "outline",
 }: {
   scriptId: string
   kind: "outfits" | "props" | "scenes"
@@ -553,6 +641,7 @@ function AddAssetButton({
   fixedCharacterId?: string
   onDone: () => void
   label?: string
+  variant?: "outline" | "inverse"
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -614,10 +703,16 @@ function AddAssetButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-6 px-1.5 text-[10px]">
-          <Plus className="h-3 w-3" />
-          {label ?? TITLE}
-        </Button>
+        {label ? (
+          <Button variant={variant} size="sm" className="h-6 px-1.5 text-[10px]">
+            <Plus className="h-3 w-3" />
+            {label}
+          </Button>
+        ) : (
+          <Button variant="inverse" size="icon-sm" aria-label={TITLE}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-2.5">
         <p className="text-xs font-medium text-zinc-200">{TITLE}</p>
@@ -626,45 +721,44 @@ function AddAssetButton({
         {kind === "outfits" && characters.length > 0 && (
           <div className="space-y-1">
             <Label className="text-[10px] text-zinc-500">所属人物</Label>
-            <select
+            <CardSelect
+              ariaLabel="所属人物"
               value={fixedCharacterId ?? characterId}
-              onChange={(event) => setCharacterId(event.target.value)}
+              onValueChange={setCharacterId}
               disabled={Boolean(fixedCharacterId)}
-              className="h-8 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-xs text-zinc-300 outline-none"
-            >
-              {(fixedCharacterId
-                ? [
-                    {
-                      id: fixedCharacterId,
-                      name:
-                        characters.find((c) => c.id === fixedCharacterId)?.name ?? "当前人物",
-                    },
-                  ]
-                : characters
-              ).map((character) => (
-                <option key={character.id} value={character.id}>
-                  {character.name}
-                </option>
-              ))}
-            </select>
+              options={
+                fixedCharacterId
+                  ? [
+                      {
+                        value: fixedCharacterId,
+                        label:
+                          characters.find((c) => c.id === fixedCharacterId)?.name ?? "当前人物",
+                      },
+                    ]
+                  : characters.map((character) => ({
+                      value: character.id,
+                      label: character.name,
+                    }))
+              }
+            />
           </div>
         )}
 
         {kind === "props" && characters.length > 0 && (
           <div className="space-y-1">
             <Label className="text-[10px] text-zinc-500">所属人物（可选）</Label>
-            <select
+            <CardSelect
+              ariaLabel="所属人物（可选）"
               value={characterId}
-              onChange={(event) => setCharacterId(event.target.value)}
-              className="h-8 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 text-xs text-zinc-300 outline-none"
-            >
-              <option value="">不关联人物（独立道具）</option>
-              {characters.map((character) => (
-                <option key={character.id} value={character.id}>
-                  {character.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCharacterId}
+              options={[
+                { value: "", label: "不关联人物（独立道具）" },
+                ...characters.map((character) => ({
+                  value: character.id,
+                  label: character.name,
+                })),
+              ]}
+            />
           </div>
         )}
 
@@ -742,21 +836,24 @@ function MissingFillPopover({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="补缺漏提取">
-          <Wand2 className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon-sm" aria-label="补缺漏提取" disabled={extracting}>
+            <Wand2 className={cn("h-3.5 w-3.5", extracting && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-[240px] text-[11px] leading-relaxed">
+          {TIP_MISSING}
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-64 space-y-2">
         <p className="text-xs font-medium text-zinc-200">补缺漏提取</p>
-        <p className="text-[10px] leading-relaxed text-zinc-500">
-          重新扫一遍全剧正文，把遗漏的角色/场景/妆造/道具自动补上——只补缺失，不动已有的任何内容。
-        </p>
+        <p className="text-[10px] leading-relaxed text-zinc-500">{TIP_MISSING}</p>
         <Textarea
           rows={2}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="捕捉关键词（可选），逗号分隔"
+          placeholder="捕捉关键词（可选），逗号分隔，让它重点找"
           className="text-xs"
         />
         <Button
@@ -780,6 +877,9 @@ function MissingFillPopover({
     </Popover>
   )
 }
+
+const TIP_MISSING =
+  "觉得 AI 提取漏了？重新扫一遍全剧正文，把遗漏的角色/场景/妆造/道具自动补上——还能填「捕捉关键词」让它重点找。只补缺失，不动你已有的任何内容"
 
 function TemplatePopover({
   scriptId,
@@ -814,13 +914,18 @@ function TemplatePopover({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="设置角色提示词模板">
-          <ClipboardList className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon-sm" aria-label="设置角色提示词模板" disabled={saving}>
+            <ClipboardList className={cn("h-3.5 w-3.5", saving && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-[240px] text-[11px] leading-relaxed">
+          设置角色提示词模板——给一段示例 prompt，置入内置框架，所有角色模仿它生成
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-72 space-y-2">
-        <p className="text-xs font-medium text-zinc-200">设置角色提示词模板</p>
+        <p className="text-xs font-medium text-zinc-200">角色提示词模板</p>
         <p className="text-[10px] leading-relaxed text-zinc-500">
           给一段示例 prompt，置入内置框架，所有角色模仿它生成
         </p>

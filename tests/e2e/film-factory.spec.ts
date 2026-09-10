@@ -129,7 +129,7 @@ test.describe("影视工厂", () => {
     })
     await expect(page.getByText(title, { exact: true })).toBeVisible()
     await expect(page.getByText("分集", { exact: true })).toBeVisible()
-    await expect(page.getByText("全剧资产")).toBeVisible()
+    await expect(page.getByText("全剧角色")).toBeVisible()
   })
 
   test("详情页展示工作流、分集与分镜区", async ({ page }) => {
@@ -142,7 +142,7 @@ test.describe("影视工厂", () => {
     await expect(page.getByText("尚未拆分镜")).toBeVisible()
     await expect(page.getByText("先让 AI 复述理解本集").first()).toBeVisible()
     await expect(page.getByText(/单集时长/)).toBeVisible()
-    await expect(page.getByText("全剧资产")).toBeVisible()
+    await expect(page.getByText("全剧角色")).toBeVisible()
     await expect(
       page.getByRole("button", { name: /下一步/ }).first(),
     ).toBeVisible()
@@ -236,9 +236,8 @@ test.describe("影视工厂", () => {
       await expect(
         page.getByRole("dialog", { name: "生成人物 / 场景资产" }),
       ).toBeVisible()
-      await page
-        .getByLabel("资产文本模型", { exact: true })
-        .selectOption("ovlm-5.6")
+      await page.getByLabel("资产文本模型", { exact: true }).click()
+      await page.getByRole("option", { name: "OVLM 5.6" }).click()
       await page.getByRole("button", { name: "取消", exact: true }).click()
       const detail = (
         await (await page.request.get(`/api/scripts/${id}`)).json()

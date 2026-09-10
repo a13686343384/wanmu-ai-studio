@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CardSelect } from "@/components/ui/card-select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { TEXT_MODELS } from "@/lib/constants"
@@ -189,17 +190,12 @@ export function ConsultDialog({
           <>
             {/* 模型 + 操作行 */}
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label="文本模型"
-                defaultValue={consultation.model}
-                className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2 text-xs text-zinc-300 outline-none"
-              >
-                {TEXT_MODELS.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+              <CardSelect
+                ariaLabel="文本模型"
+                value={consultation.model}
+                options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+                className="min-w-0 flex-1"
+              />
 
               <Button
                 variant="outline"
