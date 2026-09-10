@@ -218,7 +218,8 @@ test.describe("影视工厂", () => {
     await page.goto(`/creation/film-factory/${scriptId}`)
     await page.waitForLoadState("networkidle")
 
-    await page.getByRole("button", { name: "重新提取资产" }).click()
+    await page.getByRole("button", { name: "补缺漏提取" }).click()
+    await page.getByRole("button", { name: "开始补缺漏" }).click()
     await expect(page.getByText(/资产已提取/).first()).toBeVisible({
       timeout: 60_000,
     })

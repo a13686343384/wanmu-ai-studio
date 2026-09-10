@@ -72,7 +72,7 @@ export function StudioAssets() {
         placeholder="搜索素材名称"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="rounded-lg border border-zinc-800 bg-zinc-900 p-2 text-xs"
+        className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-2 text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
       />
       <button
         onClick={() => input.current?.click()}

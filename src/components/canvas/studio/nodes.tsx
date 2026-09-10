@@ -212,7 +212,7 @@ export function StudioTextNode({ id, data, selected }: NodeProps) {
             }
             placeholder="开启你的创作…"
             rows={7}
-            className="nodrag nowheel w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
+            className="nodrag nowheel w-full resize-none rounded-lg bg-zinc-950/80 px-2.5 py-2 text-sm leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
           />
         </div>
         <PlusHandles />
@@ -848,7 +848,7 @@ export function StudioStickyNode({ id, data, selected }: NodeProps) {
             }
             placeholder="写点备注…"
             rows={4}
-            className="nodrag nowheel w-full resize-none bg-transparent text-xs leading-relaxed text-amber-100/90 outline-none placeholder:text-amber-200/30"
+            className="nodrag nowheel w-full resize-none rounded-lg bg-black/25 px-2.5 py-2 text-xs leading-relaxed text-amber-100/90 outline-none placeholder:text-amber-200/30"
           />
           <button
             type="button"

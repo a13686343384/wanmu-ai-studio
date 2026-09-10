@@ -115,7 +115,11 @@ test("浏览器后退再前进可以恢复未保存的正文草稿", async ({ pa
       data: { action: "blueprint", revision: 0, model: "ovlm-5.6" },
     })
     await page.reload()
-    await page.getByRole("link").filter({ hasText: "草稿恢复测试" }).click()
+    await page
+      .getByRole("link")
+      .filter({ hasText: "草稿恢复测试" })
+      .first()
+      .click()
     const body = page.getByRole("textbox", { name: "本集正文", exact: true })
     await body.fill("尚未保存的地铁剧本正文")
     // App Router history navigation must preserve a recoverable local draft.

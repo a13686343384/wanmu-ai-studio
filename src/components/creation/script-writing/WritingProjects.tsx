@@ -92,7 +92,7 @@ export function WritingProjects() {
     (item) => item.title.includes(query) || item.idea.includes(query),
   )
   return (
-    <main className="mx-auto max-w-5xl px-5 py-12">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-100">剧本创作</h1>

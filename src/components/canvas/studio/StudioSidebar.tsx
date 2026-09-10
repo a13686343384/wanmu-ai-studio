@@ -139,7 +139,7 @@ export function StudioSidebar({
           type="button"
           onClick={onCollapse}
           aria-label="收起侧栏"
-          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+          className="rounded-md border border-orange-500/30 p-1.5 text-orange-400/90 transition-colors hover:bg-orange-500/10 hover:text-orange-300"
         >
           <PanelLeftClose className="h-3.5 w-3.5" />
         </button>
@@ -153,7 +153,7 @@ export function StudioSidebar({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索名称"
-              className="h-7 w-full rounded-lg border border-zinc-800 bg-zinc-900/50 pl-7 pr-2 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-700"
+              className="h-7 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 pl-7 pr-2 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-700"
             />
           </div>
 

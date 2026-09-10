@@ -849,7 +849,7 @@ function CanvasStudioInner({
               type="button"
               aria-label="展开侧栏"
               onClick={() => setSidebarOpen(true)}
-              className="sticky top-0 z-10 flex h-28 w-7 items-start justify-center rounded-r-lg border border-l-0 border-zinc-800 bg-zinc-900/90 pt-3 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+              className="sticky top-0 z-10 flex h-28 w-7 items-start justify-center rounded-r-lg pt-3 text-xs text-zinc-500 transition-colors hover:text-orange-300"
               style={{ writingMode: "vertical-rl", letterSpacing: "0.2em" }}
             >
               画布 / 资产
@@ -960,9 +960,9 @@ function CanvasStudioInner({
                 </div>
               )}
             </div>
-            <footer className="studio-footer z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-zinc-800 bg-zinc-950 p-2">
-              {/* 缩放控制 */}
-              <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900/80 px-1 py-0.5 text-zinc-400 backdrop-blur">
+            <footer className="studio-footer z-10 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-zinc-800 bg-zinc-950 p-2">
+              {/* 缩放控制（左） */}
+              <div className="flex items-center gap-1 justify-self-start rounded-lg border border-zinc-800 bg-zinc-900/80 px-1 py-0.5 text-zinc-400 backdrop-blur">
                 <button
                   type="button"
                   aria-label={showMap ? "隐藏小地图" : "显示小地图"}
@@ -1019,9 +1019,6 @@ function CanvasStudioInner({
                     <Camera className="h-3.5 w-3.5" />
                   )}
                 </button>
-                <span className="px-1 text-[10px] text-zinc-600">
-                  {nodes.length} 节点
-                </span>
                 <button
                   type="button"
                   aria-label="网格吸附"
@@ -1035,10 +1032,10 @@ function CanvasStudioInner({
                 </button>
               </div>
 
-              {/* 底部工具条 */}
+              {/* 底部工具条（正中） */}
               <div
                 data-testid="studio-toolbar"
-                className="flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/90 p-1.5 shadow-2xl backdrop-blur"
+                className="flex items-center gap-1 justify-self-center rounded-2xl border border-zinc-800 bg-zinc-900/90 p-1.5 shadow-2xl backdrop-blur"
               >
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1094,6 +1091,11 @@ function CanvasStudioInner({
                   <Copy className="h-4 w-4" />
                 </button>
               </div>
+
+              {/* 节点计数（右） */}
+              <span className="justify-self-end px-1 text-[10px] text-zinc-600">
+                {nodes.length} 节点
+              </span>
             </footer>
           </div>
 

@@ -138,7 +138,7 @@ export function StudioComposer({
           }
         }}
         placeholder="描述要生成的内容，连入的文本节点会作为上下文"
-        className="w-full resize-none bg-transparent text-xs leading-6 text-zinc-200 outline-none placeholder:text-zinc-600"
+        className="w-full resize-none rounded-lg bg-zinc-950/80 px-2.5 py-2 text-xs leading-6 text-zinc-200 outline-none placeholder:text-zinc-600"
       />
       <div className="flex flex-wrap items-center gap-2">
         <CardSelect

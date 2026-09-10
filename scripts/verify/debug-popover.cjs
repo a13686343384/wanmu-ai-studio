@@ -1,0 +1,23 @@
+const { chromium } = require("@playwright/test");
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await page.goto("http://localhost:3000/login");
+  await page.fill('input[type="email"]', "demo@wanmusheng.com");
+  await page.fill('input[type="password"]', "demo1234");
+  await page.click('button[type="submit"]');
+  await page.waitForLoadState("networkidle");
+  await page.goto("http://localhost:3000/creation/script-writing");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: ".screenshots/final-writing-list.png" });
+  const list = await page.evaluate(async () => (await (await fetch("/api/scripts")).json()).data);
+  await page.goto(`http://localhost:3000/creation/film-factory/${list[0].id}`);
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "补缺漏提取" }).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: ".screenshots/final-popover.png" });
+  await browser.close();
+  console.log("done");
+})();

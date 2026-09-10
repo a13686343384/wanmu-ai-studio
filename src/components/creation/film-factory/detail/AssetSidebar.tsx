@@ -19,7 +19,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Tooltip,
   TooltipContent,
@@ -838,9 +843,17 @@ function MissingFillPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label="补缺漏提取" disabled={extracting}>
-            <Wand2 className={cn("h-3.5 w-3.5", extracting && "animate-spin")} />
-          </Button>
+          <PopoverAnchor asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="补缺漏提取"
+              disabled={extracting}
+              onClick={() => setOpen((value) => !value)}
+            >
+              <Wand2 className={cn("h-3.5 w-3.5", extracting && "animate-spin")} />
+            </Button>
+          </PopoverAnchor>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[240px] text-[11px] leading-relaxed">
           {TIP_MISSING}
@@ -916,9 +929,17 @@ function TemplatePopover({
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label="设置角色提示词模板" disabled={saving}>
-            <ClipboardList className={cn("h-3.5 w-3.5", saving && "animate-spin")} />
-          </Button>
+          <PopoverAnchor asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="设置角色提示词模板"
+              disabled={saving}
+              onClick={() => setOpen((value) => !value)}
+            >
+              <ClipboardList className={cn("h-3.5 w-3.5", saving && "animate-spin")} />
+            </Button>
+          </PopoverAnchor>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[240px] text-[11px] leading-relaxed">
           设置角色提示词模板——给一段示例 prompt，置入内置框架，所有角色模仿它生成

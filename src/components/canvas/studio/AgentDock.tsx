@@ -258,7 +258,7 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
             maxLength={1000}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full resize-none bg-transparent text-xs leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
+            className="w-full resize-none rounded-lg bg-zinc-950/80 px-2.5 py-2 text-xs leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
             placeholder="描述你想对引用节点执行的操作"
           />
           <div className="mt-1 flex items-center gap-2">
