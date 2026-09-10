@@ -8,7 +8,21 @@ import { z } from "zod"
 const schema = z.object({
   aspectRatio: z.string().optional(),
   resolution: z.string().default("1K"),
-  kind: z.enum(["character", "scene", "prop", "outfit"]),
+  kind: z.preprocess(
+    /** 兼容旧前端的复数命名（characters/scenes/props/outfits） */
+    (value) =>
+      typeof value === "string"
+        ? (
+            {
+              characters: "character",
+              scenes: "scene",
+              props: "prop",
+              outfits: "outfit",
+            } as Record<string, string>
+          )[value] ?? value
+        : value,
+    z.enum(["character", "scene", "prop", "outfit"]),
+  ),
   /** 为空则生成该类全部资产 */
   ids: z.array(z.string()).optional(),
   model: z.string().default("man-image-v2-lite"),
