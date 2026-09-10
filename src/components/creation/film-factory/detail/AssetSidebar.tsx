@@ -767,14 +767,14 @@ function CharacterCard({
             选一个保留的角色，把「{character.name}」合并进去（同人多默认请去重），它的出场集 /
             九宫格引用会改指过去，别名并入，然后删除「{character.name}」+ 退它的图。此操作不可撤销。
           </p>
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             {others.map((target) => (
               <button
                 key={target.id}
                 type="button"
                 disabled={busy}
                 onClick={() => void mergeInto(target.id)}
-                className="flex w-full items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40 p-2 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
               >
                 <span className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950">
                   {target.imageUrl ? (
