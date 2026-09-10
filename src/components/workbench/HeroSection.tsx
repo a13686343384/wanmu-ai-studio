@@ -178,12 +178,12 @@ function HeroBackdrop() {
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden border-b border-zinc-900">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+    <section className="relative">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[calc(100%+10rem)]">
         <HeroBackdrop />
       </div>
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-14 sm:pt-20 lg:px-6">
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-10 pt-14 sm:pt-20 lg:px-6">
         <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
           你好，今天想生成点什么？
         </h1>

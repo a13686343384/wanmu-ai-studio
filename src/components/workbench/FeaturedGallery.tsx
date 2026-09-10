@@ -21,7 +21,7 @@ export function FeaturedGallery() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 pb-14 pt-2 lg:px-6">
+    <section className="relative mx-auto w-full max-w-7xl px-4 pb-14 pt-2 lg:px-6">
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* 左侧品牌面板 */}
         <div className="relative flex w-full shrink-0 flex-col justify-between overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-7 lg:w-[340px]">
