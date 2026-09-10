@@ -12,6 +12,12 @@ const schema = z.object({
   /** 为空则生成该类全部资产 */
   ids: z.array(z.string()).optional(),
   model: z.string().default("man-image-v2-lite"),
+  /** 出图提示词（可改，留空 = AI 按简介自动缩写） */
+  prompt: z.string().trim().max(4000).optional(),
+  /** 参考图地址（可选：让 AI 照着这张图出，被造型锚定到它） */
+  refImages: z.array(z.string()).max(10).optional(),
+  /** 画质档位：低画质 / 标准画质 / 高画质 / 超高清画质 / 最高画质 */
+  quality: z.string().optional(),
 })
 
 /**
@@ -38,6 +44,10 @@ export const POST = withErrorHandling(
     const withTemplate = (prompt: string) =>
       template ? `${template}\n${prompt}` : prompt
 
+    // 画质档位映射：内置「低画质」走轻量模型档，其余档位维持所选模型
+    const resolveModel = (model: string, quality?: string) =>
+      model === "all-in-one" && quality === "低画质" ? "all-in-one-low" : model
+
     if (input.kind === "character") {
       const items = await prisma.character.findMany({
         where: {
@@ -45,35 +55,47 @@ export const POST = withErrorHandling(
           ...(input.ids?.length ? { id: { in: input.ids } } : {}),
         },
       })
-      if (items.length === 0)
+      // 锁定（再生成不覆盖）：一键批量时跳过锁定角色；显式指定 ids 则视为用户主动覆盖
+      const targets = input.ids?.length
+        ? items
+        : items.filter((item) => !item.locked)
+      if (targets.length === 0 && items.length > 0)
+        return jsonError("所选角色都已锁定，解锁后再生成", 400)
+      if (targets.length === 0)
         return jsonError("没有可生成的角色，请先提取资产", 400)
 
-      for (const item of items) {
+      for (const item of targets) {
         await prisma.character.update({
           where: { id: item.id },
           data: { status: "generating" },
         })
-        const prompt = withTemplate(
-          buildAssetPrompt(
-            context,
-            "character",
-            item.name,
-            item.description,
-            item.appearance,
-          ),
-        )
+        const prompt = input.prompt
+          ? withTemplate(input.prompt)
+          : withTemplate(
+              buildAssetPrompt(
+                context,
+                "character",
+                item.name,
+                item.description,
+                item.appearance,
+              ),
+            )
         const { data } = await ai.generateImage({
           prompt,
-          model: input.model,
+          model: resolveModel(input.model, input.quality),
           aspectRatio: input.aspectRatio ?? script.targetAspect,
           resolution: input.resolution,
+          references: (input.refImages ?? item.refImages).map((url) => ({
+            name: url,
+            kind: "image" as const,
+          })),
         })
         await prisma.character.update({
           where: { id: item.id },
           data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
         })
       }
-      return jsonOk({ kind: "character", generated: items.length })
+      return jsonOk({ kind: "character", generated: targets.length })
     }
 
     if (input.kind === "scene") {
@@ -83,10 +105,13 @@ export const POST = withErrorHandling(
           ...(input.ids?.length ? { id: { in: input.ids } } : {}),
         },
       })
-      if (items.length === 0)
+      const targets = input.ids?.length
+        ? items
+        : items.filter((item) => !item.locked)
+      if (targets.length === 0)
         return jsonError("没有可生成的场景，请先提取资产", 400)
 
-      for (const item of items) {
+      for (const item of targets) {
         await prisma.scene.update({
           where: { id: item.id },
           data: { status: "generating" },
@@ -111,7 +136,7 @@ export const POST = withErrorHandling(
           data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
         })
       }
-      return jsonOk({ kind: "scene", generated: items.length })
+      return jsonOk({ kind: "scene", generated: targets.length })
     }
 
     if (input.kind === "prop") {
@@ -121,10 +146,13 @@ export const POST = withErrorHandling(
           ...(input.ids?.length ? { id: { in: input.ids } } : {}),
         },
       })
-      if (items.length === 0)
+      const targets = input.ids?.length
+        ? items
+        : items.filter((item) => !item.locked)
+      if (targets.length === 0)
         return jsonError("没有可生成的道具，请先提取资产", 400)
 
-      for (const item of items) {
+      for (const item of targets) {
         await prisma.prop.update({
           where: { id: item.id },
           data: { status: "generating" },
@@ -143,7 +171,7 @@ export const POST = withErrorHandling(
           data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
         })
       }
-      return jsonOk({ kind: "prop", generated: items.length })
+      return jsonOk({ kind: "prop", generated: targets.length })
     }
 
     if (input.kind === "outfit") {
@@ -154,10 +182,13 @@ export const POST = withErrorHandling(
         },
         include: { character: { select: { name: true } } },
       })
-      if (costumes.length === 0)
+      const targets = input.ids?.length
+        ? costumes
+        : costumes.filter((item) => !item.locked)
+      if (targets.length === 0)
         return jsonError("没有可生成的造型，请先创建造型", 400)
 
-      for (const item of costumes) {
+      for (const item of targets) {
         await prisma.costume.update({
           where: { id: item.id },
           data: { status: "generating" },
@@ -182,7 +213,7 @@ export const POST = withErrorHandling(
           data: { imageUrl: data.images[0]!.url, prompt, status: "completed" },
         })
       }
-      return jsonOk({ kind: "outfit", generated: costumes.length })
+      return jsonOk({ kind: "outfit", generated: targets.length })
     }
 
     return jsonError("未知的资产生成类型", 400)

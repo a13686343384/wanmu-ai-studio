@@ -109,6 +109,12 @@ export interface AssetDTO {
   imageUrl: string | null
   prompt: string | null
   status: string
+  /** 锁定（再生成不覆盖） */
+  locked?: boolean
+  /** 角色专有：出图参考图 */
+  refImages?: string[]
+  /** 角色专有：合并并入的别名 */
+  aliases?: string[]
   /** 角色专有 */
   appearance?: string | null
   personality?: string | null

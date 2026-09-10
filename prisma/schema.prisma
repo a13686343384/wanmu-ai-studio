@@ -277,6 +277,9 @@ model Character {
   imageUrl    String?
   prompt      String? @db.Text
   status      String  @default("pending") // pending | generating | completed | failed
+  locked      Boolean @default(false) // 锁定后再生成不覆盖
+  refImages   String[] @default([]) // 出图参考图
+  aliases     String[] @default([]) // 合并并入的别名
 
   script   Script    @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   costumes Costume[]
@@ -297,6 +300,7 @@ model Costume {
   imageUrl    String?
   prompt      String? @db.Text
   status      String  @default("pending")
+  locked    Boolean @default(false) // 锁定后再生成不覆盖
 
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
@@ -316,6 +320,7 @@ model Scene {
   imageUrl    String?
   prompt      String? @db.Text
   status      String  @default("pending")
+  locked    Boolean @default(false) // 锁定后再生成不覆盖
 
   script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
 
@@ -334,6 +339,7 @@ model Prop {
   imageUrl    String?
   prompt      String? @db.Text
   status      String  @default("pending")
+  locked    Boolean @default(false) // 锁定后再生成不覆盖
 
   script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   parentCharacter Character? @relation("PropParent", fields: [parentCharacterId], references: [id], onDelete: SetNull)

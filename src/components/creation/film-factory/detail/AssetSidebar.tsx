@@ -1,22 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import {
   ChevronDown,
   ClipboardList,
   Download,
   Loader2,
+  Lock,
+  LockOpen,
+  Merge,
+  MoreHorizontal,
   Package,
+  Pencil,
   Plus,
   RefreshCw,
   Shirt,
   Sparkles,
+  Trash2,
+  Upload,
   Users,
   Wand2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -36,6 +56,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { Textarea } from "@/components/ui/textarea"
 import { CardSelect } from "@/components/ui/card-select"
 import { cn } from "@/lib/utils"
+import { IMAGE_MODELS, TEXT_MODELS } from "@/lib/constants"
 import type { AssetDTO, CostumeDTO } from "@/lib/serializers/script"
 
 type AssetKind = "characters" | "outfits" | "props" | "scenes"
@@ -302,23 +323,43 @@ export function AssetSidebar({
                 />
               ) : (
                 characters.map((character) => (
-                  <CharacterCard key={character.id} character={character} />
+                  <CharacterCard
+                    key={character.id}
+                    character={character}
+                    characters={characters}
+                    scriptId={scriptId}
+                    onDone={onRefresh}
+                  />
                 ))
               )}
             </div>
           </div>
         </TabsContent>
 
-        {/* 妆造库：按人物分组，+ 新建造型 */}
+        {/* 妆造库：按人物分组，+ 新建造型（生成按钮置顶，与道具/场景一致） */}
         <TabsContent value="outfits" className="min-h-0 flex-1 overflow-hidden px-2.5 pb-2.5">
-          <OutfitList
-            characters={characters}
-            costumes={costumes}
-            generating={generating === "outfits"}
-            onGenerate={() => void generate("outfits", "造型")}
-            scriptId={scriptId}
-            onDone={onRefresh}
-          />
+          <div className="flex h-full flex-col">
+            <Button
+              variant="outline"
+              size="sm"
+              className="mb-2"
+              onClick={() => void generate("outfits", "造型")}
+              disabled={generating !== null || costumes.length === 0}
+            >
+              {generating === "outfits" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              生成造型图（未出图的）
+            </Button>
+            <OutfitList
+              characters={characters}
+              costumes={costumes}
+              scriptId={scriptId}
+              onDone={onRefresh}
+            />
+          </div>
         </TabsContent>
 
         {/* 道具库 */}
@@ -391,12 +432,111 @@ export function AssetSidebar({
   )
 }
 
-/* ---------------------------- 角色大图卡（img-05/09） ---------------------------- */
+/* ---------------------------- 角色大图卡（img-05/09 + 更多菜单） ---------------------------- */
 
-function CharacterCard({ character }: { character: AssetDTO }) {
+const RESOLUTIONS = ["1K", "2K", "4K"] as const
+const QUALITY_TIERS = ["低画质", "标准画质", "高画质", "超高清画质", "最高画质"] as const
+
+function CharacterCard({
+  character,
+  characters,
+  scriptId,
+  onDone,
+}: {
+  character: AssetDTO
+  characters: AssetDTO[]
+  scriptId: string
+  onDone: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [genOpen, setGenOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function patch(body: Record<string, unknown>, success?: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${character.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "操作失败")
+      if (success) toast.success(success)
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "操作失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** 上传本地图片：mode=replace 直接替换已出图；mode=ref 加入出图参考图 */
+  async function uploadImage(file: File, mode: "replace" | "ref") {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("图片大小须在 20MB 以内")
+      return
+    }
+    setBusy(true)
+    const notice = toast.loading("正在上传图片…")
+    try {
+      const form = new FormData()
+      form.set("scriptId", scriptId)
+      form.set("file", file)
+      const res = await fetch("/api/media", { method: "POST", body: form })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "上传失败")
+      const url = payload.data.url as string
+      if (mode === "replace") {
+        await patch({ imageUrl: url }, "已替换角色图")
+      } else {
+        const next = Array.from(
+          new Set([...(character.refImages ?? []), url]),
+        ).slice(0, 10)
+        await patch({ refImages: next }, "参考图已上传")
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "上传失败")
+    } finally {
+      toast.dismiss(notice)
+      setBusy(false)
+    }
+  }
+
+  async function doDelete() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${character.id}`, {
+        method: "DELETE",
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "删除失败")
+      toast.success(`已删除「${character.name}」`)
+      onDone()
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function downloadImage() {
+    if (!character.imageUrl) return
+    const anchor = document.createElement("a")
+    anchor.href = character.imageUrl
+    anchor.download = `${character.name}-参考图`
+    anchor.click()
+  }
+
+  const others = characters.filter((item) => item.id !== character.id)
+
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/50">
-      <div className="relative aspect-[16/10] bg-zinc-900">
+      <div className="group relative aspect-[16/10] bg-zinc-900">
         {character.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -415,30 +555,549 @@ function CharacterCard({ character }: { character: AssetDTO }) {
             )}
           </div>
         )}
-        <span
-          className={cn(
-            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
-            character.status === "completed"
-              ? "bg-emerald-500/20 text-emerald-300"
-              : character.status === "generating"
-                ? "bg-orange-500/20 text-orange-300"
-                : "bg-zinc-800 text-zinc-400",
+
+        {/* 状态 + 锁定徽标（右上角） */}
+        <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+          {character.locked && (
+            <span
+              aria-label="已锁定"
+              className="flex h-[18px] w-[18px] items-center justify-center rounded bg-zinc-950/85 p-0.5 text-amber-300 ring-1 ring-amber-500/40"
+            >
+              <Lock className="h-2.5 w-2.5" />
+            </span>
           )}
-        >
-          {character.status === "completed"
-            ? "已完成"
-            : character.status === "generating"
-              ? "生成中"
-              : "待生成"}
-        </span>
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[9px] font-medium",
+              character.status === "completed"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : character.status === "generating"
+                  ? "bg-orange-500/20 text-orange-300"
+                  : "bg-zinc-800 text-zinc-400",
+            )}
+          >
+            {character.status === "completed"
+              ? "已完成"
+              : character.status === "generating"
+                ? "生成中"
+                : "待生成"}
+          </span>
+        </div>
+
+        {/* 悬浮操作条（图片右下角）：下载原图 / 上传本地替换 / 编辑 / 更多 */}
+        {character.imageUrl && (
+          <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <ImageActionButton label="下载原图" disabled={busy} onClick={downloadImage}>
+              <Download className="h-3 w-3" />
+            </ImageActionButton>
+            <ImageActionButton
+              label="上传本地替换参考图"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-3 w-3" />
+            </ImageActionButton>
+            <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+              <Pencil className="h-3 w-3" />
+            </ImageActionButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="更多"
+                  disabled={busy}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded bg-rose-950/90 text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900"
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="w-48">
+                <DropdownMenuItem onSelect={() => setResetOpen(true)}>
+                  <Sparkles />
+                  重新出图
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={(character.refImages?.length ?? 0) === 0}
+                  onSelect={() => void patch({ clearRefs: true }, "参考图已清空")}
+                >
+                  <RefreshCw />
+                  清空参考图
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                  <Upload />
+                  上传图替换
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void patch(
+                      { locked: !character.locked },
+                      character.locked ? "已解锁，可再生成" : "已锁定，再生成不覆盖",
+                    )
+                  }
+                >
+                  {character.locked ? <LockOpen /> : <Lock />}
+                  {character.locked ? "解锁（恢复再生成）" : "锁定（再生成不覆盖）"}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={others.length === 0} onSelect={() => setMergeOpen(true)}>
+                  <Merge />
+                  合并到...（去重）
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  destructive
+                  className="text-rose-400 focus:text-rose-300"
+                  onSelect={() => setDeleteOpen(true)}
+                >
+                  <Trash2 />
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
+
       <div className="space-y-0.5 p-2">
-        <p className="truncate text-xs font-medium text-zinc-200">{character.name}</p>
+        <p className="truncate text-xs font-medium text-zinc-200">
+          {character.name}
+          {(character.aliases?.length ?? 0) > 0 && (
+            <span className="ml-1 text-[10px] font-normal text-zinc-600">
+              别名 {character.aliases?.join(" / ")}
+            </span>
+          )}
+        </p>
         <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">
           {character.description}
         </p>
       </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void uploadImage(file, "replace")
+          event.target.value = ""
+        }}
+      />
+
+      {/* 出角色参考图（编辑） */}
+      <CharacterGenerateDialog
+        scriptId={scriptId}
+        character={character}
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onDone={onDone}
+      />
+
+      {/* 重新出图确认 */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重新出图</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            将清空「{character.name}」的参考图并重置状态，下次点「一键出全部资产」会重新出，继续？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setResetOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setResetOpen(false)
+                void patch({ reset: true }, "已重置，下次一键出全部资产会重新出")
+              }}
+            >
+              重置
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 合并到...（去重） */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-1.5">
+              <Merge className="h-4 w-4" />
+              合并「{character.name}」到...
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            选一个保留的角色，把「{character.name}」合并进去（同人多默认请去重），它的出场集 /
+            九宫格引用会改指过去，别名并入，然后删除「{character.name}」+ 退它的图。此操作不可撤销。
+          </p>
+          <div className="space-y-1.5">
+            {others.map((target) => (
+              <button
+                key={target.id}
+                type="button"
+                disabled={busy}
+                onClick={() => void mergeInto(target.id)}
+                className="flex w-full items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
+              >
+                <span className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950">
+                  {target.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={target.imageUrl}
+                      alt={target.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-zinc-200">
+                    {target.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[10px] text-zinc-500">
+                    身份背景：{target.description}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除「{character.name}」</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            它的妆造、出图与引用关系会一并删除，此操作不可撤销。确定删除？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void doDelete()}>
+              删除
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+
+  async function mergeInto(targetId: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/merge`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sourceId: character.id, targetId }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "合并失败")
+      toast.success(payload.message ?? "合并完成")
+      onDone()
+      setMergeOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "合并失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+}
+
+/** 图片右下角悬浮小按钮（带悬停提示）。 */
+function ImageActionButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="flex h-[22px] w-[22px] items-center justify-center rounded bg-zinc-950/85 text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="text-[11px]">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/* ---------------------------- 出角色参考图弹窗（编辑 / 单独出图） ---------------------------- */
+
+function CharacterGenerateDialog({
+  scriptId,
+  character,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  scriptId: string
+  character: AssetDTO
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDone: () => void
+}) {
+  const [model, setModel] = useState(IMAGE_MODELS[0].id)
+  const [promptModel, setPromptModel] = useState(TEXT_MODELS[0].id)
+  const [prompt, setPrompt] = useState(character.prompt ?? "")
+  const [refs, setRefs] = useState<string[]>(character.refImages ?? [])
+  const [resolution, setResolution] = useState<string>("1K")
+  const [quality, setQuality] = useState<string>("标准画质")
+  const [starting, setStarting] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const imageModel = IMAGE_MODELS.find((item) => item.id === model) ?? IMAGE_MODELS[0]
+
+  async function uploadRef(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("图片大小须在 20MB 以内")
+      return
+    }
+    const notice = toast.loading("正在上传参考图…")
+    try {
+      const form = new FormData()
+      form.set("scriptId", scriptId)
+      form.set("file", file)
+      const res = await fetch("/api/media", { method: "POST", body: form })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "上传失败")
+      setRefs((current) => Array.from(new Set([...current, payload.data.url])).slice(0, 10))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "上传失败")
+    } finally {
+      toast.dismiss(notice)
+    }
+  }
+
+  async function start() {
+    setStarting(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "character",
+          ids: [character.id],
+          model,
+          resolution,
+          quality,
+          ...(prompt.trim() ? { prompt: prompt.trim() } : {}),
+          ...(refs.length ? { refImages: refs } : {}),
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      toast.success(`「${character.name}」出图完成`, {
+        description: "已出过会覆盖；确认无误后可继续下一角色",
+      })
+      onDone()
+      onOpenChange(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成失败")
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-1.5">
+            <Wand2 className="h-4 w-4" />
+            出角色参考图
+          </DialogTitle>
+        </DialogHeader>
+        <p className="-mt-1 text-[11px] leading-relaxed text-zinc-500">
+          单独给「{character.name}」出一张参考图，先看看风格效果。已出过会覆盖。
+        </p>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">生成模型</Label>
+          <CardSelect
+            ariaLabel="生成模型"
+            value={model}
+            onValueChange={setModel}
+            options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            className="w-full"
+          />
+        </div>
+        <div className="rounded-lg border border-orange-500/30 bg-orange-500/[0.06] px-2.5 py-2 text-[10px] leading-relaxed text-orange-200/90">
+          <span className="font-medium">🌸 预计单用量 {imageModel.cost} = 1张 x {imageModel.cost}/张</span>
+          <p className="mt-0.5 text-orange-200/60">
+            仅估算出图：提示词编译(文本模型)与实际参数(比例/质量)略有出入。
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">
+            提示词模型
+            <span className="ml-1 text-[10px] text-zinc-600">（把简介扩写成资产卡 prompt）</span>
+          </Label>
+          <CardSelect
+            ariaLabel="提示词模型"
+            value={promptModel}
+            onValueChange={setPromptModel}
+            options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            className="w-full"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">
+            出图提示词
+            <span className="ml-1 text-[10px] text-zinc-600">（可改，留空 = AI 按简介自动缩写）</span>
+          </Label>
+          <Textarea
+            aria-label="出图提示词"
+            rows={6}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="留空则按角色简介自动生成提示词"
+            className="font-mono text-[11px] leading-relaxed"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-zinc-400">参考图</Label>
+          <p className="text-[10px] leading-relaxed text-zinc-600">
+            可选：让 AI 照着这张图出，被造型锚定到它。
+            <br />
+            文件有效期10分钟，10分钟后会自动清理参考图（不计入容量）。
+          </p>
+          {refs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {refs.map((url) => (
+                <span key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt="参考图"
+                    className="h-10 w-10 rounded-md border border-zinc-800 object-cover"
+                  />
+                  <button
+                    type="button"
+                    aria-label="移除参考图"
+                    onClick={() => setRefs((current) => current.filter((item) => item !== url))}
+                    className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-zinc-950 text-[9px] text-zinc-400 ring-1 ring-zinc-700 hover:text-rose-300"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-3 w-3" />
+            上传参考图
+          </Button>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5">
+          <p className="text-[10px] text-zinc-500">生成参数（按模型 capability）</p>
+          <div>
+            <Label className="text-[10px] text-zinc-500">清晰度</Label>
+            <div className="mt-1 flex gap-1">
+              {RESOLUTIONS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={resolution === item}
+                  onClick={() => setResolution(item)}
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] transition-colors",
+                    resolution === item
+                      ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/40"
+                      : "text-zinc-400 ring-1 ring-zinc-800 hover:text-zinc-200",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px] text-zinc-500">画质档位</Label>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {QUALITY_TIERS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={quality === item}
+                  onClick={() => setQuality(item)}
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] transition-colors",
+                    quality === item
+                      ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/40"
+                      : "text-zinc-400 ring-1 ring-zinc-800 hover:text-zinc-200",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-[10px] font-medium text-orange-300/90">
+            🌸 预计单张约 {imageModel.cost} 樱米花 · 出图时扣除
+          </p>
+          <p className="text-[10px] leading-relaxed text-zinc-600">
+            比例固定 16:9 多画格资料卡（压框/侧栏/细节），最终视频比例无关 —
+            九宫格故事板也固定 16:9，短片视频则按剧集比例出。
+          </p>
+        </div>
+
+        <p className="text-[10px] text-zinc-600">
+          提示：任务会在后台依次完成，本页每 5 秒自动刷新，关闭页面后任务仍会继续。
+        </p>
+
+        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button variant="brand" size="sm" disabled={starting} onClick={() => void start()}>
+            {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            开始出图
+          </Button>
+        </div>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void uploadRef(file)
+            event.target.value = ""
+          }}
+        />
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -528,15 +1187,11 @@ function AssetCard({ asset }: { asset: AssetDTO }) {
 function OutfitList({
   characters,
   costumes,
-  generating,
-  onGenerate,
   scriptId,
   onDone,
 }: {
   characters: AssetDTO[]
   costumes: (CostumeDTO & { characterName: string })[]
-  generating: boolean
-  onGenerate: () => void
   scriptId: string
   onDone: () => void
 }) {
@@ -582,21 +1237,6 @@ function OutfitList({
           )
         })
       )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={onGenerate}
-        disabled={generating || costumes.length === 0}
-      >
-        {generating ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="h-3.5 w-3.5" />
-        )}
-        生成造型图（未出图的）
-      </Button>
     </div>
   )
 }
