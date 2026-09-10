@@ -1209,10 +1209,11 @@ function OutfitList({
         characters.map((character) => {
           const mine = costumes.filter((costume) => costume.characterId === character.id)
           return (
-            <div key={character.id} className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-2">
-              <div className="flex items-center gap-1.5 pb-1.5">
-                <Shirt className="h-3 w-3 text-zinc-500" />
-                <span className="truncate text-xs font-medium text-zinc-300">{character.name}</span>
+            <div key={character.id} className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-zinc-500">
+                  {character.name} · {mine.length}套造型
+                </span>
                 <div className="ml-auto">
                   <AddAssetButton
                     scriptId={scriptId}
@@ -1225,13 +1226,16 @@ function OutfitList({
                 </div>
               </div>
               {mine.length === 0 ? (
-                <p className="text-[10px] text-zinc-600">暂无造型</p>
+                <p className="text-[10px] text-zinc-600">暂无造型，点右上角「+ 新建造型」添加</p>
               ) : (
-                <div className="space-y-1.5">
-                  {mine.map((costume) => (
-                    <CostumeCard key={costume.id} costume={costume} />
-                  ))}
-                </div>
+                mine.map((costume) => (
+                  <CostumeCard
+                    key={costume.id}
+                    costume={costume}
+                    scriptId={scriptId}
+                    onDone={onDone}
+                  />
+                ))
               )}
             </div>
           )
@@ -1241,30 +1245,185 @@ function OutfitList({
   )
 }
 
-function CostumeCard({ costume }: { costume: CostumeDTO & { characterName: string } }) {
+/** 妆造大图卡：悬停图片右下角出「重出 / 替换」。 */
+function CostumeCard({
+  costume,
+  scriptId,
+  onDone,
+}: {
+  costume: CostumeDTO & { characterName: string }
+  scriptId: string
+  onDone: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [regenOpen, setRegenOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  /** 替换：唤起系统文件选择框，上传后直接替换已出图 */
+  async function uploadReplace(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("图片大小须在 20MB 以内")
+      return
+    }
+    setBusy(true)
+    const notice = toast.loading("正在上传图片…")
+    try {
+      const form = new FormData()
+      form.set("scriptId", scriptId)
+      form.set("file", file)
+      const res = await fetch("/api/media", { method: "POST", body: form })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "上传失败")
+      const patch = await fetch(`/api/scripts/${scriptId}/assets/${costume.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: payload.data.url }),
+      })
+      const patchPayload = await patch.json()
+      if (!patch.ok) throw new Error(patchPayload.error ?? "替换失败")
+      toast.success("已替换造型图")
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "替换失败")
+    } finally {
+      toast.dismiss(notice)
+      setBusy(false)
+    }
+  }
+
+  /** 重新出这套造型：删掉当前图重新生成 */
+  async function regenerate() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "outfit",
+          ids: [costume.id],
+          model: "all-in-one",
+          resolution: "1K",
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      toast.success(`「${costume.name}」已重新出图`)
+      onDone()
+      setRegenOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 p-1.5">
-      <div className="h-9 w-9 shrink-0 overflow-hidden rounded border border-zinc-800 bg-zinc-950">
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/50">
+      <div className="group relative aspect-[16/10] bg-zinc-900">
         {costume.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={costume.imageUrl}
             alt={costume.name}
             loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[8px] text-zinc-600">
-            待出图
+          <div className="flex h-full w-full items-center justify-center">
+            {costume.status === "generating" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+            ) : (
+              <Shirt className="h-5 w-5 text-zinc-700" />
+            )}
           </div>
         )}
+
+        {/* 名字徽标（左上）+ 状态徽标（右上） */}
+        <span className="absolute left-1.5 top-1.5 rounded bg-zinc-950/85 px-1.5 py-0.5 text-[9px] text-zinc-300 ring-1 ring-zinc-800">
+          {costume.name}
+        </span>
+        <span
+          className={cn(
+            "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-medium",
+            costume.status === "completed"
+              ? "bg-emerald-500/20 text-emerald-300"
+              : costume.status === "generating"
+                ? "bg-orange-500/20 text-orange-300"
+                : "bg-zinc-800 text-zinc-400",
+          )}
+        >
+          {costume.status === "completed"
+            ? "已完成"
+            : costume.status === "generating"
+              ? "生成中"
+              : "待生成"}
+        </span>
+
+        {/* 悬浮操作条（右下）：重出 / 替换 */}
+        <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <button
+            type="button"
+            aria-label="重出"
+            disabled={busy}
+            onClick={() => setRegenOpen(true)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <RefreshCw className="h-3 w-3" />
+            重出
+          </button>
+          <button
+            type="button"
+            aria-label="替换"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          >
+            <Upload className="h-3 w-3" />
+            替换
+          </button>
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[11px] text-zinc-200">{costume.name}</p>
-        {costume.situation && (
-          <p className="truncate text-[9px] text-zinc-600">{costume.situation}</p>
-        )}
+
+      <div className="space-y-0.5 p-2">
+        <p className="truncate text-xs font-medium text-zinc-200">{costume.name}</p>
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">
+          {costume.description || "无描述"}
+        </p>
       </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void uploadReplace(file)
+          event.target.value = ""
+        }}
+      />
+
+      {/* 重新出这套造型（确认） */}
+      <Dialog open={regenOpen} onOpenChange={setRegenOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>重新出这套造型</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            会删掉当前造型图重新生成（清还旧图容量，重新计费），会自动挂默认造型脸 +
+            道具图保证一致，继续？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setRegenOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void regenerate()}>
+              重新出图
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

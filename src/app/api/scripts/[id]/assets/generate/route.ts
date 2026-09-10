@@ -180,7 +180,7 @@ export const POST = withErrorHandling(
           ...(input.ids?.length ? { id: { in: input.ids } } : {}),
           character: { scriptId: script.id },
         },
-        include: { character: { select: { name: true } } },
+        include: { character: { select: { name: true, imageUrl: true } } },
       })
       const targets = input.ids?.length
         ? costumes
@@ -202,11 +202,23 @@ export const POST = withErrorHandling(
             item.situation,
           ),
         )
+        // 自动挂默认造型脸 + 该角色的关联道具图，保证多套造型一致
+        const anchorRefs = [
+          item.character.imageUrl,
+          ...(
+            await prisma.prop.findMany({
+              where: { parentCharacterId: item.characterId, imageUrl: { not: null } },
+              select: { imageUrl: true },
+              take: 3,
+            })
+          ).map((prop) => prop.imageUrl),
+        ].filter((url): url is string => Boolean(url))
         const { data } = await ai.generateImage({
           prompt,
-          model: input.model,
+          model: resolveModel(input.model, input.quality),
           aspectRatio: script.targetAspect,
           resolution: input.resolution,
+          references: anchorRefs.map((url) => ({ name: url, kind: "image" as const })),
         })
         await prisma.costume.update({
           where: { id: item.id },
