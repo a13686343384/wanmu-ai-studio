@@ -488,6 +488,13 @@ model Credential {
   @@index([workspaceId])
 }
 
+/// 全局运行时设置（key-value），如 ai_mode = mock | live。
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
 /* ---------------------------- 电商设计室 ---------------------------- */
 
 /// 电商设计室项目：商品套图 / A+ 详情页的配置与产物。

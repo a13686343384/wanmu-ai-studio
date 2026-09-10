@@ -213,6 +213,8 @@ export interface GenerateImageInput {
   style?: string | null
   /** 参考素材名列表（用于提示词拼装） */
   references?: { name: string; kind: MediaKind }[]
+  /** 工作区（live 模式下 ComfyUI 产物落库用） */
+  workspaceId?: string
 }
 
 export interface GenerateImageResult {
@@ -231,6 +233,8 @@ export interface GenerateVideoInput {
   firstFrameUrl?: string
   lastFrameUrl?: string
   references?: { name: string; kind: MediaKind }[]
+  /** 工作区（live 模式下 ComfyUI 产物落库用） */
+  workspaceId?: string
 }
 
 export interface GenerateVideoResult {

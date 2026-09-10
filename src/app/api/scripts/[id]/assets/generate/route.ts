@@ -105,6 +105,7 @@ export const POST = withErrorHandling(
           model: resolveModel(input.model, input.quality),
           aspectRatio: input.aspectRatio ?? script.targetAspect,
           resolution: input.resolution,
+          workspaceId: script.workspaceId,
           references: (input.refImages ?? item.refImages).map((url) => ({
             name: url,
             kind: "image" as const,
@@ -152,6 +153,7 @@ export const POST = withErrorHandling(
           model: resolveModel(input.model, input.quality),
           aspectRatio: input.aspectRatio ?? script.targetAspect,
           resolution: input.resolution,
+          workspaceId: script.workspaceId,
           references: (input.refImages ?? item.refImages).map((url) => ({
             name: url,
             kind: "image" as const,

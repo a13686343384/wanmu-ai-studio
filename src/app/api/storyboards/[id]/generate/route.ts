@@ -28,6 +28,7 @@ export const POST = withErrorHandling(
                 targetAspect: true,
                 visualStyle: true,
                 episodeDuration: true,
+                workspaceId: true,
               },
             },
           },
@@ -71,6 +72,7 @@ export const POST = withErrorHandling(
           aspectRatio: input.aspectRatio ?? script.targetAspect,
           resolution: input.resolution,
           count: 1,
+          workspaceId: script.workspaceId,
         })
 
         const updated = await prisma.storyboard.update({
@@ -87,6 +89,7 @@ export const POST = withErrorHandling(
         model: input.model,
         aspectRatio: input.aspectRatio ?? script.targetAspect,
         resolution: input.resolution,
+        workspaceId: script.workspaceId,
         duration: input.duration,
         skipStoryboardImage: input.skipStoryboardImage,
         firstFrameUrl: input.skipStoryboardImage ? undefined : storyboard.imageUrl ?? undefined,

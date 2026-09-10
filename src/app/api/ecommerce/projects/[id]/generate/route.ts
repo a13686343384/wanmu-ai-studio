@@ -79,6 +79,7 @@ export const POST = withErrorHandling(
             model: config.imageModel ?? "man-image-v2-lite",
             aspectRatio: config.ratio ?? "1:1",
             resolution: "1K",
+            workspaceId: project.workspaceId,
           })
           items[index] = { ...item, status: "done", url: data.images[0]!.url }
         }

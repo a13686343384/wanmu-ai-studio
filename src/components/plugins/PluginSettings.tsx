@@ -40,6 +40,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { MODEL_TEMPLATES, type ModelKind } from "@/lib/plugins/templates"
+import { AiServiceSettings } from "@/components/plugins/AiServiceSettings"
 import { cn } from "@/lib/utils"
 
 interface ModelRow {
@@ -188,6 +189,11 @@ export function PluginSettings() {
           <Plus />
           新建模型
         </Button>
+      </div>
+
+      {/* AI 服务：MOCK 开关 + 凭据 + ComfyUI */}
+      <div className="mt-5">
+        <AiServiceSettings />
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-5">
