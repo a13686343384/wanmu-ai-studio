@@ -19,6 +19,7 @@ export default async function WritingPage({
     <WritingEditor
       initialProject={{
         ...project,
+        createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString(),
         document: readWritingDocument(project.document),
       }}

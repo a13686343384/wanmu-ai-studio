@@ -1,0 +1,25 @@
+const { chromium } = require("@playwright/test");
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  page.on("console", (msg) => { if (msg.type() === "error") console.log("CONSOLE:", msg.text().slice(0, 200)); });
+  page.on("pageerror", (err) => console.log("PAGEERROR:", String(err).slice(0, 200)));
+  await page.goto("http://localhost:3000/login");
+  await page.fill('input[type="email"]', "demo@wanmusheng.com");
+  await page.fill('input[type="password"]', "demo1234");
+  await page.click('button[type="submit"]');
+  await page.waitForLoadState("networkidle");
+  await page.goto("http://localhost:3000/creation/script-writing");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1000);
+  const card = page.locator("div.group.cursor-pointer").first();
+  await card.hover();
+  await card.getByRole("button", { name: "更多操作" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("menuitem", { name: "删除剧本" }).click();
+  await page.waitForTimeout(1000);
+  console.log("alert count:", await page.locator('[role="alertdialog"]').count());
+  console.log("dialog content:", await page.getByText(/确定要删除/).count());
+  console.log("url still list:", page.url());
+  await browser.close();
+})();

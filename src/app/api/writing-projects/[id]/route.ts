@@ -1,3 +1,4 @@
+import { z } from "zod"
 import { AppError, jsonOk, withErrorHandling } from "@/lib/api"
 import { prisma } from "@/lib/prisma"
 import { requireUser } from "@/lib/session"
@@ -22,6 +23,22 @@ export const DELETE = withErrorHandling(
     const project = await requireWritingProject(params.id, user.id)
     await prisma.writingProject.delete({ where: { id: project.id } })
     return jsonOk({ id: project.id })
+  },
+)
+const renameSchema = z.object({ title: z.string().trim().min(1, "请输入剧名").max(60) })
+
+/** PATCH /api/writing-projects/[id] — 重命名剧本 */
+export const PATCH = withErrorHandling(
+  async (req: Request, { params }: { params: { id: string } }) => {
+    const user = await requireUser()
+    const project = await requireWritingProject(params.id, user.id)
+    const { title } = renameSchema.parse(await req.json())
+    const updated = await prisma.writingProject.update({
+      where: { id: project.id },
+      data: { title },
+      select: { id: true, title: true },
+    })
+    return jsonOk(updated, "已重命名")
   },
 )
 export const POST = withErrorHandling(

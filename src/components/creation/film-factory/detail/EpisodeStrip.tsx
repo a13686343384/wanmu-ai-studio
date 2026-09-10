@@ -9,7 +9,7 @@ const PROGRESSIVE_THRESHOLD = 60
 
 /**
  * 分集胶片条（详情页横向分集选择）。
- * 胶片齿孔背景 + EP 号 / 标题 chip，横向滚动，当前分集高亮。
+ * 胶片齿孔背景 + EP 号 / 标题 chip，横向滚动（滚动条可见，保证能翻到最后一集），当前分集高亮。
  */
 export function EpisodeStrip({
   episodes,
@@ -38,7 +38,7 @@ export function EpisodeStrip({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-[repeating-linear-gradient(90deg,#27272a_0_6px,transparent_6px_14px)]"
       />
 
-      <div className="scrollbar-hide relative flex gap-1.5 overflow-x-auto px-0.5 py-2">
+      <div className="relative flex gap-1.5 overflow-x-auto px-0.5 py-2">
         {visible.map((episode) => {
           const active = episode.id === activeId
           return (

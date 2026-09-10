@@ -37,6 +37,7 @@ export interface WritingProjectDTO {
   episodeDuration: number
   revision: number
   document: WritingDocument
+  createdAt: string
   updatedAt: string
   importedScriptId: string | null
 }

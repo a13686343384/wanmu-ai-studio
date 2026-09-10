@@ -1,0 +1,21 @@
+const { chromium } = require("@playwright/test");
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await page.goto("http://localhost:3000/login");
+  await page.fill('input[type="email"]', "demo@wanmusheng.com");
+  await page.fill('input[type="password"]', "demo1234");
+  await page.click('button[type="submit"]');
+  await page.waitForLoadState("networkidle");
+  await page.goto("http://localhost:3000/creation/script-writing");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: "新建剧本" }).click();
+  await page.waitForTimeout(800);
+  console.log("dialogs:", await page.locator('[role="dialog"]').count());
+  console.log("题材配方:", await page.getByText("题材配方").count());
+  const label = await page.getByText("题材配方").first().evaluate((el) => getComputedStyle(el).fontSize).catch(() => "n/a");
+  console.log("label size:", label);
+  await page.screenshot({ path: ".screenshots/verify-writing-create.png" });
+  await browser.close();
+})();

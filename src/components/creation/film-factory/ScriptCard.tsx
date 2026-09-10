@@ -60,7 +60,7 @@ export function ScriptCard({
 
   // 整卡可点：点在按钮/链接/菜单上不触发进入详情
   function openDetail(event: React.MouseEvent) {
-    if ((event.target as HTMLElement).closest("button, a")) return
+    if ((event.target as HTMLElement).closest("button, a, [role='menuitem']")) return
     router.push(`/creation/film-factory/${script.id}`)
   }
 
