@@ -1,9 +1,39 @@
 # 进度与交接（PROGRESS）
 
-> **最后更新：** 2026-09-09（UI 对齐 ×3 轮 + 画布操作页/导演台）
-> **当前状态：** 21 个任务**全部完成**（功能交付 + UI/性能打磨 + 文档与部署配置）。
-> **验证基线：** `tsc --noEmit` 0 错误 · `npm run build` 成功 · 冒烟 **17/17** · E2E **26/26** · `npm run lint` 通过。
-> **全新环境演练已通过：** 克隆 → `npm ci` → 内嵌库自动 initdb → `db:setup` → `build` → `start` → 冒烟 17/17。
+> **最后更新：** 2026-09-10（真实 AI 服务接入：Qwen/DeepSeek + 本地 ComfyUI + MOCK 开关）
+> **当前状态：** 21 个基础任务 + 备忘录需求 + 真实 AI 接入 **全部完成并已提交**（最新 commit 见 `git log`）。
+> **验证基线：** `tsc --noEmit` 0 错误 · `npm run build` 成功 · 冒烟 **17/17** · E2E **40/40**（mock 模式）。
+> **AI 模式当前值：** `ai_mode = mock`（默认；插件页「AI 服务」开关可切 live，已实测真实 Qwen 调用成功）。
+
+---
+
+## ⚡ 断点续写指引（新会话/新 Agent 从这里开始）
+
+1. **读我**：本文件「五、最近一轮工作明细（2026-09-10）」+ `docs/plans/2026-09-10-live-ai-integration.md`（计划，已全部勾选）+ 同名 `.log.md`（执行日志）。
+2. **环境**：`npm run db:dev`（内嵌 PG 常驻）→ 若端口 3000 无响应，重启 dev server（**新增路由文件后必须重启**，否则路由清单缓存导致 404，这是本仓库已知坑）。
+3. **AI 模式切换**：页面入口 = `/plugins` 页顶部「AI 服务」卡片开关；程序入口 = `PATCH /api/settings/ai {"mode":"live"|"mock"}`；存储 = SystemSetting 表 key `ai_mode`。**当前值为 mock。**
+4. **凭据**：已落 `Credential` 表（「阿里云 Qwen（token-plan）」「DeepSeek」「ComfyUI 本地」三条）；`scripts/setup-live-ai.mjs` 幂等重跑。
+
+### 待办（按优先级）
+1. **ComfyUI 8118 不可达**（ping 通、端口拒连）：需在 Win11 主机启动 ComfyUI 并放行 8118。完成后到 `/plugins` 点「测试连接」，出图/出视频即自动走本地通道（模板已入库：Z-Image Turbo 文生图 + MiniMaxH3 四参考图图生视频，见 `src/services/ai/comfy/`）。如需远程操作 Win11，用户本机有 Windows App 可远程连接。
+2. **线上出图通道**：token-plan 的 `/images/generations` 对 wan2.7-image 返回 `url error`（接口形态待查）；短期方案 = 在插件页用 16 模板接入任意线上出图 API（CustomModel kind=image 优先级高于 ComfyUI）。
+3. **generateAudio（live）**：返回明确「暂未配置」；可按同样方式接 TTS 模板。
+4. **Z_image UI→API 转换脚本**（可选）：已用代码内置 API 模板替代，未做离线转换脚本。
+5. **live 模式 E2E**：`scripts/verify/verify-live-ai.cjs`（切换开关 + 真实调用验证）；全量 E2E 需保持 mock 模式。
+
+### 本轮提交索引（新→旧）
+| commit | 内容 |
+|---|---|
+| 6a3bf1c | 真实 AI 服务接入（Qwen 主力文本 + DeepSeek 辅 + ComfyUI）+ MOCK 开关 |
+| 7c2dcde | 合并弹窗人物列表溢出修复（grid min-width:auto） |
+| 9e0feb8 | 生成接口兼容旧前端复数 kind 参数 |
+| ac1a18d | 剧本创作列表对齐影视工厂 + 分集条滚动条可见 |
+| e78c25d | 全局字号 7 级 / 弹窗 4 档规范 + 生成按钮参数修复 |
+| 7b95943 | 提示词模板按类型区分 + 场景卡与空间资产弹窗 |
+| 35c9332 / 55210ef / 17f3d13 | 道具卡 / 妆造卡 / 角色卡操作条与更多菜单 |
+| 355800b | 剧本创作宽度/404、电商 JSON 报错、画布工具条居中等 4 问题 |
+
+---
 
 ---
 
@@ -166,3 +196,30 @@ feat: initialize Next.js 14 project with Tailwind CSS, shadcn-ready theme and ba
 ```
 
 > 最新代码状态见 `git log --oneline`；`test:e2e` 新增的 `tests/e2e/*.spec.ts` 与 `playwright.config.ts` 在最近一次提交中。
+
+
+---
+
+## 五、最近一轮工作明细（2026-09-10 · 真实 AI 接入 + 四轮 UI/功能修复）
+
+### 5.1 真实 AI 服务接入（commit 6a3bf1c）
+- **配置**：`SystemSetting` 表（`ai_mode` / `ai_providers`）；凭据在 `Credential` 表；`lib/settings.ts` 5s 缓存读写。
+- **文本（11 能力全真实）**：建档分析/会诊/会诊对话/台词优化/大纲/分集摘要/角色·场景·道具提取/分镜拆分/编剧写作/自由文本 → **Qwen3.7-plus 主力**（token-plan OpenAI 兼容端点），失败自动 failover DeepSeek；JSON 提取带一次修复重试。实现：`src/services/ai/live-ai.service.ts` + `live/openai-chat.ts`。
+- **图片/视频**：顺序 = 线上 CustomModel(kind=image|video，插件 invoke 引擎) → 本地 ComfyUI（Z-Image Turbo 文生图 / MiniMaxH3 四参考图图生视频，模板在 `src/services/ai/comfy/workflows/`，客户端 `comfy/client.ts`：ping/upload/prompt/history/view，产物落 MediaFile）→ 明确报错（不静默回 Mock）。
+- **MOCK 开关**：`/plugins` 页「AI 服务」卡片；`getAIService()` 为 mode-aware Proxy，切换即时生效，调用方零改动。
+- **端到端已实测**：live 模式 analyzeScript 返回真实 Qwen 立项方案；切回 mock 行为复原；ComfyUI 测试按钮返回清晰不可达提示。
+
+### 5.2 资产侧栏（影视工厂右栏，严格按需求图）
+- 角色卡：悬浮「下载原图/上传本地替换/编辑(出角色参考图弹窗)/更多」；更多菜单六项 = 重新出图 / 清空参考图 / 上传图替换 / 锁定（再生成不覆盖，批量跳过锁定）/ 合并到...（去重，别名并入+删除源角色）/ 删除（确认弹窗）。
+- 妆造卡：大图卡（名字徽标+状态徽标），悬停「重出（确认弹窗，挂角色脸+道具参考）/ 替换（文件选择框）」，生成按钮置顶。
+- 道具卡：大图卡，悬停「重出 / 替换 / 编辑（编辑道具卡弹窗：所属人物/名称/外观细节）/ 删除(红)」。
+- 场景卡：大图卡，更多菜单以「空间资产（多角度/侧别/…）」替换合并项；空间资产弹窗 = 双模型 + 比例 12 档 + 清晰度 + 画质锁定低画质 + 多角度 5 宫格（俯视/正向/反向/左侧/右侧）+ 侧别锁定卡 + 光影设计卡（`POST /api/scripts/[id]/scenes/[sceneId]/spatial`）。
+- 提示词模板按 Tab 独立（角色/妆造/道具/场景四字段）。
+
+### 5.3 剧本创作模块对齐影视工厂
+- 列表页同构：三行标题（眉标+徽标/h1/描述）+ 统计卡 + 同款搜索/排序/新建；场记板卡片（WR 编号/标题状态/简介/集数）；宽度实测与影视工厂一致（1152px）。
+- 卡片菜单 = 置顶/编辑(重命名 PATCH)/删除(AlertDialog)；整卡点击守卫含 `[role='menuitem']`。
+- 详情分集条去掉 scrollbar-hide（滚动条可见，能翻到最后一集）。
+
+### 5.4 全局设计规范
+- 字号 7 级（3xl/2xl/lg/base/sm/xs/[11px]/[10px] 下限），离群字号已归一，全局行高在 globals.css；弹窗 4 档（sm/md/lg + XL 2xl~4xl & 88vh）；文档在 globals.css 头部与 AGENTS.md 4.5。
