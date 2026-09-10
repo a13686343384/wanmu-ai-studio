@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, Music, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { OptionPills } from "@/components/creation/film-factory/intake/OptionCard"
-import { AUDIO_MODELS, DURATIONS } from "@/lib/constants"
+import { DURATIONS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 
 /**
  * 配音 / 音乐生成器。
@@ -30,8 +31,10 @@ export function AudioGenerator({
   episodeId: string
   onGenerated: (audioUrl: string) => void
 }) {
+  const { models: audioModels } = useAiModels("audio")
   const [prompt, setPrompt] = useState("沉稳大气的纪录片解说，男声，低频铺底，渐强收尾")
-  const [model, setModel] = useState(AUDIO_MODELS[0]!.id)
+  const [model, setModel] = useState("")
+  useEffect(() => { if (audioModels.length && !model) setModel(audioModels[0]!.id) }, [audioModels, model])
   const [duration, setDuration] = useState("15s")
   const [smartLyrics, setSmartLyrics] = useState(true)
   const [running, setRunning] = useState(false)
@@ -86,11 +89,11 @@ export function AudioGenerator({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AUDIO_MODELS.map((item) => (
+              {audioModels.length > 0 ? audioModels.map((item) => (
                 <SelectItem key={item.id} value={item.id}>
-                  {item.name} 内置 · {item.cost} 起
+                  {item.name}{item.builtIn ? " 内置" : ""} · {item.cost} 起
                 </SelectItem>
-              ))}
+              )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
             </SelectContent>
           </Select>
         </div>

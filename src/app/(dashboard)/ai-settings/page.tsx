@@ -2,10 +2,10 @@ import type { Metadata } from "next"
 import { PluginSettings } from "@/components/plugins/PluginSettings"
 
 export const metadata: Metadata = {
-  title: "插件",
+  title: "AI 设置",
 }
 
-/** 插件：自定义模型接入与凭据管理。 */
-export default function PluginsPage() {
+/** AI 设置：模型接入配置与凭据管理。 */
+export default function AiSettingsPage() {
   return <PluginSettings />
 }

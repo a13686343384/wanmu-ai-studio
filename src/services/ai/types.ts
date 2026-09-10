@@ -247,10 +247,37 @@ export interface GenerateAudioInput {
   duration: string
   /** 智能歌词 */
   smartLyrics?: boolean
+  /** 工作区（live 模式下产物落库用） */
+  workspaceId?: string
 }
 
 export interface GenerateAudioResult {
   audio: MediaAsset
+}
+
+/* ---------------------------- 字幕（ASR） ---------------------------- */
+
+export interface GenerateSubtitleInput {
+  /** 音频/视频文件的 URL */
+  audioUrl: string
+  /** ASR 模型 ID（CustomModel.id） */
+  model: string
+  /** 语言提示（可选，如 "zh"、"en"） */
+  language?: string
+  workspaceId?: string
+}
+
+export interface SubtitleSegment {
+  start: number
+  end: number
+  text: string
+}
+
+export interface GenerateSubtitleResult {
+  /** SRT 格式字幕内容 */
+  srt: string
+  /** 结构化分段 */
+  segments: SubtitleSegment[]
 }
 
 /* ---------------------------- 分镜 ---------------------------- */
@@ -311,6 +338,9 @@ export interface AIService {
   generateAudio(
     input: GenerateAudioInput,
   ): Promise<AIResult<GenerateAudioResult>>
+  generateSubtitle(
+    input: GenerateSubtitleInput,
+  ): Promise<AIResult<GenerateSubtitleResult>>
 
   splitStoryboards(
     input: SplitStoryboardsInput,

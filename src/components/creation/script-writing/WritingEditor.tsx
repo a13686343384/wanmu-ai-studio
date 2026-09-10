@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
-import { TEXT_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import type { WritingProjectDTO } from "@/lib/writing/types"
 import { cn } from "@/lib/utils"
 
@@ -45,7 +45,9 @@ export function WritingEditor({
   const [generation, setGeneration] = useState<"blueprint" | "episode">(
     "blueprint",
   )
-  const [model, setModel] = useState(TEXT_MODELS[1]?.id ?? TEXT_MODELS[0]!.id)
+  const { models: textModels } = useAiModels("text")
+  const [model, setModel] = useState("")
+  useEffect(() => { if (textModels.length && !model) setModel(textModels[0]!.id) }, [textModels, model])
   const [busy, setBusy] = useState("")
   const [progress, setProgress] = useState(0)
   const lock = useRef(false)
@@ -479,7 +481,7 @@ export function WritingEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEXT_MODELS.map((item) => (
+                  {textModels.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} · {item.cost}积分
                     </SelectItem>
@@ -616,7 +618,7 @@ export function WritingEditor({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TEXT_MODELS.map((item) => (
+                    {textModels.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name} · {item.cost} 积分/次
                       </SelectItem>

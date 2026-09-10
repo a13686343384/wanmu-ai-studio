@@ -24,7 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { OptionPills } from "@/components/creation/film-factory/intake/OptionCard"
-import { ASPECT_RATIOS, DURATIONS, IMAGE_MODELS, TEXT_MODELS, VIDEO_MODELS } from "@/lib/constants"
+import { ASPECT_RATIOS, DURATIONS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { cn } from "@/lib/utils"
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
 
@@ -61,8 +62,12 @@ export function StoryboardGenerateDialog({
   onOpenChange: (open: boolean) => void
   onDone: () => void
 }) {
-  const [model, setModel] = useState(kind === "image" ? "man-image-v2-lite" : VIDEO_MODELS[0]!.id)
-  const [textModel, setTextModel] = useState(TEXT_MODELS[0]!.id)
+  const { models: imageModels } = useAiModels("image")
+  const { models: videoModels } = useAiModels("video")
+  const { models: textModels } = useAiModels("text")
+
+  const [model, setModel] = useState("")
+  const [textModel, setTextModel] = useState("")
   const [videoMode, setVideoMode] = useState<VideoMode>("storyboard")
   const [genStyle, setGenStyle] = useState("first-frame")
   const [aspectRatio, setAspectRatio] = useState("9:16")
@@ -73,8 +78,17 @@ export function StoryboardGenerateDialog({
   const [running, setRunning] = useState(false)
 
   useEffect(() => {
+    if (kind === "image" && imageModels.length > 0 && !model) setModel(imageModels[0]!.id)
+    if (kind === "video" && videoModels.length > 0 && !model) setModel(videoModels[0]!.id)
+  }, [kind, imageModels, videoModels, model])
+
+  useEffect(() => {
+    if (textModels.length > 0 && !textModel) setTextModel(textModels[0]!.id)
+  }, [textModels, textModel])
+
+  useEffect(() => {
     if (!open) return
-    setModel(kind === "image" ? "man-image-v2-lite" : VIDEO_MODELS[0]!.id)
+    setModel("")
     setResolution(kind === "image" ? "1K" : "480p")
     setPrompt(storyboard?.prompt ?? "")
     setNegative(storyboard?.negativePrompt ?? "")
@@ -112,8 +126,8 @@ export function StoryboardGenerateDialog({
     }
   }
 
-  const models = kind === "image" ? IMAGE_MODELS : VIDEO_MODELS
-  const videoModelCost = VIDEO_MODELS[0]?.cost ?? 120
+  const models = kind === "image" ? imageModels : videoModels
+  const videoModelCost = videoModels[0]?.cost ?? 120
 
   return (
     <Dialog open={open} onOpenChange={(value) => !running && onOpenChange(value)}>
@@ -152,11 +166,11 @@ export function StoryboardGenerateDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEXT_MODELS.map((item) => (
+                  {textModels.length > 0 ? textModels.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name}
                     </SelectItem>
-                  ))}
+                  )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

@@ -11,6 +11,8 @@ import type {
   ConsultScriptResult,
   GenerateAudioInput,
   GenerateAudioResult,
+  GenerateSubtitleInput,
+  GenerateSubtitleResult,
   GenerateImageInput,
   GenerateImageResult,
   GenerateOutlineInput,
@@ -33,6 +35,7 @@ import { makePoster, mockDelay } from "./mock-media"
 import {
   AUDIO_MODELS,
   IMAGE_MODELS,
+  SUBTITLE_MODELS,
   TEXT_MODELS,
   VIDEO_MODELS,
 } from "@/lib/constants"
@@ -507,6 +510,32 @@ export const mockAIService: AIService = {
         },
       },
       usage: usage(input.model, costOf(AUDIO_MODELS, input.model)),
+    }
+  },
+
+  async generateSubtitle(
+    input: GenerateSubtitleInput,
+  ): Promise<AIResult<GenerateSubtitleResult>> {
+    await mockDelay(800, 1500)
+    const segments = [
+      { start: 0, end: 3.5, text: "（旁白）这是一个关于未来的故事。" },
+      { start: 3.5, end: 7.2, text: "在不久的将来，人类与AI共存。" },
+      { start: 7.2, end: 11.0, text: "但和平的表象下，暗流涌动。" },
+    ]
+    const srt = segments
+      .map((s, i) => {
+        const fmt = (t: number) => {
+          const m = Math.floor(t / 60)
+          const sec = Math.floor(t % 60)
+          const ms = Math.round((t % 1) * 1000)
+          return `00:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`
+        }
+        return `${i + 1}\n${fmt(s.start)} --> ${fmt(s.end)}\n${s.text}`
+      })
+      .join("\n\n")
+    return {
+      data: { srt, segments },
+      usage: usage(input.model, costOf(SUBTITLE_MODELS, input.model)),
     }
   },
 

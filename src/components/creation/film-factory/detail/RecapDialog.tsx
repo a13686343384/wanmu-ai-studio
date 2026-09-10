@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronDown, FileText, Loader2, MessageSquare, Send, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { TEXT_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import type { EpisodeDTO } from "@/lib/serializers/script"
 
 export interface RecapResult {
@@ -48,7 +48,9 @@ export function RecapDialog({
   onLoaded: (result: RecapResult) => void
 }) {
   const [running, setRunning] = useState(false)
-  const [model, setModel] = useState("ovlm-5.6")
+  const { models: textModels } = useAiModels("text")
+  const [model, setModel] = useState("")
+  useEffect(() => { if (textModels.length && !model) setModel(textModels[0]!.id) }, [textModels, model])
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([])
   const [chatDraft, setChatDraft] = useState("")
   const [chatting, setChatting] = useState(false)
@@ -147,7 +149,7 @@ export function RecapDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TEXT_MODELS.map((item) => (
+              {textModels.length === 0 ? <SelectItem value="__empty" disabled>暂无可用模型</SelectItem> : textModels.map((item) => (
                 <SelectItem key={item.id} value={item.id}>
                   {item.name}
                 </SelectItem>

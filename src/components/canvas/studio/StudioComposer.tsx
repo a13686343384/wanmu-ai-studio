@@ -4,25 +4,16 @@ import { ArrowUp, Loader2 } from "lucide-react"
 import { useNodesData, useReactFlow } from "@xyflow/react"
 import {
   ASPECT_RATIOS,
-  AUDIO_MODELS,
   DURATIONS,
-  IMAGE_MODELS,
   RESOLUTIONS,
-  TEXT_MODELS,
-  VIDEO_MODELS,
 } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { Progress } from "@/components/ui/progress"
 import { CardSelect } from "@/components/ui/card-select"
 import { useStudio, type StudioNodeData, type StudioNodeKind } from "./types"
 
 import { useStudioRequest } from "./useStudioRequest"
 
-const MODELS = {
-  text: TEXT_MODELS,
-  image: IMAGE_MODELS,
-  video: VIDEO_MODELS,
-  audio: AUDIO_MODELS,
-}
 export function StudioComposer({
   nodeId,
   kind,
@@ -36,6 +27,16 @@ export function StudioComposer({
     kind === "director" || kind === "action" || kind === "sticky"
       ? "text"
       : kind
+  const { models: textModels } = useAiModels("text")
+  const { models: imageModels } = useAiModels("image")
+  const { models: videoModels } = useAiModels("video")
+  const { models: audioModels } = useAiModels("audio")
+  const MODELS = {
+    text: textModels,
+    image: imageModels,
+    video: videoModels,
+    audio: audioModels,
+  }
   const { getNodes, getEdges, updateNodeData, getNode } = useReactFlow()
   const { beforeChange } = useStudio()
   const data = useNodesData(nodeId)?.data as StudioNodeData | undefined
@@ -43,9 +44,9 @@ export function StudioComposer({
   const request = useStudioRequest(nodeId)
   if (!data) return null
   const draft = data.prompt ?? ""
-  const model = data.modelId ?? MODELS[mediaType][0]!.id
+  const model = data.modelId ?? MODELS[mediaType][0]?.id ?? ""
   const current =
-    MODELS[mediaType].find((item) => item.id === model) ?? MODELS[mediaType][0]!
+    MODELS[mediaType].find((item) => item.id === model) ?? MODELS[mediaType][0]
   const running = request.running
   const params = {
     aspectRatio: String(data.aspectRatio ?? "16:9"),
@@ -192,7 +193,7 @@ export function StudioComposer({
           />
         )}
         <span className="ml-auto text-xs text-orange-300">
-          {current.cost} 积分
+          {current?.cost ?? 0} 积分
         </span>
         <button
           type="button"

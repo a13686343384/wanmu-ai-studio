@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ASPECT_RATIOS, IMAGE_MODELS, RESOLUTIONS } from "@/lib/constants"
+import { ASPECT_RATIOS, RESOLUTIONS } from "@/lib/constants"
 import { useCanvasStore, type CanvasNodeData } from "@/stores/useCanvasStore"
+import { useAiModels } from "@/hooks/useAiModels"
 
 const NODE_KIND_LABEL: Record<string, string> = {
   text: "文本节点",
@@ -35,6 +36,7 @@ export function PropertiesPanel() {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData)
   const removeNode = useCanvasStore((s) => s.removeNode)
   const duplicateNode = useCanvasStore((s) => s.duplicateNode)
+  const { models: imageModels } = useAiModels("image")
 
   if (!node) {
     return (
@@ -107,14 +109,14 @@ export function PropertiesPanel() {
           <div className="space-y-1.5">
             <Label className="text-[11px] text-zinc-400">模型</Label>
             <Select
-              value={data.model ?? IMAGE_MODELS[0]!.id}
+              value={data.model ?? imageModels[0]?.id ?? ""}
               onValueChange={(value) => updateNodeData(node.id, { model: value })}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {IMAGE_MODELS.map((model) => (
+                {imageModels.map((model) => (
                   <SelectItem key={model.id} value={model.id}>
                     {model.name}
                   </SelectItem>

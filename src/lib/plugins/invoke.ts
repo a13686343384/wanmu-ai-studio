@@ -27,6 +27,8 @@ export interface InvokeConfig {
   poll?: { method?: string; path: string; interval_sec?: number; deadline_sec?: number; timeout_sec?: number; not_found_grace?: number } | null
   firstLast?: { body?: Record<string, unknown> } | null
   extract: Record<string, unknown>
+  /** JS 函数体：(body, input) => body，在模板渲染后做二次加工 */
+  transformBody?: string | null
 }
 
 /** 点路径取值：choices.0.message.content */
@@ -100,7 +102,20 @@ export async function invokeCustomModel(
   const action = useEdits ? (edits as NonNullable<typeof edits>) : config.submit
   const method = (action.method ?? "POST").toUpperCase()
   const url = `${config.baseUrl.replace(/\/$/, "")}${action.path}`
-  const body = renderValue(action.body, vars)
+  let body: unknown = renderValue(action.body, vars)
+
+  // transformBody 钩子：模板渲染后的二次加工
+  if (config.transformBody) {
+    try {
+      const fn = new Function("body", "input", config.transformBody) as (
+        body: unknown,
+        input: InvokeInput,
+      ) => unknown
+      body = fn(body, input)
+    } catch (err) {
+      console.warn("[invoke] transformBody 执行失败，使用原始 body:", err)
+    }
+  }
 
   const headers: Record<string, string> = { "content-type": "application/json" }
   const auth = config.auth ?? {}

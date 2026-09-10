@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -21,24 +21,32 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import {
-  TEXT_MODELS,
-  IMAGE_MODELS,
-  VIDEO_MODELS,
-  AUDIO_MODELS,
-} from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { useStudio } from "./types"
 const SUGGESTIONS = ["来点灵感", "写段文案", "拆个分镜", "这段有点平", "梳理一下叙事"]
 
-const MODELS = {
-  text: TEXT_MODELS,
-  image: IMAGE_MODELS,
-  video: VIDEO_MODELS,
-  audio: AUDIO_MODELS,
-}
 export function AgentDock({ onClose }: { onClose: () => void }) {
-  const [kind, setKind] = useState<keyof typeof MODELS>("text")
-  const [model, setModel] = useState(TEXT_MODELS[0]!.id)
+  const { models: textModels } = useAiModels("text")
+  const { models: imageModels } = useAiModels("image")
+  const { models: videoModels } = useAiModels("video")
+  const { models: audioModels } = useAiModels("audio")
+  const MODELS = {
+    text: textModels,
+    image: imageModels,
+    video: videoModels,
+    audio: audioModels,
+  }
+  type ModelKind = keyof typeof MODELS
+  const [kind, setKind] = useState<ModelKind>("text")
+  const [model, setModel] = useState("")
+
+  // Set default model when models load or kind changes
+  useEffect(() => {
+    const list = MODELS[kind]
+    if (list.length > 0 && !list.find((m) => m.id === model)) {
+      setModel(list[0]!.id)
+    }
+  }, [kind, textModels, imageModels, videoModels, audioModels]) // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState("")
   const [running, setRunning] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
@@ -149,7 +157,8 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
                   type="button"
                   onClick={() => {
                     setKind(key)
-                    setModel(MODELS[key][0]!.id)
+                    const first = MODELS[key][0]
+                    if (first) setModel(first.id)
                   }}
                   className={cn(
                     "flex-1 rounded-md px-2 py-1 text-[11px] transition-colors",

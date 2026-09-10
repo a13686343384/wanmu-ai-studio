@@ -171,6 +171,95 @@ async function main() {
   })
   console.log(`  ✓ 剧本 ${script.title}`)
 
+  // Qwen 文本模型（OpenAI 兼容）
+  const qwenCred = await prisma.credential.findFirst({ where: { name: "阿里云 Qwen（token-plan）" } })
+  await prisma.customModel.upsert({
+    where: { id: "cm-qwen-text" },
+    update: {},
+    create: {
+      id: "cm-qwen-text",
+      workspaceId: personal.id,
+      name: "Qwen3.7 Plus",
+      kind: "text",
+      lifecycle: "sync",
+      providerType: "api",
+      baseUrl: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      apiKey: qwenCred?.apiKey ?? "",
+      cost: 5,
+      enabled: true,
+      templateKey: "chat-openai",
+      constraints: { model_id: "qwen3.7-plus", prompt_max_chars: 0 },
+      submit: { method: "POST", path: "/chat/completions", timeout_sec: 300, body: { model: "{{model_id}}", messages: [{ role: "user", content: "{{prompt}}" }], max_tokens: "{{max_tokens | int}}", temperature: "{{temperature}}" } },
+      extract: { text: ["choices.0.message.content"], error: ["error.message"] },
+    },
+  })
+  console.log("  ✓ Qwen 文本模型")
+
+  // DeepSeek 文本模型
+  const dsCred = await prisma.credential.findFirst({ where: { name: "DeepSeek" } })
+  await prisma.customModel.upsert({
+    where: { id: "cm-deepseek-text" },
+    update: {},
+    create: {
+      id: "cm-deepseek-text",
+      workspaceId: personal.id,
+      name: "DeepSeek Chat",
+      kind: "text",
+      lifecycle: "sync",
+      providerType: "api",
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: dsCred?.apiKey ?? "",
+      cost: 3,
+      enabled: true,
+      templateKey: "chat-openai",
+      constraints: { model_id: "deepseek-chat", prompt_max_chars: 0 },
+      submit: { method: "POST", path: "/chat/completions", timeout_sec: 300, body: { model: "{{model_id}}", messages: [{ role: "user", content: "{{prompt}}" }], max_tokens: "{{max_tokens | int}}", temperature: "{{temperature}}" } },
+      extract: { text: ["choices.0.message.content"], error: ["error.message"] },
+    },
+  })
+  console.log("  ✓ DeepSeek 文本模型")
+
+  // ComfyUI 本地模型（providerType=comfyui）
+  await prisma.customModel.upsert({
+    where: { id: "cm-comfyui-local" },
+    update: {},
+    create: {
+      id: "cm-comfyui-local",
+      workspaceId: personal.id,
+      name: "ComfyUI 本地（Z-Image / MiniMax-H3）",
+      kind: "image",
+      lifecycle: "sync",
+      providerType: "comfyui",
+      baseUrl: "http://192.168.1.12:8188",
+      cost: 0,
+      enabled: true,
+      constraints: { workflow: "z-image-t2i" },
+      submit: {},
+      extract: {},
+    },
+  })
+  console.log("  ✓ ComfyUI 本地图片模型")
+
+  await prisma.customModel.upsert({
+    where: { id: "cm-comfyui-video" },
+    update: {},
+    create: {
+      id: "cm-comfyui-video",
+      workspaceId: personal.id,
+      name: "ComfyUI 本地视频（MiniMax-H3 R2V）",
+      kind: "video",
+      lifecycle: "async",
+      providerType: "comfyui",
+      baseUrl: "http://192.168.1.12:8188",
+      cost: 0,
+      enabled: true,
+      constraints: { workflow: "minimax-h3-r2v" },
+      submit: {},
+      extract: {},
+    },
+  })
+  console.log("  ✓ ComfyUI 本地视频模型")
+
   console.log("→ 种子数据写入完成")
 }
 

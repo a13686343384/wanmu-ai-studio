@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { NodeShell } from "./NodeShell"
 import { useCanvasStore, type CanvasNodeData } from "@/stores/useCanvasStore"
-import { IMAGE_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 
 /**
  * AI 生成节点：选择模型、输入提示词与反向提示词，直接调用生成接口。
@@ -16,6 +16,7 @@ import { IMAGE_MODELS } from "@/lib/constants"
 export function AINode({ id, data, selected }: NodeProps) {
   const nodeData = data as CanvasNodeData
   const updateNodeData = useCanvasStore((s) => s.updateNodeData)
+  const { models: imageModels } = useAiModels("image")
 
   async function run() {
     const prompt = (nodeData.prompt ?? "").trim()
@@ -76,7 +77,7 @@ export function AINode({ id, data, selected }: NodeProps) {
           onChange={(event) => updateNodeData(id, { model: event.target.value })}
           className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-orange-500/60"
         >
-          {IMAGE_MODELS.map((model) => (
+          {imageModels.map((model) => (
             <option key={model.id} value={model.id}>
               {model.name} · {model.cost} 积分
             </option>

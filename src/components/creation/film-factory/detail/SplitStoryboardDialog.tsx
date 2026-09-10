@@ -31,13 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { OptionPills } from "@/components/creation/film-factory/intake/OptionCard"
-import {
-  AUDIO_MODELS,
-  IMAGE_MODELS,
-  RESOLUTIONS,
-  TEXT_MODELS,
-  VIDEO_MODELS,
-} from "@/lib/constants"
+import { RESOLUTIONS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { cn } from "@/lib/utils"
 
 type Mode = "image" | "text" | "video" | "bgm"
@@ -74,14 +69,35 @@ export function SplitStoryboardDialog({
   initialMode?: Mode
   onDone: () => void
 }) {
+  const { models: textModels } = useAiModels("text")
+  const { models: imageModels } = useAiModels("image")
+  const { models: videoModels } = useAiModels("video")
+  const { models: audioModels } = useAiModels("audio")
+
   const [tab, setTab] = useState<Mode>(initialMode ?? "image")
   useEffect(() => {
     if (open && initialMode) setTab(initialMode)
   }, [open, initialMode])
-  const [textModel, setTextModel] = useState(TEXT_MODELS[0]!.id)
-  const [imageModel, setImageModel] = useState("man-image-v2-lite")
-  const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0]!.id)
-  const [audioModel, setAudioModel] = useState(AUDIO_MODELS[0]!.id)
+  const [textModel, setTextModel] = useState("")
+  const [imageModel, setImageModel] = useState("")
+  const [videoModel, setVideoModel] = useState("")
+  const [audioModel, setAudioModel] = useState("")
+
+  useEffect(() => {
+    if (textModels.length > 0 && !textModel) setTextModel(textModels[0]!.id)
+  }, [textModels, textModel])
+
+  useEffect(() => {
+    if (imageModels.length > 0 && !imageModel) setImageModel(imageModels[0]!.id)
+  }, [imageModels, imageModel])
+
+  useEffect(() => {
+    if (videoModels.length > 0 && !videoModel) setVideoModel(videoModels[0]!.id)
+  }, [videoModels, videoModel])
+
+  useEffect(() => {
+    if (audioModels.length > 0 && !audioModel) setAudioModel(audioModels[0]!.id)
+  }, [audioModels, audioModel])
   const [resolution, setResolution] = useState("1080p")
   const [quality, setQuality] = useState("low")
   const [skipImage, setSkipImage] = useState(false)
@@ -239,11 +255,11 @@ export function SplitStoryboardDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TEXT_MODELS.map((model) => (
+                    {textModels.length > 0 ? textModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name}
                       </SelectItem>
-                    ))}
+                    )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -255,11 +271,11 @@ export function SplitStoryboardDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {IMAGE_MODELS.map((model) => (
+                    {imageModels.length > 0 ? imageModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name} · {model.cost}
                       </SelectItem>
-                    ))}
+                    )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -309,11 +325,11 @@ export function SplitStoryboardDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEXT_MODELS.map((model) => (
+                  {textModels.length > 0 ? textModels.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name} · {model.cost} 积分/次
                     </SelectItem>
-                  ))}
+                  )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -333,11 +349,11 @@ export function SplitStoryboardDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {VIDEO_MODELS.map((model) => (
+                    {videoModels.length > 0 ? videoModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name} · {model.cost}
                       </SelectItem>
-                    ))}
+                    )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -423,11 +439,11 @@ export function SplitStoryboardDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {AUDIO_MODELS.map((model) => (
+                    {audioModels.length > 0 ? audioModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name} 内置 · {model.cost} 起
                       </SelectItem>
-                    ))}
+                    )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -457,7 +473,7 @@ export function SplitStoryboardDialog({
 
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-zinc-600">
-            共 {TEXT_MODELS.length + IMAGE_MODELS.length + VIDEO_MODELS.length + AUDIO_MODELS.length} 个内置模型可选
+            共 {textModels.length + imageModels.length + videoModels.length + audioModels.length} 个模型可选
           </span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>

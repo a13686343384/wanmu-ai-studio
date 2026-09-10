@@ -12,6 +12,8 @@ import type {
   ConsultScriptResult,
   GenerateAudioInput,
   GenerateAudioResult,
+  GenerateSubtitleInput,
+  GenerateSubtitleResult,
   GenerateImageInput,
   GenerateImageResult,
   GenerateOutlineInput,
@@ -31,13 +33,6 @@ import type {
   SummarizeEpisodeResult,
   UsageInfo,
 } from "./types"
-import {
-  AUDIO_MODELS,
-  IMAGE_MODELS,
-  TEXT_MODELS,
-  VIDEO_MODELS,
-} from "@/lib/constants"
-import { getAiProviders } from "@/lib/settings"
 import { prisma } from "@/lib/prisma"
 import {
   AiUpstreamError,
@@ -49,6 +44,40 @@ import { buildGraph, comfyRun, storeOutput } from "./comfy/client"
 import type { InvokeConfig, InvokeInput } from "@/lib/plugins/invoke"
 import { invokeCustomModel } from "@/lib/plugins/invoke"
 
+/* ---------------------------- 统一模型查找 ---------------------------- */
+
+/** 按 CustomModel.id 精确查找模型配置。 */
+async function loadCustomModel(modelId: string): Promise<{
+  config: InvokeConfig
+  providerType: string
+  cost: number
+  name: string
+} | null> {
+  const model = await prisma.customModel.findFirst({
+    where: { id: modelId, enabled: true },
+  })
+  if (!model) return null
+  const config: InvokeConfig = {
+    lifecycle: model.lifecycle === "async" ? "async" : "sync",
+    baseUrl: model.baseUrl,
+    apiKey: model.apiKey,
+    auth: (model.auth ?? {}) as InvokeConfig["auth"],
+    constraints: (model.constraints ?? {}) as Record<string, unknown>,
+    submit: model.submit as unknown as InvokeConfig["submit"],
+    edits: (model.edits ?? null) as InvokeConfig["edits"],
+    poll: (model.poll ?? null) as InvokeConfig["poll"],
+    firstLast: (model.firstLast ?? null) as InvokeConfig["firstLast"],
+    extract: (model.extract ?? {}) as Record<string, unknown>,
+    transformBody: model.transformBody,
+  }
+  return {
+    config,
+    providerType: model.providerType ?? "api",
+    cost: model.cost,
+    name: model.name,
+  }
+}
+
 /* ---------------------------- 文本通道 ---------------------------- */
 
 interface TextChannel {
@@ -57,44 +86,28 @@ interface TextChannel {
   model: string
 }
 
-async function loadCredentialKey(name: string): Promise<string> {
-  const credential = await prisma.credential.findFirst({ where: { name } })
-  return credential?.apiKey ?? ""
-}
-
-/** 主力 = Qwen（token-plan）；辅助 = DeepSeek。返回按优先级排列的可用文本通道。 */
-async function textChannels(preferDeepseek = false): Promise<TextChannel[]> {
-  const providers = await getAiProviders()
-  const [qwenKey, deepseekKey] = await Promise.all([
-    loadCredentialKey(providers.qwen.credentialName),
-    loadCredentialKey(providers.deepseek.credentialName),
-  ])
-  const qwen: TextChannel = {
-    baseUrl: providers.qwen.baseUrl,
-    apiKey: qwenKey,
-    model: providers.qwen.model,
-  }
-  const deepseek: TextChannel = {
-    baseUrl: providers.deepseek.baseUrl,
-    apiKey: deepseekKey,
-    model: providers.deepseek.model,
-  }
-  return preferDeepseek ? [deepseek, qwen].filter((c) => hasKey(c)) : [qwen, deepseek].filter((c) => hasKey(c))
-}
-
-function hasKey(channel: TextChannel): boolean {
-  return Boolean(channel.apiKey)
+/** 文本通道：仅从 CustomModel(kind=text, enabled=true) 读取。无配置则返回空数组。 */
+async function textChannels(): Promise<TextChannel[]> {
+  const textModels = await prisma.customModel.findMany({
+    where: { kind: "text", enabled: true },
+    orderBy: { createdAt: "desc" },
+  })
+  return textModels.map((m) => ({
+    baseUrl: m.baseUrl,
+    apiKey: m.apiKey ?? "",
+    model: String((m.constraints as Record<string, unknown>)?.model_id ?? m.name),
+  })).filter((c) => c.baseUrl && c.apiKey)
 }
 
 async function chatText(
   system: string,
   user: string,
-  options?: { preferDeepseek?: boolean; maxTokens?: number; temperature?: number },
+  options?: { maxTokens?: number; temperature?: number },
 ): Promise<{ text: string; model: string }> {
-  const channels = await textChannels(options?.preferDeepseek)
+  const channels = await textChannels()
   if (channels.length === 0) {
     throw new Error(
-      "live 模式未配置文本模型凭据：请到「插件 → AI 服务」完成 Qwen / DeepSeek 配置",
+      "live 模式未配置文本模型：请前往 /ai-settings 添加 kind=text 的自定义模型",
     )
   }
   const failures: string[] = []
@@ -124,7 +137,7 @@ async function chatText(
 async function chatJson<T>(
   system: string,
   user: string,
-  options?: { preferDeepseek?: boolean; maxTokens?: number },
+  options?: { maxTokens?: number },
 ): Promise<{ data: T; model: string }> {
   const { text, model } = await chatText(
     `${system}\n${JSON_ONLY_SUFFIX}`,
@@ -134,7 +147,6 @@ async function chatJson<T>(
   try {
     return { data: extractJson<T>(text), model }
   } catch {
-    // 一次修复重试：把坏输出喂回去要求修正
     const repair = await chatText(
       "用户会给你一段不合法的 JSON，请修正为合法 JSON 后只输出修正结果。" + JSON_ONLY_SUFFIX,
       text.slice(0, 4000),
@@ -145,13 +157,6 @@ async function chatJson<T>(
 }
 
 /* ---------------------------- 计费与工具 ---------------------------- */
-
-function costOf(
-  list: readonly { id: string; cost: number }[],
-  modelId: string,
-): number {
-  return list.find((m) => m.id === modelId)?.cost ?? list[0]?.cost ?? 1
-}
 
 function usage(inputModel: string, usedModel: string, tapies: number): UsageInfo {
   void usedModel
@@ -236,16 +241,18 @@ function ratioToSize(ratio: string, quality: string): { width: number; height: n
   return { width, height }
 }
 
-async function comfyImage(input: GenerateImageInput): Promise<GenerateImageResult> {
-  const providers = await getAiProviders()
+async function comfyImage(input: GenerateImageInput, comfyBaseUrl: string, workflow?: string): Promise<GenerateImageResult> {
   const { width, height } = ratioToSize(input.aspectRatio, input.resolution)
   const count = Math.min(Math.max(input.count ?? 1, 1), 4)
   const images: { url: string }[] = []
   for (let index = 0; index < count; index += 1) {
     const seed = Math.floor(Math.random() * 2 ** 31)
-    const graph = zImageT2iGraph(input.prompt, width, height, seed)
+    // 根据 workflow 选择工作流模板，默认 z-image-t2i
+    const graph = workflow === "z-image-t2i" || !workflow
+      ? zImageT2iGraph(input.prompt, width, height, seed)
+      : zImageT2iGraph(input.prompt, width, height, seed) // TODO: 支持更多内置工作流或从文件加载
     const outputs = await comfyRun({
-      baseUrl: providers.comfyui.baseUrl,
+      baseUrl: comfyBaseUrl,
       graph,
       timeoutMs: 10 * 60_000,
     })
@@ -268,9 +275,11 @@ const H3_RATIO_LABEL: Record<string, string> = {
   "3:4": "3:4 (Classic Portrait)",
 }
 
-async function comfyVideo(input: GenerateVideoInput): Promise<GenerateVideoResult> {
-  const providers = await getAiProviders()
-  const template = loadVideoTemplate()
+async function comfyVideo(input: GenerateVideoInput, comfyBaseUrl: string, workflow?: string): Promise<GenerateVideoResult> {
+  // 根据 workflow 选择视频模板，默认 minimax-h3-r2v
+  const template = workflow === "minimax-h3-r2v" || !workflow
+    ? loadVideoTemplate()
+    : loadVideoTemplate() // TODO: 支持更多内置工作流或从文件加载
   const seconds = Number.parseInt(input.duration.replace(/\D/g, ""), 10) || 5
   const seed = Math.floor(Math.random() * 2 ** 31)
 
@@ -298,7 +307,7 @@ async function comfyVideo(input: GenerateVideoInput): Promise<GenerateVideoResul
   })
 
   const outputs = await comfyRun({
-    baseUrl: providers.comfyui.baseUrl,
+    baseUrl: comfyBaseUrl,
     graph,
     refs,
     refImageNodes: refs.length ? H3_REF_NODES : [],
@@ -327,34 +336,6 @@ async function defaultWorkspaceId(): Promise<string> {
   const workspace = await prisma.workspace.findFirst({ select: { id: true } })
   if (!workspace) throw new Error("没有可用工作区")
   return workspace.id
-}
-
-/** 线上自定义模型优先（插件体系），其次 ComfyUI。 */
-async function customModelMedia(
-  workspaceId: string | undefined,
-  kind: "image" | "video",
-  input: InvokeInput,
-): Promise<{ url: string } | null> {
-  if (!workspaceId) return null
-  const model = await prisma.customModel.findFirst({
-    where: { workspaceId, kind, enabled: true },
-  })
-  if (!model) return null
-  const config: InvokeConfig = {
-    lifecycle: model.lifecycle === "async" ? "async" : "sync",
-    baseUrl: model.baseUrl,
-    apiKey: model.apiKey,
-    auth: (model.auth ?? {}) as InvokeConfig["auth"],
-    constraints: (model.constraints ?? {}) as Record<string, unknown>,
-    submit: model.submit as unknown as InvokeConfig["submit"],
-    edits: (model.edits ?? null) as InvokeConfig["edits"],
-    poll: (model.poll ?? null) as InvokeConfig["poll"],
-    firstLast: (model.firstLast ?? null) as InvokeConfig["firstLast"],
-    extract: (model.extract ?? {}) as Record<string, unknown>,
-  }
-  const result = await invokeCustomModel(config, input)
-  if (!result.ok || !result.url) return null
-  return { url: result.url }
 }
 
 /* ---------------------------- 服务实现 ---------------------------- */
@@ -713,57 +694,114 @@ export const liveAIService: AIService = {
   /* ---------------------------- 图像 / 视频 / 音频 ---------------------------- */
 
   async generateImage(input: GenerateImageInput): Promise<AIResult<GenerateImageResult>> {
-    // 1) 线上自定义模型（插件体系，用户可在设置里按模板接入任意出图 API）
-    const custom = await customModelMedia(input.workspaceId, "image", {
+    const loaded = await loadCustomModel(input.model)
+    if (!loaded) {
+      throw new Error("live 模式未找到图片模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+    }
+    if (loaded.providerType === "comfyui") {
+      const workflow = String((loaded.config.constraints ?? {}).workflow ?? "z-image-t2i")
+      const result = await comfyImage(input, loaded.config.baseUrl, workflow)
+      return { data: result, usage: usage(loaded.name, "", loaded.cost) }
+    }
+    const invokeInput: InvokeInput = {
       prompt: input.prompt,
       ratio: input.aspectRatio,
       resolution: input.resolution,
       count: input.count ?? 1,
       refs: input.references?.map((r) => r.name),
-    })
-    if (custom) {
-      return {
-        data: { images: [{ url: custom.url }] },
-        usage: usage(input.model, "", costOf(IMAGE_MODELS, input.model)),
-      }
     }
-    // 2) 本地 ComfyUI（Z-Image Turbo 文生图）
-    try {
-      const result = await comfyImage(input)
-      return { data: result, usage: usage(input.model, "", costOf(IMAGE_MODELS, input.model)) }
-    } catch (error) {
-      throw new Error(
-        `live 模式图片生成失败：${error instanceof Error ? error.message : "未知错误"}（可到设置里检查 ComfyUI 连通性，或接入线上出图自定义模型）`,
-      )
+    const result = await invokeCustomModel(loaded.config, invokeInput)
+    if (!result.ok || !result.url) {
+      throw new Error("图片生成失败：" + (result.ok ? "未返回结果" : result.error))
     }
+    return { data: { images: [{ url: result.url }] }, usage: usage(loaded.name, "", loaded.cost) }
   },
 
   async generateVideo(input: GenerateVideoInput): Promise<AIResult<GenerateVideoResult>> {
-    const custom = await customModelMedia(input.workspaceId, "video", {
+    const loaded = await loadCustomModel(input.model)
+    if (!loaded) {
+      throw new Error("live 模式未找到视频模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+    }
+    if (loaded.providerType === "comfyui") {
+      const workflow = String((loaded.config.constraints ?? {}).workflow ?? "minimax-h3-r2v")
+      const result = await comfyVideo(input, loaded.config.baseUrl, workflow)
+      return { data: result, usage: usage(loaded.name, "", loaded.cost) }
+    }
+    const invokeInput: InvokeInput = {
       prompt: input.prompt,
       ratio: input.aspectRatio,
       resolution: input.resolution,
       duration: Number.parseInt(input.duration.replace(/\D/g, ""), 10) || 5,
       refs: input.references?.map((r) => r.name),
-    })
-    if (custom) {
-      return {
-        data: { video: { url: custom.url, duration: 5, mimeType: "video/mp4" } },
-        usage: usage(input.model, "", costOf(VIDEO_MODELS, input.model)),
-      }
     }
-    try {
-      const result = await comfyVideo(input)
-      return { data: result, usage: usage(input.model, "", costOf(VIDEO_MODELS, input.model)) }
-    } catch (error) {
-      throw new Error(
-        `live 模式视频生成失败：${error instanceof Error ? error.message : "未知错误"}（可到设置里检查 ComfyUI 连通性，或接入线上视频自定义模型）`,
-      )
+    const result = await invokeCustomModel(loaded.config, invokeInput)
+    if (!result.ok || !result.url) {
+      throw new Error("视频生成失败：" + (result.ok ? "未返回结果" : result.error))
+    }
+    return {
+      data: { video: { url: result.url, duration: 5, mimeType: "video/mp4" } },
+      usage: usage(loaded.name, "", loaded.cost),
     }
   },
 
-  async generateAudio(_input: GenerateAudioInput): Promise<AIResult<GenerateAudioResult>> {
-    void _input
-    throw new Error("live 模式音频生成暂未配置：可在插件设置里接入 TTS 自定义模型后使用")
+  async generateAudio(input: GenerateAudioInput): Promise<AIResult<GenerateAudioResult>> {
+    const loaded = await loadCustomModel(input.model)
+    if (!loaded) {
+      throw new Error("live 模式未找到音频模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+    }
+    const invokeInput: InvokeInput = {
+      prompt: input.prompt,
+      duration: Number.parseInt(input.duration.replace(/\D/g, ""), 10) || 15,
+    }
+    const result = await invokeCustomModel(loaded.config, invokeInput)
+    if (!result.ok || !result.url) {
+      throw new Error("音频生成失败：" + (result.ok ? "未返回结果" : result.error))
+    }
+    return {
+      data: { audio: { url: result.url, duration: 15, mimeType: "audio/mpeg" } },
+      usage: usage(loaded.name, "", loaded.cost),
+    }
+  },
+
+  async generateSubtitle(input: GenerateSubtitleInput): Promise<AIResult<GenerateSubtitleResult>> {
+    const loaded = await loadCustomModel(input.model)
+    if (!loaded) {
+      throw new Error("live 模式未找到字幕模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
+    }
+    // ASR 调用：上传音频 URL，返回文本结果
+    const invokeInput: InvokeInput = {
+      prompt: input.audioUrl,
+    }
+    const result = await invokeCustomModel(loaded.config, invokeInput)
+    if (!result.ok) {
+      throw new Error("字幕生成失败：" + result.error)
+    }
+    // 尝试从 text 解析 JSON segments，否则当作纯文本
+    let segments: { start: number; end: number; text: string }[] = []
+    let srt = result.text ?? ""
+    try {
+      const parsed = JSON.parse(srt)
+      if (Array.isArray(parsed)) {
+        segments = parsed
+        srt = segments
+          .map((s, i) => {
+            const fmt = (t: number) => {
+              const m = Math.floor(t / 60)
+              const sec = Math.floor(t % 60)
+              const ms = Math.round((t % 1) * 1000)
+              return `00:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`
+            }
+            return `${i + 1}\n${fmt(s.start)} --> ${fmt(s.end)}\n${s.text}`
+          })
+          .join("\n\n")
+      }
+    } catch {
+      // 纯文本，包装为单段
+      segments = [{ start: 0, end: 0, text: srt }]
+    }
+    return {
+      data: { srt, segments },
+      usage: usage(loaded.name, "", loaded.cost),
+    }
   },
 }

@@ -17,7 +17,6 @@ import {
   EXECUTION_MODES,
   SCRIPT_PROCESSING_MODES,
   SERIES_TYPES,
-  TEXT_MODELS,
   WORK_TYPES,
   type AspectRatio,
   type ExecutionMode,
@@ -25,6 +24,7 @@ import {
   type SeriesType,
   type WorkType,
 } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 
 export interface IntakeConfig {
   workType: WorkType
@@ -48,6 +48,7 @@ export function ConfigPanel({
   config: IntakeConfig
   onChange: (patch: Partial<IntakeConfig>) => void
 }) {
+  const { models: textModels } = useAiModels("text")
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -183,7 +184,7 @@ export function ConfigPanel({
 
       <p className="flex items-start gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
         <Monitor className="mt-0.5 h-3 w-3 shrink-0" />
-        当前主模型：{TEXT_MODELS.find((m) => m.id === config.textModel)?.name ?? config.textModel}
+        当前主模型：{textModels.find((m) => m.id === config.textModel)?.name ?? config.textModel}
       </p>
     </div>
   )

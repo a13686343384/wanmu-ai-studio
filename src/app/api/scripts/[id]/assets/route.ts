@@ -18,6 +18,8 @@ const extractSchema = z.object({
  * POST /api/scripts/[id]/assets
  * 从剧本中提取角色 / 场景 / 道具（不生成图片，图片由 assets/generate 负责）。
  * merge=false（默认）：清空并覆盖同类资产；merge=true：只补缺失名称，不动已有内容。
+ *
+ * 注意：AI 调用在事务外执行，避免事务超时（默认 5s）。
  */
 export const POST = withErrorHandling(
   async (req: Request, { params }: { params: { id: string } }) => {
@@ -39,38 +41,58 @@ export const POST = withErrorHandling(
       ? `重点捕捉这些关键词相关的内容：${keyword}。`
       : ""
 
-    const pickNew = <T extends { name: string }>(
-      drafts: T[],
-      existingNames: Set<string>,
-    ): T[] =>
-      merge
-        ? drafts.filter((draft) => !existingNames.has(draft.name))
-        : drafts
+    // ---- 阶段 1：AI 提取（事务外，不受超时限制）----
+    interface ExtractedData {
+      characters?: { name: string; description: string; appearance?: string; personality?: string }[]
+      scenes?: { name: string; description: string; environment?: string; lighting?: string }[]
+      props?: { name: string; description: string }[]
+    }
+    const extracted: ExtractedData = {}
 
+    if (targets.includes("characters")) {
+      const existingNames = new Set(
+        (
+          await prisma.character.findMany({
+            where: { scriptId: script.id },
+            select: { name: true },
+          })
+        ).map((item) => item.name),
+      )
+      const { data } = await ai.extractCharacters({
+        content: merge
+          ? `${script.content}\n\n[补缺漏提示] ${keywordHint}已存在角色：${[
+              ...existingNames,
+            ].join("、")}。只输出遗漏的新角色，不要重复已有的。`
+          : script.content,
+        model: model ?? script.textModel,
+      })
+      extracted.characters = merge
+        ? data.filter((draft) => !existingNames.has(draft.name))
+        : data
+    }
+
+    if (targets.includes("scenes")) {
+      const { data } = await ai.extractScenes({
+        content: script.content,
+        model: model ?? script.textModel,
+      })
+      extracted.scenes = data
+    }
+
+    if (targets.includes("props")) {
+      const { data } = await ai.extractProps({
+        content: script.content,
+        model: model ?? script.textModel,
+      })
+      extracted.props = data
+    }
+
+    // ---- 阶段 2：数据库写入（短事务，只做 CRUD）----
     await prisma.$transaction(async (tx) => {
-      if (targets.includes("characters")) {
-        const existingNames = new Set(
-          (
-            await tx.character.findMany({
-              where: { scriptId: script.id },
-              select: { name: true },
-            })
-          ).map((item) => item.name),
-        )
-        const { data } = await ai.extractCharacters({
-          content: merge
-            ? `${script.content}\n\n[补缺漏提示] ${keywordHint}已存在角色：${[
-                ...existingNames,
-              ].join("、")}。只输出遗漏的新角色，不要重复已有的。`
-            : script.content,
-          model: model ?? script.textModel,
-        })
-        const fresh = merge
-          ? data.filter((draft) => !existingNames.has(draft.name))
-          : data
+      if (extracted.characters !== undefined) {
         if (!merge) await tx.character.deleteMany({ where: { scriptId: script.id } })
         await tx.character.createMany({
-          data: fresh.map((draft) => ({
+          data: extracted.characters.map((draft) => ({
             scriptId: script.id,
             name: draft.name,
             description: draft.description,
@@ -79,17 +101,13 @@ export const POST = withErrorHandling(
             status: "pending",
           })),
         })
-        result.characters = fresh.length
+        result.characters = extracted.characters.length
       }
 
-      if (targets.includes("scenes")) {
-        const { data } = await ai.extractScenes({
-          content: script.content,
-          model: model ?? script.textModel,
-        })
+      if (extracted.scenes !== undefined) {
         if (!merge) await tx.scene.deleteMany({ where: { scriptId: script.id } })
         await tx.scene.createMany({
-          data: data.map((draft) => ({
+          data: extracted.scenes.map((draft) => ({
             scriptId: script.id,
             name: draft.name,
             description: draft.description,
@@ -98,24 +116,20 @@ export const POST = withErrorHandling(
             status: "pending",
           })),
         })
-        result.scenes = data.length
+        result.scenes = extracted.scenes.length
       }
 
-      if (targets.includes("props")) {
-        const { data } = await ai.extractProps({
-          content: script.content,
-          model: model ?? script.textModel,
-        })
+      if (extracted.props !== undefined) {
         if (!merge) await tx.prop.deleteMany({ where: { scriptId: script.id } })
         await tx.prop.createMany({
-          data: data.map((draft) => ({
+          data: extracted.props.map((draft) => ({
             scriptId: script.id,
             name: draft.name,
             description: draft.description,
             status: "pending",
           })),
         })
-        result.props = data.length
+        result.props = extracted.props.length
       }
     })
 

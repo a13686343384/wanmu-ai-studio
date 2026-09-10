@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Ban, Loader2, Video } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/select"
 import { OptionPills } from "@/components/creation/film-factory/intake/OptionCard"
 import { VideoProgressBar } from "@/components/creation/film-factory/video/VideoProgressBar"
-import { DURATIONS, RESOLUTIONS, VIDEO_MODELS } from "@/lib/constants"
+import { DURATIONS, RESOLUTIONS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import type { StoryboardDTO } from "@/components/creation/film-factory/detail/StoryboardCard"
 
 const NEGATIVE_PRESETS = ["低清晰度", "畸形", "文字水印", "logo", "镜头抖动", "人脸变形", "过曝"]
@@ -47,7 +48,12 @@ export function VideoBatchDialog({
   storyboards: StoryboardDTO[]
   onDone: () => void
 }) {
-  const [model, setModel] = useState(VIDEO_MODELS[0]!.id)
+  const { models: videoModels } = useAiModels("video")
+  const [model, setModel] = useState("")
+
+  useEffect(() => {
+    if (videoModels.length > 0 && !model) setModel(videoModels[0]!.id)
+  }, [videoModels, model])
   const [resolution, setResolution] = useState("1080p")
   const [duration, setDuration] = useState("5s")
   const [skipImage, setSkipImage] = useState(false)
@@ -143,11 +149,11 @@ export function VideoBatchDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {VIDEO_MODELS.map((item) => (
+                  {videoModels.length > 0 ? videoModels.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} · {item.cost} 积分
                     </SelectItem>
-                  ))}
+                  )) : <SelectItem value="" disabled>暂无可用模型，请到「AI 设置」配置</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -237,10 +243,10 @@ export function VideoBatchDialog({
 
           {!running && (
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
-              预计消耗 {VIDEO_MODELS.find((m) => m.id === model)?.cost ?? 0} 积分/镜 ×{" "}
+              预计消耗 {videoModels.find((m) => m.id === model)?.cost ?? 0} 积分/镜 ×{" "}
               {storyboards.length} 镜 ≈{" "}
               <Badge variant="brand" className="font-normal">
-                {(VIDEO_MODELS.find((m) => m.id === model)?.cost ?? 0) * storyboards.length} 积分
+                {(videoModels.find((m) => m.id === model)?.cost ?? 0) * storyboards.length} 积分
               </Badge>
             </div>
           )}

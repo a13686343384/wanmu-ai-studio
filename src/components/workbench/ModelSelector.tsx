@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, ChevronDown, Coins, Sparkles } from "lucide-react"
+import { Check, ChevronDown, Coins, Loader2, Sparkles } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,20 +8,34 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import { modelsForMediaType, useWorkbenchStore } from "@/stores/useWorkbenchStore"
+import { useWorkbenchStore } from "@/stores/useWorkbenchStore"
+import { useAiModels, type ModelKind } from "@/hooks/useAiModels"
+
+const MEDIA_TO_KIND: Record<string, ModelKind> = {
+  video: "video",
+  image: "image",
+  audio: "audio",
+}
 
 /**
  * 模型选择下拉。
- * 每个选项展示：模型名 + 内置标签 + 积分消耗 + 选中态，
- * 与设计稿（全能图片 / Seedream / Man Image 系列）一致。
+ * live 模式下从 CustomModel 配置读取；mock 模式返回内置列表。
+ * 无可用模型时显示提示。
  */
 export function ModelSelector() {
   const mediaType = useWorkbenchStore((s) => s.mediaType)
   const modelId = useWorkbenchStore((s) => s.modelId)
   const setModel = useWorkbenchStore((s) => s.setModel)
 
-  const models = modelsForMediaType(mediaType)
+  const kind = MEDIA_TO_KIND[mediaType] ?? "image"
+  const { models, loading } = useAiModels(kind)
+
+  // 当选中的模型不在列表中时，自动切到第一个
   const current = models.find((m) => m.id === modelId) ?? models[0]
+  if (current && current.id !== modelId && models.length > 0) {
+    // 延迟设置避免渲染期间 setState
+    queueMicrotask(() => setModel(current.id))
+  }
 
   return (
     <DropdownMenu>
@@ -31,13 +45,25 @@ export function ModelSelector() {
           data-testid="model-trigger"
           className="flex max-w-[240px] items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
         >
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-          <span className="truncate">{current?.name}</span>
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-zinc-500" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+          )}
+          <span className="truncate">
+            {loading ? "加载中…" : current?.name ?? "暂无可用模型"}
+          </span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="w-72">
+        {models.length === 0 && !loading && (
+          <div className="px-3 py-4 text-center text-xs text-zinc-500">
+            暂无可用模型，
+            <a href="/ai-settings" className="text-orange-400 hover:text-orange-300 underline">前往配置</a>
+          </div>
+        )}
         {models.map((model) => (
           <DropdownMenuItem
             key={model.id}
@@ -61,7 +87,7 @@ export function ModelSelector() {
             </span>
             <span className="flex items-center gap-1 pl-7 text-[11px] text-zinc-500">
               <Coins className="h-3 w-3 text-amber-400" />
-              {model.cost} 起 · {model.note}
+              {model.cost} 起 · {model.note || "自定义"}
             </span>
           </DropdownMenuItem>
         ))}

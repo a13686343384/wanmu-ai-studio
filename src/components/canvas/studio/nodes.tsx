@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { StudioComposer } from "./StudioComposer"
 import { useStudio, type StudioNodeData } from "./types"
 import { uploadStudioMedia } from "./upload"
-import { TEXT_MODELS, VIDEO_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -587,6 +587,8 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
   const meta = d.meta ?? {}
   const { updateNodeData, getNode } = useReactFlow()
   const request = useStudioRequest(id)
+  const { models: videoModels } = useAiModels("video")
+  const { models: textModels } = useAiModels("text")
 
   function patchMeta(patch: Partial<NonNullable<StudioNodeData["meta"]>>) {
     if (getNode(id))
@@ -620,8 +622,8 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
           prompt: `动作导演·${meta.sceneType ?? "对打"}·${mode === "detail" ? "详细编排" : "执行编排"}：${requirement}`,
           modelId:
             mode === "run"
-              ? VIDEO_MODELS[0]!.id
-              : (d.modelId ?? TEXT_MODELS[0]!.id),
+              ? (videoModels[0]?.id ?? "")
+              : (d.modelId ?? textModels[0]?.id ?? ""),
           references: [],
         }),
       })

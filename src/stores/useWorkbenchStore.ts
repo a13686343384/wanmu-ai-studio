@@ -1,12 +1,7 @@
 "use client"
 
 import { create } from "zustand"
-import {
-  AUDIO_MODELS,
-  IMAGE_MODELS,
-  VIDEO_MODELS,
-  type AIModel,
-} from "@/lib/constants"
+import type { AIModel } from "@/lib/constants"
 
 export type MediaType = "video" | "image" | "audio"
 
@@ -68,21 +63,18 @@ interface WorkbenchState {
   reset: () => void
 }
 
-/** 按媒体类型返回可用的模型清单。 */
-export function modelsForMediaType(type: MediaType): readonly AIModel[] {
-  switch (type) {
-    case "video":
-      return VIDEO_MODELS
-    case "audio":
-      return AUDIO_MODELS
-    default:
-      return IMAGE_MODELS
-  }
+/**
+ * 按媒体类型返回可用的模型清单。
+ * @deprecated 请使用 useAiModels hook 获取动态模型列表（live/mock 模式感知）。
+ * 此函数仅保留作为 fallback，返回空数组。
+ */
+export function modelsForMediaType(_type: MediaType): readonly AIModel[] {
+  return []
 }
 
 /** 媒体类型切换时，默认选中该类型下的第一个模型。 */
-function defaultModelId(type: MediaType) {
-  return modelsForMediaType(type)[0]?.id ?? ""
+function defaultModelId(_type: MediaType) {
+  return ""
 }
 
 const initialState = {

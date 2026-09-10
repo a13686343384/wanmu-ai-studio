@@ -3,7 +3,7 @@
  * 每个模板 = 可视化表单的默认值 + 请求体示例，保存后实例化为 CustomModel。
  */
 
-export type ModelKind = "text" | "image" | "video" | "audio"
+export type ModelKind = "text" | "image" | "video" | "audio" | "subtitle"
 
 export interface ModelTemplate {
   key: string
@@ -843,6 +843,96 @@ export const MODEL_TEMPLATES: readonly ModelTemplate[] = [
       },
       extract: { url: ["data.audio_url"], error: ["error.message"] },
       result: { download: true, mime: "audio/mpeg", count: 1 },
+    },
+  },
+
+  /* ==================== 火山引擎 Seedance ==================== */
+  {
+    key: "volc-seedance",
+    title: "火山 Seedance · 文/图生视频",
+    kind: "video",
+    lifecycle: "async",
+    previewBody: `{
+  "model": "{{model_id}}",
+  "content": [
+    {"type":"text","text":"{{prompt}}"},
+    {"type":"image_url","image_url":{"url":"REF_URL"},"role":"first_frame"}
+  ],
+  "ratio": "{{ratio}}", "duration": {{duration | int}}, "resolution": "{{resolution}}"
+}`,
+    config: {
+      auth: { header: "Authorization", scheme: "Bearer" },
+      constraints: {
+        ratios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+        resolutions: ["480p", "720p", "1080p"],
+        duration: { min: 5, max: 10 },
+        max_references: 2,
+        inputs: { image: { max: 2 }, video: { max: 0, max_total_duration: 0 }, audio: { max: 0, max_total_duration: 0 } },
+        require_reference: false,
+        prompt_max_chars: 0,
+      },
+      submit: {
+        method: "POST",
+        path: "/api/v3/contents/generations/tasks",
+        timeout_sec: 180,
+        body: {
+          model: "{{model_id}}",
+          content: [{ type: "text", text: "{{prompt}}" }],
+          ratio: "{{ratio}}",
+          duration: "{{duration | int}}",
+          resolution: "{{resolution}}",
+        },
+      },
+      // transformBody：把 refs 注入 content 数组
+      transformBody: `(body, input) => {
+  const content = body.content || [];
+  if (input.refs && input.refs.length > 0) {
+    content.push({ type: "image_url", image_url: { url: input.refs[0] }, role: "first_frame" });
+  }
+  if (input.refs && input.refs.length > 1) {
+    content.push({ type: "image_url", image_url: { url: input.refs[1] }, role: "last_frame" });
+  }
+  return { ...body, content };
+}`,
+      poll: {
+        method: "GET",
+        path: "/api/v3/contents/generations/tasks/{{id}}",
+        interval_sec: 10,
+        deadline_sec: 3600,
+        timeout_sec: 30,
+        not_found_grace: 3,
+      },
+      extract: {
+        id: ["id"],
+        status: "status",
+        url: ["content.0.video.url", "content.0.video.cover_url"],
+        error: ["error.message", "error_msg"],
+        status_map: { done: ["succeeded"], fail: ["failed", "expired"] },
+      },
+      result: { download: true, mime: "video/mp4" },
+    },
+  },
+
+  /* ==================== Whisper ASR ==================== */
+  {
+    key: "whisper-asr",
+    title: "Whisper ASR · 语音转字幕",
+    kind: "subtitle",
+    lifecycle: "sync",
+    previewBody: `multipart/form-data: file=@audio.mp3, model={{model_id}}, language=zh`,
+    config: {
+      auth: { header: "Authorization", scheme: "Bearer" },
+      constraints: { max_references: 0, prompt_max_chars: 0 },
+      submit: {
+        method: "POST",
+        path: "/v1/audio/transcriptions",
+        timeout_sec: 300,
+        encoding: "multipart",
+        file_field: "file",
+        body: { model: "{{model_id}}", response_format: "verbose_json" },
+      },
+      extract: { text: ["text"], error: ["error.message"] },
+      result: { mime: "application/json" },
     },
   },
 ]

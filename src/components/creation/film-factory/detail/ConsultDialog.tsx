@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CardSelect } from "@/components/ui/card-select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { TEXT_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import type { ConsultationDTO } from "@/lib/serializers/script"
 
 const SEVERITY_META = {
@@ -59,6 +59,7 @@ export function ConsultDialog({
   consultation: ConsultationDTO | null
   onRefresh: () => void
 }) {
+  const { models: textModels } = useAiModels("text")
   const [running, setRunning] = useState(false)
   const [applying, setApplying] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
@@ -193,7 +194,7 @@ export function ConsultDialog({
               <CardSelect
                 ariaLabel="文本模型"
                 value={consultation.model}
-                options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+                options={textModels.length > 0 ? textModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
                 className="min-w-0 flex-1"
               />
 

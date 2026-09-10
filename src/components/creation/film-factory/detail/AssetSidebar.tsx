@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ChevronDown,
   ClipboardList,
@@ -56,7 +56,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { Textarea } from "@/components/ui/textarea"
 import { CardSelect } from "@/components/ui/card-select"
 import { cn } from "@/lib/utils"
-import { IMAGE_MODELS, TEXT_MODELS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import type { AssetDTO, CostumeDTO } from "@/lib/serializers/script"
 
 type AssetKind = "characters" | "outfits" | "props" | "scenes"
@@ -892,8 +892,10 @@ function AssetGenerateDialog({
   onOpenChange: (open: boolean) => void
   onDone: () => void
 }) {
-  const [model, setModel] = useState(IMAGE_MODELS[0].id)
-  const [promptModel, setPromptModel] = useState(TEXT_MODELS[0].id)
+  const { models: imageModels } = useAiModels("image")
+  const { models: textModels } = useAiModels("text")
+  const [model, setModel] = useState("")
+  const [promptModel, setPromptModel] = useState("")
   const [prompt, setPrompt] = useState(character.prompt ?? "")
   const [refs, setRefs] = useState<string[]>(character.refImages ?? [])
   const [resolution, setResolution] = useState<string>("1K")
@@ -901,7 +903,15 @@ function AssetGenerateDialog({
   const [starting, setStarting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const imageModel = IMAGE_MODELS.find((item) => item.id === model) ?? IMAGE_MODELS[0]
+  useEffect(() => {
+    if (imageModels.length > 0 && !model) setModel(imageModels[0]!.id)
+  }, [imageModels, model])
+
+  useEffect(() => {
+    if (textModels.length > 0 && !promptModel) setPromptModel(textModels[0]!.id)
+  }, [textModels, promptModel])
+
+  const imageModel = imageModels.find((item) => item.id === model) ?? imageModels[0]
 
   async function uploadRef(file: File) {
     if (file.size > 20 * 1024 * 1024) {
@@ -973,12 +983,12 @@ function AssetGenerateDialog({
             ariaLabel="生成模型"
             value={model}
             onValueChange={setModel}
-            options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            options={imageModels.length > 0 ? imageModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
             className="w-full"
           />
         </div>
         <div className="rounded-lg border border-orange-500/30 bg-orange-500/[0.06] px-2.5 py-2 text-[10px] leading-relaxed text-orange-200/90">
-          <span className="font-medium">🌸 预计单用量 {imageModel.cost} = 1张 x {imageModel.cost}/张</span>
+          <span className="font-medium">🌸 预计单用量 {imageModel?.cost ?? 0} = 1张 x {imageModel?.cost ?? 0}/张</span>
           <p className="mt-0.5 text-orange-200/60">
             仅估算出图：提示词编译(文本模型)与实际参数(比例/质量)略有出入。
           </p>
@@ -993,7 +1003,7 @@ function AssetGenerateDialog({
             ariaLabel="提示词模型"
             value={promptModel}
             onValueChange={setPromptModel}
-            options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            options={textModels.length > 0 ? textModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
             className="w-full"
           />
         </div>
@@ -1099,7 +1109,7 @@ function AssetGenerateDialog({
             </div>
           </div>
           <p className="text-[10px] font-medium text-orange-300/90">
-            🌸 预计单张约 {imageModel.cost} 樱米花 · 出图时扣除
+            🌸 预计单张约 {imageModel?.cost ?? 0} 樱米花 · 出图时扣除
           </p>
           <p className="text-[10px] leading-relaxed text-zinc-600">
             比例固定 16:9 多画格资料卡（压框/侧栏/细节），最终视频比例无关 —
@@ -2163,13 +2173,23 @@ function SpatialDialog({
 }) {
   const pack: Record<string, string | undefined> =
     (scene as { spatialPack?: Record<string, string> }).spatialPack ?? {}
-  const [textModel, setTextModel] = useState(TEXT_MODELS[0].id)
-  const [imageModel, setImageModel] = useState(IMAGE_MODELS[0].id)
+  const { models: spatialImageModels } = useAiModels("image")
+  const { models: spatialTextModels } = useAiModels("text")
+  const [textModel, setTextModel] = useState("")
+  const [imageModel, setImageModel] = useState("")
   const [ratio, setRatio] = useState<string>("9:16")
   const [resolution, setResolution] = useState<string>("1K")
   const [busyKey, setBusyKey] = useState<string | null>(null)
 
-  const imageModelConfig = IMAGE_MODELS.find((item) => item.id === imageModel) ?? IMAGE_MODELS[0]
+  useEffect(() => {
+    if (spatialTextModels.length > 0 && !textModel) setTextModel(spatialTextModels[0]!.id)
+  }, [spatialTextModels, textModel])
+
+  useEffect(() => {
+    if (spatialImageModels.length > 0 && !imageModel) setImageModel(spatialImageModels[0]!.id)
+  }, [spatialImageModels, imageModel])
+
+  const imageModelConfig = spatialImageModels.find((item) => item.id === imageModel) ?? spatialImageModels[0]
 
   async function generate(target: string) {
     setBusyKey(target)
@@ -2221,7 +2241,7 @@ function SpatialDialog({
               ariaLabel="文本模型"
               value={textModel}
               onValueChange={setTextModel}
-              options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+              options={spatialTextModels.length > 0 ? spatialTextModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
               className="w-full"
             />
           </div>
@@ -2231,7 +2251,7 @@ function SpatialDialog({
               ariaLabel="生图模型"
               value={imageModel}
               onValueChange={setImageModel}
-              options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+              options={spatialImageModels.length > 0 ? spatialImageModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
               className="w-full"
             />
           </div>
@@ -2306,7 +2326,7 @@ function SpatialDialog({
             </p>
           </div>
           <p className="text-[10px] font-medium text-orange-300/90">
-            🌸 预计单张约 {imageModelConfig.cost} 樱米花 · 出图时扣除
+            🌸 预计单张约 {imageModelConfig?.cost ?? 0} 樱米花 · 出图时扣除
           </p>
           <p className="text-[10px] leading-relaxed text-zinc-600">
             套图默认按低渲染档 {ratio} 出，一次出 5 张（俯视 + 四向）。

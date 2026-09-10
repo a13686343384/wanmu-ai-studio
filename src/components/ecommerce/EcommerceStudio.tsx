@@ -35,15 +35,8 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  AUDIO_MODELS,
-  IMAGE_MODELS,
-  TEXT_MODELS,
-  VIDEO_MODELS,
-} from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 import { cn } from "@/lib/utils"
-
-const MODEL_LISTS = { text: TEXT_MODELS, image: IMAGE_MODELS, video: VIDEO_MODELS, audio: AUDIO_MODELS }
 
 const PLATFORMS = ["亚马逊", "独立站", "Temu", "Shopee", "速卖通", "Lazada", "TikTok Shop", "天猫 / 淘宝"]
 const REGIONS = ["美国", "中国", "欧洲", "东南亚", "日本", "中东", "拉美"]
@@ -84,9 +77,27 @@ export function EcommerceStudio() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewList, setPreviewList] = useState<string[]>([])
 
+  // 动态模型列表
+  const { models: imageModels } = useAiModels("image")
+  const { models: textModels } = useAiModels("text")
+
   // 共享表单状态
-  const [imageModel, setImageModel] = useState(IMAGE_MODELS[0]!.id)
-  const [planModel, setPlanModel] = useState(TEXT_MODELS[0]!.id)
+  const [imageModel, setImageModel] = useState("")
+  const [planModel, setPlanModel] = useState("")
+
+  // 模型加载完成后设置默认值
+  useEffect(() => {
+    if (imageModels.length > 0 && !imageModel) {
+      setImageModel(imageModels[0]!.id)
+    }
+  }, [imageModels, imageModel])
+
+  useEffect(() => {
+    if (textModels.length > 0 && !planModel) {
+      setPlanModel(textModels[0]!.id)
+    }
+  }, [textModels, planModel])
+
   const [platform, setPlatform] = useState(PLATFORMS[0]!)
   const [region, setRegion] = useState(REGIONS[0]!)
   const [lang, setLang] = useState(LANGS[0]!)
@@ -279,7 +290,7 @@ export function EcommerceStudio() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {IMAGE_MODELS.map((item) => (
+                  {imageModels.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} · {item.cost} 起
                     </SelectItem>
@@ -294,7 +305,7 @@ export function EcommerceStudio() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEXT_MODELS.map((item) => (
+                  {textModels.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} · {item.cost} 起
                     </SelectItem>

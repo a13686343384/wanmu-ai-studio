@@ -7,6 +7,7 @@ import {
   Download,
   Loader2,
   Pencil,
+  Play,
   Plus,
   Sparkles,
   Trash2,
@@ -74,6 +75,7 @@ const KIND_LABEL: Record<ModelKind, string> = {
   image: "图片",
   video: "视频",
   audio: "音频",
+  subtitle: "字幕",
 }
 
 const EMPTY_CONFIG = {
@@ -98,13 +100,14 @@ interface ConfigDraft {
   json: string
 }
 
-/** /plugins 页面：自定义模型接入 + 凭据管理。 */
+/** /ai-settings 页面：AI 模型接入配置 + 凭据管理。 */
 export function PluginSettings() {
   const [tab, setTab] = useState("models")
   const [models, setModels] = useState<ModelRow[]>([])
   const [credentials, setCredentials] = useState<CredentialRow[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<{ id: string | null; draft: ConfigDraft } | null>(null)
+  const [testingId, setTestingId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -154,12 +157,25 @@ export function PluginSettings() {
     if (res.ok) void reload()
   }
 
+  async function testModel(id: string) {
+    setTestingId(id)
+    try {
+      const res = await fetch(`/api/plugins/models/${id}/test`, { method: "POST" })
+      const payload = await res.json()
+      toast[payload.data?.ok ? "success" : "warning"](payload.data?.message ?? "测试完成")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "测试失败")
+    } finally {
+      setTestingId(null)
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6 lg:px-6">
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">Plugins</p>
-          <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-50">插件</h1>
+          <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-50">AI 设置</h1>
           <p className="mt-1 text-xs text-zinc-500">
             接入自定义模型（16 种模板）· 管理 API 凭据
           </p>
@@ -232,6 +248,19 @@ export function PluginSettings() {
                   <p className="mt-0.5 truncate text-[11px] text-zinc-500">{model.baseUrl}</p>
                 </div>
                 <Switch checked={model.enabled} onCheckedChange={() => void toggleModel(model)} />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`测试 ${model.name}`}
+                  disabled={testingId === model.id}
+                  onClick={() => void testModel(model.id)}
+                >
+                  {testingId === model.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -443,7 +472,7 @@ function CredentialPanel({
               <Input
                 value={baseUrl}
                 onChange={(event) => setBaseUrl(event.target.value)}
-                placeholder="留空则用插件里写的地址"
+                placeholder="留空则用模板默认地址"
               />
             </div>
             <div className="space-y-1.5">

@@ -44,10 +44,16 @@ async function comfyJson(url: string, init?: RequestInit): Promise<unknown> {
   return res.json()
 }
 
-/** 服务是否可达（/system_info）。 */
+/** 服务是否可达（/api/system_stats，兼容新版 ComfyUI ≥0.33）。 */
 export async function comfyPing(baseUrl: string): Promise<boolean> {
   try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/system_info`, {
+    const base = baseUrl.replace(/\/$/, "")
+    // 优先尝试新版端点，失败则回退旧版
+    let res = await fetch(`${base}/api/system_stats`, {
+      signal: AbortSignal.timeout(4000),
+    })
+    if (res.ok) return true
+    res = await fetch(`${base}/system_info`, {
       signal: AbortSignal.timeout(4000),
     })
     return res.ok
@@ -100,7 +106,7 @@ export async function comfyRun(
   const base = options.baseUrl.replace(/\/$/, "")
   if (!(await comfyPing(base))) {
     throw new Error(
-      `ComfyUI（${base}）不可达：请确认 Win11 主机已启动 ComfyUI 且 8118 端口对局域网开放`,
+      `ComfyUI（${base}）不可达：请确认 Win11 主机已启动 ComfyUI 且端口对局域网开放`,
     )
   }
 

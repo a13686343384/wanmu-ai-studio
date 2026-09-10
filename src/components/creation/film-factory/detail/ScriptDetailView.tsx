@@ -269,6 +269,7 @@ export function ScriptDetailView({
         setProgress(Math.round(((index + 1) / queue.length) * 100))
       }
       await reloadScript()
+      setAssetSetupOpen(false)
       toast.success("全剧资产已生成，可以继续拆分镜")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "资产生成失败")

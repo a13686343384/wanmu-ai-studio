@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { CardSelect } from "@/components/ui/card-select"
-import { ASPECT_RATIOS, IMAGE_MODELS, TEXT_MODELS } from "@/lib/constants"
+import { ASPECT_RATIOS } from "@/lib/constants"
+import { useAiModels } from "@/hooks/useAiModels"
 export interface AssetSetup {
   textModel: string
   imageModel: string
@@ -28,8 +29,12 @@ export function AssetSetupDialog({
   aspectRatio: string
   onStart: (config: AssetSetup) => void
 }) {
-  const [textModel, setTextModel] = useState(TEXT_MODELS[0]!.id)
-  const [imageModel, setImageModel] = useState(IMAGE_MODELS[0]!.id)
+  const { models: textModels } = useAiModels("text")
+  const { models: imageModels } = useAiModels("image")
+  const [textModel, setTextModel] = useState("")
+  const [imageModel, setImageModel] = useState("")
+  useEffect(() => { if (textModels.length && !textModel) setTextModel(textModels[0]!.id) }, [textModels, textModel])
+  useEffect(() => { if (imageModels.length && !imageModel) setImageModel(imageModels[0]!.id) }, [imageModels, imageModel])
   const [aspect, setAspect] = useState(aspectRatio)
   const [resolution, setResolution] = useState("1K")
   return (
@@ -47,7 +52,7 @@ export function AssetSetupDialog({
             ariaLabel="资产文本模型"
             value={textModel}
             onValueChange={setTextModel}
-            options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            options={textModels.length > 0 ? textModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
             triggerClassName="h-10 w-full text-sm"
           />
         </div>
@@ -57,7 +62,7 @@ export function AssetSetupDialog({
             ariaLabel="资产生图模型"
             value={imageModel}
             onValueChange={setImageModel}
-            options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+            options={imageModels.length > 0 ? imageModels.map((item) => ({ value: item.id, label: item.name })) : [{ value: "", label: "暂无可用模型，请到「AI 设置」配置" }]}
             triggerClassName="h-10 w-full text-sm"
           />
         </div>
