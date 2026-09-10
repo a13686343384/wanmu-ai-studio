@@ -125,6 +125,8 @@ export interface AssetDTO {
   /** 场景专有 */
   environment?: string | null
   lighting?: string | null
+  /** 场景专有：空间资产包（多角度图 / 侧别锁定卡 / 光影设计卡） */
+  spatialPack?: Record<string, string> | null
 }
 
 export interface ConsultationDTO {
@@ -147,6 +149,9 @@ export interface ConsultationDTO {
 export interface ScriptDetail extends ScriptSummary {
   content: string
   assetPromptTemplate?: string | null
+  outfitPromptTemplate?: string | null
+  propPromptTemplate?: string | null
+  scenePromptTemplate?: string | null
   pacingProfile?: { [key: string]: unknown } | null
   era: string | null
   tone: string | null

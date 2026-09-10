@@ -125,6 +125,9 @@ export function AssetSidebar({
   scenes,
   props,
   assetPromptTemplate,
+  outfitPromptTemplate,
+  propPromptTemplate,
+  scenePromptTemplate,
   onRefresh,
 }: {
   scriptId: string
@@ -132,8 +135,18 @@ export function AssetSidebar({
   scenes: AssetDTO[]
   props: AssetDTO[]
   assetPromptTemplate?: string | null
+  outfitPromptTemplate?: string | null
+  propPromptTemplate?: string | null
+  scenePromptTemplate?: string | null
   onRefresh: () => void
 }) {
+  /** 各 Tab 独立的提示词模板（角色 / 妆造 / 道具 / 场景互不相同） */
+  const templateByKind: Record<AssetKind, string> = {
+    characters: assetPromptTemplate ?? "",
+    outfits: outfitPromptTemplate ?? "",
+    props: propPromptTemplate ?? "",
+    scenes: scenePromptTemplate ?? "",
+  }
   const [tab, setTab] = useState<AssetKind>("characters")
   const [extracting, setExtracting] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
@@ -239,7 +252,12 @@ export function AssetSidebar({
             <Download className="h-3.5 w-3.5" />
           </TipButton>
           <MissingFillPopover scriptId={scriptId} extracting={extracting} onExtract={extract} />
-          <TemplatePopover scriptId={scriptId} initial={assetPromptTemplate ?? ""} onSaved={onRefresh} />
+          <TemplatePopover
+            kind={tab}
+            scriptId={scriptId}
+            initial={templateByKind[tab]}
+            onSaved={onRefresh}
+          />
           {tab !== "characters" && (
             <AddAssetButton
               scriptId={scriptId}
@@ -430,7 +448,14 @@ export function AssetSidebar({
                   className="border-none bg-transparent"
                 />
               ) : (
-                scenes.map((scene) => <AssetCard key={scene.id} asset={scene} />)
+                scenes.map((scene) => (
+                  <SceneCard
+                    key={scene.id}
+                    scene={scene}
+                    scriptId={scriptId}
+                    onDone={onRefresh}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -692,9 +717,10 @@ function CharacterCard({
       />
 
       {/* 出角色参考图（编辑） */}
-      <CharacterGenerateDialog
+      <AssetGenerateDialog
         scriptId={scriptId}
-        character={character}
+        kind="character"
+        asset={character}
         open={genOpen}
         onOpenChange={setGenOpen}
         onDone={onDone}
@@ -849,17 +875,19 @@ function ImageActionButton({
   )
 }
 
-/* ---------------------------- 出角色参考图弹窗（编辑 / 单独出图） ---------------------------- */
+/* ---------------------------- 出参考图弹窗（角色 / 场景 · 编辑 / 单独出图） ---------------------------- */
 
-function CharacterGenerateDialog({
+function AssetGenerateDialog({
   scriptId,
-  character,
+  kind,
+  asset: character,
   open,
   onOpenChange,
   onDone,
 }: {
   scriptId: string
-  character: AssetDTO
+  kind: "character" | "scene"
+  asset: AssetDTO
   open: boolean
   onOpenChange: (open: boolean) => void
   onDone: () => void
@@ -903,7 +931,7 @@ function CharacterGenerateDialog({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          kind: "character",
+          kind,
           ids: [character.id],
           model,
           resolution,
@@ -932,7 +960,7 @@ function CharacterGenerateDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5">
             <Wand2 className="h-4 w-4" />
-            出角色参考图
+            {kind === "character" ? "出角色参考图" : "出场景参考图"}
           </DialogTitle>
         </DialogHeader>
         <p className="-mt-1 text-[11px] leading-relaxed text-zinc-500">
@@ -1810,6 +1838,588 @@ function PropEditDialog({
   )
 }
 
+/* ---------------------------- 场景大图卡（空间资产 / 更多菜单） ---------------------------- */
+
+const RATIOS = ["1:1", "2:1", "1:2", "5:4", "4:5", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16", "21:9"] as const
+const SPATIAL_ANGLES = [
+  { key: "overhead", label: "俯视布局" },
+  { key: "front", label: "正向" },
+  { key: "back", label: "反向" },
+  { key: "left", label: "左侧" },
+  { key: "right", label: "右侧" },
+] as const
+
+function SceneCard({
+  scene,
+  scriptId,
+  onDone,
+}: {
+  scene: AssetDTO
+  scriptId: string
+  onDone: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [genOpen, setGenOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [spatialOpen, setSpatialOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function patch(body: Record<string, unknown>, success?: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${scene.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "操作失败")
+      if (success) toast.success(success)
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "操作失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function uploadImage(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("图片大小须在 20MB 以内")
+      return
+    }
+    setBusy(true)
+    const notice = toast.loading("正在上传图片…")
+    try {
+      const form = new FormData()
+      form.set("scriptId", scriptId)
+      form.set("file", file)
+      const res = await fetch("/api/media", { method: "POST", body: form })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "上传失败")
+      await patch({ imageUrl: payload.data.url }, "已替换场景图")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "上传失败")
+    } finally {
+      toast.dismiss(notice)
+      setBusy(false)
+    }
+  }
+
+  async function doDelete() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${scene.id}`, {
+        method: "DELETE",
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "删除失败")
+      toast.success(`已删除「${scene.name}」`)
+      onDone()
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function downloadImage() {
+    if (!scene.imageUrl) return
+    const anchor = document.createElement("a")
+    anchor.href = scene.imageUrl
+    anchor.download = `${scene.name}-参考图`
+    anchor.click()
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/50">
+      <div className="group relative aspect-[16/10] bg-zinc-900">
+        {scene.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={scene.imageUrl}
+            alt={scene.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {scene.status === "generating" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+            ) : (
+              <Package className="h-5 w-5 text-zinc-700" />
+            )}
+          </div>
+        )}
+
+        <span className="absolute left-1.5 top-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-medium text-orange-300 ring-1 ring-orange-500/40">
+          场景
+        </span>
+        <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+          {scene.locked && (
+            <span
+              aria-label="已锁定"
+              className="flex h-[18px] w-[18px] items-center justify-center rounded bg-zinc-950/85 p-0.5 text-amber-300 ring-1 ring-amber-500/40"
+            >
+              <Lock className="h-2.5 w-2.5" />
+            </span>
+          )}
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[9px] font-medium",
+              scene.status === "completed"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : scene.status === "generating"
+                  ? "bg-orange-500/20 text-orange-300"
+                  : "bg-zinc-800 text-zinc-400",
+            )}
+          >
+            {scene.status === "completed"
+              ? "已完成"
+              : scene.status === "generating"
+                ? "生成中"
+                : "待生成"}
+          </span>
+        </div>
+
+        {/* 悬浮操作条（图片右下角），更多菜单与角色基本一致 */}
+        {scene.imageUrl && (
+          <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <ImageActionButton label="下载原图" disabled={busy} onClick={downloadImage}>
+              <Download className="h-3 w-3" />
+            </ImageActionButton>
+            <ImageActionButton
+              label="上传本地替换参考图"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-3 w-3" />
+            </ImageActionButton>
+            <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+              <Pencil className="h-3 w-3" />
+            </ImageActionButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="更多"
+                  disabled={busy}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded bg-rose-950/90 text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900"
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="w-48">
+                <DropdownMenuItem onSelect={() => setResetOpen(true)}>
+                  <Sparkles />
+                  重新出图
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={(scene.refImages?.length ?? 0) === 0}
+                  onSelect={() => void patch({ clearRefs: true }, "参考图已清空")}
+                >
+                  <RefreshCw />
+                  清空参考图
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                  <Upload />
+                  上传图替换
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void patch(
+                      { locked: !scene.locked },
+                      scene.locked ? "已解锁，可再生成" : "已锁定，再生成不覆盖",
+                    )
+                  }
+                >
+                  {scene.locked ? <LockOpen /> : <Lock />}
+                  {scene.locked ? "解锁（恢复再生成）" : "锁定（再生成不覆盖）"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSpatialOpen(true)}>
+                  <Merge />
+                  空间资产（多角度/侧别/…）
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  destructive
+                  className="text-rose-400 focus:text-rose-300"
+                  onSelect={() => setDeleteOpen(true)}
+                >
+                  <Trash2 />
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-0.5 p-2">
+        <p className="truncate text-xs font-medium text-zinc-200">{scene.name}</p>
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-500">
+          {scene.description}
+        </p>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void uploadImage(file)
+          event.target.value = ""
+        }}
+      />
+
+      {/* 出场景参考图（编辑） */}
+      <AssetGenerateDialog
+        scriptId={scriptId}
+        kind="scene"
+        asset={scene}
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onDone={onDone}
+      />
+
+      {/* 重新出图确认 */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重新出图</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            将清空「{scene.name}」的参考图并重置状态，下次点「一键出全部资产」会重新出，继续？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setResetOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setResetOpen(false)
+                void patch({ reset: true }, "已重置，下次一键出全部资产会重新出")
+              }}
+            >
+              重置
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 空间资产（多角度 / 侧别 / 光影） */}
+      <SpatialDialog
+        scriptId={scriptId}
+        scene={scene}
+        open={spatialOpen}
+        onOpenChange={setSpatialOpen}
+        onDone={onDone}
+      />
+
+      {/* 删除确认 */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除场景「{scene.name}」</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            会同时删掉已出的场景图与空间资产包，此操作不可撤销。确定删除？
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void doDelete()}>
+              删除
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+/** 空间资产弹窗：跨镜空间一致性资产包（多角度 5 张 + 侧别锁定卡 + 光影设计卡）。 */
+function SpatialDialog({
+  scriptId,
+  scene,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  scriptId: string
+  scene: AssetDTO
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDone: () => void
+}) {
+  const pack: Record<string, string | undefined> =
+    (scene as { spatialPack?: Record<string, string> }).spatialPack ?? {}
+  const [textModel, setTextModel] = useState(TEXT_MODELS[0].id)
+  const [imageModel, setImageModel] = useState(IMAGE_MODELS[0].id)
+  const [ratio, setRatio] = useState<string>("9:16")
+  const [resolution, setResolution] = useState<string>("1K")
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+
+  const imageModelConfig = IMAGE_MODELS.find((item) => item.id === imageModel) ?? IMAGE_MODELS[0]
+
+  async function generate(target: string) {
+    setBusyKey(target)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/scenes/${scene.id}/spatial`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target,
+          imageModel,
+          resolution,
+          aspectRatio: ratio,
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      toast.success(`已生成 ${payload.data.generated} 项空间资产`)
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成失败")
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const missingCount = [
+    ...SPATIAL_ANGLES.map((a) => a.key),
+    "sideCard",
+    "lightCard",
+  ].filter((key) => !pack[key]).length
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-1.5">
+            <Merge className="h-4 w-4" />
+            空间资产 · {scene.name}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="-mt-1 text-[11px] leading-relaxed text-zinc-500">
+          跨镜空间一致性资产包 — 同场景所有镜头挂它们锁住空间 / 侧别 / 光影，防穿帮。每种单独出，互不影响。
+        </p>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[10px] text-zinc-500">文本模型（绥提示词）</Label>
+            <CardSelect
+              ariaLabel="文本模型"
+              value={textModel}
+              onValueChange={setTextModel}
+              options={TEXT_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+              className="w-full"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-zinc-500">生图模型（多角度图）</Label>
+            <CardSelect
+              ariaLabel="生图模型"
+              value={imageModel}
+              onValueChange={setImageModel}
+              options={IMAGE_MODELS.map((item) => ({ value: item.id, label: item.name }))}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5">
+          <p className="text-[10px] text-zinc-500">出图参数（多角度包共 5 张，下方为单张消耗）</p>
+          <div>
+            <Label className="text-[10px] text-zinc-500">比例</Label>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {RATIOS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={ratio === item}
+                  onClick={() => setRatio(item)}
+                  className={cn(
+                    "rounded-md px-1.5 py-0.5 text-[10px] transition-colors",
+                    ratio === item
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "text-zinc-400 ring-1 ring-zinc-800 hover:text-zinc-200",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px] text-zinc-500">清晰度</Label>
+            <div className="mt-1 flex gap-1">
+              {(["1K", "2K", "4K"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={resolution === item}
+                  onClick={() => setResolution(item)}
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] transition-colors",
+                    resolution === item
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "text-zinc-400 ring-1 ring-zinc-800 hover:text-zinc-200",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px] text-zinc-500">画质档位</Label>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {(["低画质", "标准画质", "高画质", "超高清画质", "最高画质"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  disabled
+                  aria-pressed={item === "低画质"}
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px]",
+                    item === "低画质"
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "cursor-not-allowed text-zinc-600 ring-1 ring-zinc-800 opacity-50",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+              📌 影视厂的分镜图 / 首帧图 / 调度图固定按 1K、低渲染出（它们只是视频帧的参考稿，出大图只会更难更像）。此处不可调。
+            </p>
+          </div>
+          <p className="text-[10px] font-medium text-orange-300/90">
+            🌸 预计单张约 {imageModelConfig.cost} 樱米花 · 出图时扣除
+          </p>
+          <p className="text-[10px] leading-relaxed text-zinc-600">
+            套图默认按低渲染档 {ratio} 出，一次出 5 张（俯视 + 四向）。
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Merge className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="text-xs font-medium text-zinc-200">多角度空间包</span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="全部重出"
+                disabled={busyKey !== null}
+                onClick={() => void generate("all")}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", busyKey === "all" && "animate-spin")} />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                disabled={busyKey !== null || missingCount === 0}
+                onClick={() => void generate("missing")}
+              >
+                {busyKey === "missing" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : null}
+                出图
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {SPATIAL_ANGLES.map((angle) => {
+              const url = pack[angle.key]
+              return (
+                <button
+                  key={angle.key}
+                  type="button"
+                  disabled={busyKey !== null}
+                  title={url ? "点击重出这一视角" : `生成${angle.label}`}
+                  onClick={() => void generate(angle.key)}
+                  className="group/tile flex flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40 transition-colors hover:border-zinc-600 disabled:opacity-60"
+                >
+                  <span className="flex aspect-[3/4] w-full items-center justify-center bg-zinc-950">
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={url} alt={angle.label} className="h-full w-full object-cover" />
+                    ) : busyKey === angle.key ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-400" />
+                    ) : (
+                      <span className="text-zinc-700">—</span>
+                    )}
+                  </span>
+                  <span className="py-1 text-center text-[9px] text-zinc-500">{angle.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "sideCard", title: "侧别锁定卡" },
+              { key: "lightCard", title: "光影设计卡" },
+            ] as const
+          ).map((cardItem) => {
+            const url = pack[cardItem.key]
+            return (
+              <div
+                key={cardItem.key}
+                className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2"
+              >
+                {url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={url}
+                    alt={cardItem.title}
+                    className="h-9 w-9 rounded-md border border-zinc-800 object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] text-zinc-200">{cardItem.title}</p>
+                  <p className="text-[10px] text-zinc-600">{url ? "已生成" : "未生成"}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  disabled={busyKey !== null}
+                  onClick={() => void generate(cardItem.key)}
+                >
+                  {busyKey === cardItem.key ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "生成"
+                  )}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /* ---------------------------- 手动添加弹窗 ---------------------------- */
 
 function AddAssetButton({
@@ -2075,15 +2685,52 @@ function MissingFillPopover({
 const TIP_MISSING =
   "觉得 AI 提取漏了？重新扫一遍全剧正文，把遗漏的角色/场景/妆造/道具自动补上——还能填「捕捉关键词」让它重点找。只补缺失，不动你已有的任何内容"
 
+const TEMPLATE_CONFIG: Record<
+  AssetKind,
+  { field: string; label: string; title: string; desc: string; toast: string }
+> = {
+  characters: {
+    field: "assetPromptTemplate",
+    label: "设置角色提示词模板",
+    title: "角色提示词模板",
+    desc: "给一段示例 prompt，置入内置框架，所有角色模仿它生成",
+    toast: "所有角色卡将模仿它生成",
+  },
+  outfits: {
+    field: "outfitPromptTemplate",
+    label: "设置妆造提示词模板",
+    title: "妆造提示词模板",
+    desc: "给一段示例 prompt，置入内置框架，所有造型模仿它生成",
+    toast: "所有造型卡将模仿它生成",
+  },
+  props: {
+    field: "propPromptTemplate",
+    label: "设置道具提示词模板",
+    title: "道具提示词模板",
+    desc: "给一段示例 prompt，置入内置框架，所有道具模仿它生成",
+    toast: "所有道具卡将模仿它生成",
+  },
+  scenes: {
+    field: "scenePromptTemplate",
+    label: "设置场景提示词模板",
+    title: "场景提示词模板",
+    desc: "给一段示例 prompt，置入内置框架，所有场景模仿它生成",
+    toast: "所有场景卡将模仿它生成",
+  },
+}
+
 function TemplatePopover({
+  kind,
   scriptId,
   initial,
   onSaved,
 }: {
+  kind: AssetKind
   scriptId: string
   initial: string
   onSaved: () => void
 }) {
+  const config = TEMPLATE_CONFIG[kind]
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(initial)
   const [saving, setSaving] = useState(false)
@@ -2094,10 +2741,10 @@ function TemplatePopover({
       const res = await fetch(`/api/scripts/${scriptId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ assetPromptTemplate: value.trim() || null }),
+        body: JSON.stringify({ [config.field]: value.trim() || null }),
       })
       if (!res.ok) throw new Error("保存失败")
-      toast.success("提示词模板已保存", { description: "所有角色卡将模仿它生成" })
+      toast.success("提示词模板已保存", { description: config.toast })
       setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
@@ -2114,7 +2761,7 @@ function TemplatePopover({
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label="设置角色提示词模板"
+              aria-label={config.label}
               disabled={saving}
               onClick={() => setOpen((value) => !value)}
             >
@@ -2123,14 +2770,12 @@ function TemplatePopover({
           </PopoverAnchor>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[240px] text-[11px] leading-relaxed">
-          设置角色提示词模板——给一段示例 prompt，置入内置框架，所有角色模仿它生成
+          {config.label}——给一段示例 prompt，置入内置框架，{config.desc.slice(11)}
         </TooltipContent>
       </Tooltip>
       <PopoverContent align="end" className="w-72 space-y-2">
-        <p className="text-xs font-medium text-zinc-200">角色提示词模板</p>
-        <p className="text-[10px] leading-relaxed text-zinc-500">
-          给一段示例 prompt，置入内置框架，所有角色模仿它生成
-        </p>
+        <p className="text-xs font-medium text-zinc-200">{config.title}</p>
+        <p className="text-[10px] leading-relaxed text-zinc-500">{config.desc}</p>
         <Textarea
           rows={4}
           value={value}

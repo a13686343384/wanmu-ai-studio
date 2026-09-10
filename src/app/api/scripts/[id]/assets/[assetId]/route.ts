@@ -75,12 +75,20 @@ export const PATCH = withErrorHandling(
       })
     }
 
-    // 妆造 / 道具 / 场景：锁定与换图；道具另支持编辑道具卡
+    // 妆造 / 道具 / 场景：锁定与换图；道具另支持编辑道具卡；场景参考图与重置同角色
     const data: Record<string, unknown> = {}
     if (input.locked !== undefined) data.locked = input.locked
     if (input.imageUrl !== undefined) {
       data.imageUrl = input.imageUrl
       data.status = input.imageUrl ? "completed" : "pending"
+    }
+    if (found.kind === "scene") {
+      if (input.clearRefs) data.refImages = []
+      if (input.refImages) data.refImages = input.refImages
+      if (input.reset) {
+        data.refImages = []
+        data.status = "pending"
+      }
     }
     if (found.kind === "prop") {
       if (input.name !== undefined) data.name = input.name
@@ -98,15 +106,27 @@ export const PATCH = withErrorHandling(
     }
     if (Object.keys(data).length === 0) throw new AppError("没有需要更新的内容", 400)
 
-    const updated =
-      found.kind === "costume"
-        ? await prisma.costume.update({ where: { id: found.costume.id }, data })
-        : found.kind === "prop"
-          ? await prisma.prop.update({ where: { id: found.prop.id }, data })
-          : await prisma.scene.update({ where: { id: found.scene.id }, data })
+    let updated: {
+      id: string
+      locked: boolean
+      imageUrl: string | null
+      refImages?: string[]
+    }
+    if (found.kind === "costume") {
+      updated = await prisma.costume.update({ where: { id: found.costume.id }, data })
+    } else if (found.kind === "prop") {
+      updated = await prisma.prop.update({ where: { id: found.prop.id }, data })
+    } else {
+      updated = await prisma.scene.update({ where: { id: found.scene.id }, data })
+    }
 
     await prisma.script.update({ where: { id: script.id }, data: { updatedAt: new Date() } })
-    return jsonOk({ id: updated.id, locked: updated.locked, imageUrl: updated.imageUrl })
+    return jsonOk({
+      id: updated.id,
+      locked: updated.locked,
+      refImages: updated.refImages,
+      imageUrl: updated.imageUrl,
+    })
   },
 )
 

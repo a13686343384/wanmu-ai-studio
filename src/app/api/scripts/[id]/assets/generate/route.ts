@@ -38,8 +38,14 @@ export const POST = withErrorHandling(
       costumeStyle: script.costumeStyle,
       era: script.era,
     }
-    // 剧本级提示词模板（查看全部信息 / 资产坞「提示词模板」设置），所有资产出图统一置入
-    const template = script.assetPromptTemplate?.trim()
+    // 剧本级提示词模板：角色 / 妆造 / 道具 / 场景 各自独立（资产坞「提示词模板」按 Tab 分别设置）
+    const kindTemplates: Record<string, string | null | undefined> = {
+      character: script.assetPromptTemplate,
+      outfit: script.outfitPromptTemplate,
+      prop: script.propPromptTemplate,
+      scene: script.scenePromptTemplate,
+    }
+    const template = kindTemplates[input.kind]?.trim()
 
     const withTemplate = (prompt: string) =>
       template ? `${template}\n${prompt}` : prompt
@@ -116,20 +122,26 @@ export const POST = withErrorHandling(
           where: { id: item.id },
           data: { status: "generating" },
         })
-        const prompt = withTemplate(
-          buildAssetPrompt(
-            context,
-            "scene",
-            item.name,
-            item.description,
-            [item.environment, item.lighting].filter(Boolean).join("，"),
-          ),
-        )
+        const prompt = input.prompt
+          ? withTemplate(input.prompt)
+          : withTemplate(
+              buildAssetPrompt(
+                context,
+                "scene",
+                item.name,
+                item.description,
+                [item.environment, item.lighting].filter(Boolean).join("，"),
+              ),
+            )
         const { data } = await ai.generateImage({
           prompt,
-          model: input.model,
+          model: resolveModel(input.model, input.quality),
           aspectRatio: input.aspectRatio ?? script.targetAspect,
           resolution: input.resolution,
+          references: (input.refImages ?? item.refImages).map((url) => ({
+            name: url,
+            kind: "image" as const,
+          })),
         })
         await prisma.scene.update({
           where: { id: item.id },

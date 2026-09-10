@@ -23,6 +23,9 @@ const patchScriptSchema = z.object({
   targetAspect: z.enum(["9:16", "16:9", "1:1", "4:3", "3:4"]).optional(),
   pacingProfile: z.record(z.unknown()).nullable().optional(),
   assetPromptTemplate: z.string().trim().max(2000).nullable().optional(),
+  outfitPromptTemplate: z.string().trim().max(2000).nullable().optional(),
+  propPromptTemplate: z.string().trim().max(2000).nullable().optional(),
+  scenePromptTemplate: z.string().trim().max(2000).nullable().optional(),
 })
 
 /** GET /api/scripts/[id] — 剧本详情（含分集与资产计数） */
