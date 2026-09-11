@@ -461,7 +461,8 @@ export const liveAIService: AIService = {
   async analyzeScript(
     input: AnalyzeScriptInput,
   ): Promise<AIResult<ScriptAnalysis>> {
-    const { data, model } = await chatJson<{
+    // ── 第一步：分析元信息（不含分集灵感，避免 token 不够导致截断） ──
+    const { data: meta, model } = await chatJson<{
       genre: string
       narrativeStyle: string
       visualStyle: string
@@ -474,10 +475,9 @@ export const liveAIService: AIService = {
       recommendedEpisodes: number
       recommendedDuration: number
       treatment: string
-      episodeIdeas: { number: number; title: string; summary: string }[]
     }>(
       input,
-      "你是短剧立项分析师。通读剧本，输出立项方案。",
+      "你是短剧立项分析师。通读剧本，输出立项方案（不含分集灵感）。",
       JSON.stringify({
         剧名: input.title,
         作品类型: input.workType,
@@ -495,41 +495,70 @@ export const liveAIService: AIService = {
           forbidden: "禁止内容数组",
           recommendedEpisodes: "推荐集数（数字）",
           recommendedDuration: "推荐单集秒数（数字）",
-          treatment: "立项方案摘要",
-          episodeIdeas: "分集灵感数组 number/title/summary",
+          treatment: "立项方案摘要（200字以内）",
         },
       }),
-      { maxTokens: 8192 },
+      { maxTokens: 4096 },
     )
-    const analysis: ScriptAnalysis = {
-      genre: asString(data.genre, "都市/情感/悬疑"),
-      narrativeStyle: asString(data.narrativeStyle, "多线交织、情绪递进"),
-      visualStyle: asString(data.visualStyle, "高质感实拍"),
-      costumeStyle: asString(data.costumeStyle, "都市通勤风"),
-      era: asString(data.era, "当代都市"),
-      tone: asString(data.tone, "细腻、克制、有温度"),
-      audienceNotes: asString(
-        data.audienceNotes,
-        "目标观众偏好强钩子、快节奏。",
-      ),
-      allowed: asStringArray(data.allowed, ["强冲突与反转", "情感张力"]),
-      forbidden: asStringArray(data.forbidden, [
-        "过度血腥特写",
-        "现实政治影射",
-        "未成年人不当情节",
-      ]),
-      recommendedEpisodes: asNumber(data.recommendedEpisodes, 12),
-      recommendedDuration: asNumber(data.recommendedDuration, 90),
-      treatment: asString(data.treatment, "立项方案生成中内容缺失。"),
-      episodeIdeas: Array.isArray(data.episodeIdeas)
-        ? data.episodeIdeas.map((item, index) => ({
+
+    const totalEpisodes = asNumber(meta.recommendedEpisodes, 12)
+
+    // ── 第二步：单独生成分集灵感（给足 token） ──
+    let episodeIdeas: { number: number; title: string; summary: string }[] = []
+    try {
+      const { data: ideasData } = await chatJson<{
+        episodeIdeas: { number: number; title: string; summary: string }[]
+      }>(
+        input,
+        `你是短剧编剧。根据以下立项方案，为 ${totalEpisodes} 集生成每集的标题和一句话摘要。`,
+        JSON.stringify({
+          剧名: input.title,
+          题材: asString(meta.genre, ""),
+          叙事风格: asString(meta.narrativeStyle, ""),
+          立项方案: asString(meta.treatment, ""),
+          剧本全文: input.content.slice(0, 20000),
+          目标集数: totalEpisodes,
+          输出要求: {
+            episodeIdeas: `恰好 ${totalEpisodes} 个元素的数组，每项 { number(从1开始), title(≤14字), summary(≤80字一句话概括本集核心事件) }`,
+          },
+        }),
+        { maxTokens: Math.max(8192, totalEpisodes * 200) },
+      )
+      episodeIdeas = Array.isArray(ideasData.episodeIdeas)
+        ? ideasData.episodeIdeas.map((item, index) => ({
             number: asNumber(item?.number, index + 1),
             title: asString(item?.title, `第${index + 1}集`),
             summary: asString(item?.summary, ""),
           }))
-        : [],
+        : []
+    } catch {
+      // 分集灵感生成失败不阻塞主流程
+      console.warn("[analyzeScript] 分集灵感生成失败，使用空数组")
     }
-    return { data: analysis, usage: usage(input.model, model, 6) }
+
+    const analysis: ScriptAnalysis = {
+      genre: asString(meta.genre, "都市/情感/悬疑"),
+      narrativeStyle: asString(meta.narrativeStyle, "多线交织、情绪递进"),
+      visualStyle: asString(meta.visualStyle, "高质感实拍"),
+      costumeStyle: asString(meta.costumeStyle, "都市通勤风"),
+      era: asString(meta.era, "当代都市"),
+      tone: asString(meta.tone, "细腻、克制、有温度"),
+      audienceNotes: asString(
+        meta.audienceNotes,
+        "目标观众偏好强钩子、快节奏。",
+      ),
+      allowed: asStringArray(meta.allowed, ["强冲突与反转", "情感张力"]),
+      forbidden: asStringArray(meta.forbidden, [
+        "过度血腥特写",
+        "现实政治影射",
+        "未成年人不当情节",
+      ]),
+      recommendedEpisodes: totalEpisodes,
+      recommendedDuration: asNumber(meta.recommendedDuration, 90),
+      treatment: asString(meta.treatment, "立项方案生成中内容缺失。"),
+      episodeIdeas,
+    }
+    return { data: analysis, usage: usage(input.model, model, 8) }
   },
 
   async generateText(
