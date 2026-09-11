@@ -35,6 +35,19 @@ import { useAiModels } from "@/hooks/useAiModels"
 import type { WritingProjectDTO } from "@/lib/writing/types"
 import { cn } from "@/lib/utils"
 
+/** 轻量 Markdown → HTML（加粗、标题、列表、换行） */
+function simpleMarkdown(text: string): string {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-medium text-zinc-100 mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-sm font-semibold text-zinc-100 mt-3 mb-1">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-base font-semibold text-zinc-50 mt-3 mb-1">$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-zinc-100">$1</strong>')
+    .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc text-zinc-400">$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal text-zinc-400">$1</li>')
+    .replace(/\n/g, "<br/>")
+}
+
 type Panel = "blueprint" | "characters" | "history" | "generate" | null
 export function WritingEditor({
   initialProject,
@@ -430,7 +443,7 @@ export function WritingEditor({
             <Sparkles className="h-4 w-4 text-orange-500" />
             编剧 Agent
             <span className="ml-auto text-[10px] text-zinc-500">
-              围绕本剧持续打磨
+              对话打磨大纲 · 查一致性 · 定稿
             </span>
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
@@ -439,18 +452,36 @@ export function WritingEditor({
                 <div
                   key={i}
                   className={cn(
-                    "whitespace-pre-wrap rounded-xl p-3 text-xs leading-6",
+                    "rounded-xl p-3 text-xs leading-6",
                     item.role === "user"
-                      ? "ml-6 bg-orange-500/15 text-orange-200"
+                      ? "ml-6 bg-orange-500/15 text-orange-200 whitespace-pre-wrap"
                       : "mr-3 bg-zinc-800/60 text-zinc-300",
                   )}
+                  {...(item.role !== "user" ? { dangerouslySetInnerHTML: { __html: simpleMarkdown(item.text) } } : {})}
                 >
-                  {item.text}
+                  {item.role === "user" ? item.text : null}
                 </div>
               ))
             ) : (
-              <div className="py-8 text-sm leading-7 text-zinc-500">
-                先生成项目蓝图，建立人物与分集结构。之后可以描述想调整的冲突、节奏或人物动机。
+              <div className="space-y-4 py-4">
+                <p className="text-sm leading-7 text-zinc-400">
+                  和编剧 Agent 一起打磨大纲
+                </p>
+                <div className="grid gap-2">
+                  {[
+                    "先取配方，给我一版大纲初稿",
+                    "前3集节奏帮我加强钩子",
+                    "通读已生成的正文，查一下有没有漏洞",
+                    "我满意了，定稿吧",
+                  ].map((prompt) => (
+                    <button key={prompt} type="button"
+                      onClick={() => { setMessage(prompt); void action("chat", { instruction: prompt }) }}
+                      disabled={!!busy}
+                      className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-left text-xs text-zinc-400 transition-colors hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50">
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -472,39 +503,26 @@ export function WritingEditor({
               maxLength={2000}
               disabled={!!busy}
               rows={3}
-              placeholder="例如：让主角更主动，把悬念提前到开场…"
+              placeholder="和编剧 Agent 聊聊这部剧的大纲…"
               className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200 outline-none"
             />
             <div className="flex items-center justify-between gap-2">
               <Select value={model} onValueChange={setModel}>
-                <SelectTrigger
-                  className="h-7 min-w-0 gap-1 text-xs"
-                  aria-label="编剧模型"
-                >
+                <SelectTrigger className="h-7 min-w-0 gap-1 text-xs" aria-label="编剧模型">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {textModels.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} · {item.cost}积分
-                    </SelectItem>
+                    <SelectItem key={item.id} value={item.id}>{item.name} · {item.cost}积分</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                type="submit"
-                size="sm"
-                variant="brand"
-                disabled={!!busy || !message.trim()}
-              >
-                {busy === "chat" ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Send />
-                )}
+              <Button type="submit" size="sm" variant="brand" disabled={!!busy || !message.trim()}>
+                {busy === "chat" ? <Loader2 className="animate-spin" /> : <Send />}
                 发送
               </Button>
             </div>
+            <p className="text-[10px] text-zinc-600">每次对话消耗 🎫2 · 失败自动退还</p>
           </form>
         </aside>
       </div>
