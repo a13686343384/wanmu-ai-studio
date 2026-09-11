@@ -1,6 +1,6 @@
 "use client"
 import { currentModelScope } from "@/lib/ai/client-scope"
-import { ArrowUp, Loader2 } from "lucide-react"
+import { ArrowUp, Camera, Loader2, Mic, Shield, Sparkles, Wand2 } from "lucide-react"
 import { useNodesData, useReactFlow } from "@xyflow/react"
 import { ASPECT_RATIOS, DURATIONS, RESOLUTIONS } from "@/lib/constants"
 import { useAiModels } from "@/hooks/useAiModels"
@@ -178,19 +178,54 @@ export function StudioComposer({
             options={[...DURATIONS]}
           />
         )}
+        {/* 图片模式额外控制 */}
+        {mediaType === "image" && (
+          <>
+            <button type="button" title="风格" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Wand2 className="h-3 w-3" />风格
+            </button>
+            <button type="button" title="安全区" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Shield className="h-3 w-3" />安全区
+            </button>
+            <button type="button" title="特效" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Sparkles className="h-3 w-3" />特效
+            </button>
+          </>
+        )}
+        {/* 视频模式额外控制 */}
+        {mediaType === "video" && (
+          <>
+            <button type="button" title="运镜" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Camera className="h-3 w-3" />运镜
+            </button>
+            <button type="button" title="安全区" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Shield className="h-3 w-3" />安全区
+            </button>
+            <button type="button" title="特效" className="flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:border-zinc-600">
+              <Sparkles className="h-3 w-3" />特效
+            </button>
+          </>
+        )}
+        {/* 音频三模式切换 */}
         {mediaType === "audio" && (
-          <CardSelect
-            ariaLabel="音频模式"
-            value={params.smartLyrics ? "lyrics" : "music"}
-            disabled={running}
-            onValueChange={(value) =>
-              updateNodeData(nodeId, { smartLyrics: value === "lyrics" })
-            }
-            options={[
-              { value: "lyrics", label: "智能歌词" },
-              { value: "music", label: "纯音乐" },
-            ]}
-          />
+          <>
+            <CardSelect
+              ariaLabel="音频模式"
+              value={params.smartLyrics ? "lyrics" : "music"}
+              disabled={running}
+              onValueChange={(value) =>
+                updateNodeData(nodeId, { smartLyrics: value === "lyrics" })
+              }
+              options={[
+                { value: "adaptive", label: "自适应" },
+                { value: "lyrics", label: "自定义" },
+                { value: "music", label: "纯音乐" },
+              ]}
+            />
+            <button type="button" title="录音输入" className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-700 text-zinc-400 hover:border-zinc-600">
+              <Mic className="h-3 w-3" />
+            </button>
+          </>
         )}
         <span className="ml-auto text-xs text-orange-300">
           {current?.cost ?? 0} 积分
