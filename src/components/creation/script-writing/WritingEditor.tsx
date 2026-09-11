@@ -536,7 +536,7 @@ export function WritingEditor({
           <DialogHeader>
             <DialogTitle>
               {panel === "blueprint"
-                ? "剧本大纲"
+                ? "故事大纲"
                 : panel === "characters"
                   ? "角色档案"
                   : panel === "history"
@@ -557,9 +557,25 @@ export function WritingEditor({
           </DialogHeader>
           {panel === "blueprint" && (
             <>
-              <pre className="whitespace-pre-wrap text-sm leading-8 text-zinc-300">
-                {project.document.blueprint || "还没有大纲，请先生成项目蓝图。"}
-              </pre>
+              {/* 工具栏 */}
+              <div className="flex flex-wrap gap-1 border-b border-zinc-800 pb-2">
+                <Button variant="ghost" size="sm" onClick={() => toast.info("质检功能即将上线")}>质检</Button>
+                <Button variant="ghost" size="sm" onClick={() => setPanel("history")}>版本</Button>
+                <Button variant="ghost" size="sm" disabled={!hasBlueprint}
+                  onClick={() => { if (hasBlueprint) void copy(project.document.blueprint) }}>复制</Button>
+                <Button variant="ghost" size="sm" onClick={() => openGeneration("blueprint")}>重新生成蓝图</Button>
+              </div>
+              {hasBlueprint ? (
+                <div className="text-sm leading-8 text-zinc-300"
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdown(project.document.blueprint) }} />
+              ) : (
+                <div className="space-y-3 py-4 text-center">
+                  <p className="text-sm text-zinc-500">还没有大纲 — 用右侧「编剧 Agent」对话式打磨（推荐）：它会取本题材的爆款配方，提出初稿，按你的反馈反复调整，满意后说「定稿吧」自动派生分集。</p>
+                  <Button variant="inverse" size="sm" onClick={() => openGeneration("blueprint")}>
+                    <Sparkles />一键生成项目包蓝图
+                  </Button>
+                </div>
+              )}
               {hasBlueprint && (
                 <Button
                   variant="outline"
