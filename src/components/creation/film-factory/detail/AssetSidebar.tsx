@@ -1222,11 +1222,11 @@ function AssetGenerateDialog({
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (imageModels.length > 0 && !model) setModel(imageModels[0]!.id)
+    if (imageModels.length > 0 && !imageModels.some(m => m.id === model)) setModel(imageModels[0]!.id)
   }, [imageModels, model])
 
   useEffect(() => {
-    if (textModels.length > 0 && !promptModel) setPromptModel(textModels[0]!.id)
+    if (textModels.length > 0 && !textModels.some(m => m.id === promptModel)) setPromptModel(textModels[0]!.id)
   }, [textModels, promptModel])
 
   const imageModel =

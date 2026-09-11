@@ -78,12 +78,12 @@ export function StoryboardGenerateDialog({
   const [running, setRunning] = useState(false)
 
   useEffect(() => {
-    if (kind === "image" && imageModels.length > 0 && !model) setModel(imageModels[0]!.id)
-    if (kind === "video" && videoModels.length > 0 && !model) setModel(videoModels[0]!.id)
+    if (kind === "image" && imageModels.length > 0 && !imageModels.some(m => m.id === model)) setModel(imageModels[0]!.id)
+    if (kind === "video" && videoModels.length > 0 && !videoModels.some(m => m.id === model)) setModel(videoModels[0]!.id)
   }, [kind, imageModels, videoModels, model])
 
   useEffect(() => {
-    if (textModels.length > 0 && !textModel) setTextModel(textModels[0]!.id)
+    if (textModels.length > 0 && !textModels.some(m => m.id === textModel)) setTextModel(textModels[0]!.id)
   }, [textModels, textModel])
 
   useEffect(() => {

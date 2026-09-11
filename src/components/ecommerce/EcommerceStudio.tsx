@@ -87,7 +87,7 @@ export function EcommerceStudio() {
 
   // 模型加载完成后设置默认值
   useEffect(() => {
-    if (imageModels.length > 0 && !imageModel) {
+    if (imageModels.length > 0 && !imageModels.some(m => m.id === imageModel)) {
       setImageModel(imageModels[0]!.id)
     }
   }, [imageModels, imageModel])

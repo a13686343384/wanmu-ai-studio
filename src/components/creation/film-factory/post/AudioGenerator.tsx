@@ -34,7 +34,7 @@ export function AudioGenerator({
   const { models: audioModels } = useAiModels("audio")
   const [prompt, setPrompt] = useState("沉稳大气的纪录片解说，男声，低频铺底，渐强收尾")
   const [model, setModel] = useState("")
-  useEffect(() => { if (audioModels.length && !model) setModel(audioModels[0]!.id) }, [audioModels, model])
+  useEffect(() => { if (audioModels.length && !audioModels.some(m => m.id === model)) setModel(audioModels[0]!.id) }, [audioModels, model])
   const [duration, setDuration] = useState("15s")
   const [smartLyrics, setSmartLyrics] = useState(true)
   const [running, setRunning] = useState(false)

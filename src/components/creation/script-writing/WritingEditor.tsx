@@ -67,7 +67,7 @@ export function WritingEditor({
   const { models: textModels } = useAiModels("text")
   const [model, setModel] = useState("")
   useEffect(() => {
-    if (textModels.length && !model) setModel(textModels[0]!.id)
+    if (textModels.length && !textModels.some(m => m.id === model)) setModel(textModels[0]!.id)
   }, [textModels, model])
   const [busy, setBusy] = useState("")
   const lock = useRef(false)

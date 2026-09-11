@@ -87,19 +87,19 @@ export function SplitStoryboardDialog({
   const [audioModel, setAudioModel] = useState("")
 
   useEffect(() => {
-    if (textModels.length > 0 && !textModel) setTextModel(textModels[0]!.id)
+    if (textModels.length > 0 && !textModels.some(m => m.id === textModel)) setTextModel(textModels[0]!.id)
   }, [textModels, textModel])
 
   useEffect(() => {
-    if (imageModels.length > 0 && !imageModel) setImageModel(imageModels[0]!.id)
+    if (imageModels.length > 0 && !imageModels.some(m => m.id === imageModel)) setImageModel(imageModels[0]!.id)
   }, [imageModels, imageModel])
 
   useEffect(() => {
-    if (videoModels.length > 0 && !videoModel) setVideoModel(videoModels[0]!.id)
+    if (videoModels.length > 0 && !videoModels.some(m => m.id === videoModel)) setVideoModel(videoModels[0]!.id)
   }, [videoModels, videoModel])
 
   useEffect(() => {
-    if (audioModels.length > 0 && !audioModel) setAudioModel(audioModels[0]!.id)
+    if (audioModels.length > 0 && !audioModels.some(m => m.id === audioModel)) setAudioModel(audioModels[0]!.id)
   }, [audioModels, audioModel])
   const [resolution, setResolution] = useState("1080p")
   const [quality, setQuality] = useState("low")

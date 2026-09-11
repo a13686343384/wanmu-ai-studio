@@ -56,7 +56,7 @@ export function VideoBatchDialog({
   const [model, setModel] = useState("")
 
   useEffect(() => {
-    if (videoModels.length > 0 && !model) setModel(videoModels[0]!.id)
+    if (videoModels.length > 0 && !videoModels.some(m => m.id === model)) setModel(videoModels[0]!.id)
   }, [videoModels, model])
   const [resolution, setResolution] = useState("1080p")
   const [duration, setDuration] = useState("source")

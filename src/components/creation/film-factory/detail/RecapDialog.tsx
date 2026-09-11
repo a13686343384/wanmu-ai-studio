@@ -50,7 +50,7 @@ export function RecapDialog({
   const [running, setRunning] = useState(false)
   const { models: textModels } = useAiModels("text")
   const [model, setModel] = useState("")
-  useEffect(() => { if (textModels.length && !model) setModel(textModels[0]!.id) }, [textModels, model])
+  useEffect(() => { if (textModels.length && !textModels.some(m => m.id === model)) setModel(textModels[0]!.id) }, [textModels, model])
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([])
   const [chatDraft, setChatDraft] = useState("")
   const [chatting, setChatting] = useState(false)

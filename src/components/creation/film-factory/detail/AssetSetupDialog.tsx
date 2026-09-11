@@ -36,10 +36,10 @@ export function AssetSetupDialog({
   const [textModel, setTextModel] = useState("")
   const [imageModel, setImageModel] = useState("")
   useEffect(() => {
-    if (textModels.length && !textModel) setTextModel(textModels[0]!.id)
+    if (textModels.length && !textModels.some(m => m.id === textModel)) setTextModel(textModels[0]!.id)
   }, [textModels, textModel])
   useEffect(() => {
-    if (imageModels.length && !imageModel) setImageModel(imageModels[0]!.id)
+    if (imageModels.length && !imageModels.some(m => m.id === imageModel)) setImageModel(imageModels[0]!.id)
   }, [imageModels, imageModel])
   void aspectRatio
   const aspect = "16:9"
