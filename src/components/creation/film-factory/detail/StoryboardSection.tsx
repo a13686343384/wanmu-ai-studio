@@ -114,6 +114,20 @@ export function StoryboardSection({
     filtered.reduce((sum, item) => sum + (item.duration ?? 0), 0),
   )
 
+  // 列数随建档画幅动态：竖屏多列小卡、横屏少列大卡、方形居中
+  const orientation = (() => {
+    const [w, h] = aspectRatio.split(":").map(Number)
+    if (!w || !h) return "landscape"
+    const ratio = w / h
+    return ratio < 0.95 ? "portrait" : ratio > 1.05 ? "landscape" : "square"
+  })()
+  const gridCols =
+    orientation === "portrait"
+      ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6"
+      : orientation === "square"
+        ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5"
+        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
@@ -361,7 +375,7 @@ export function StoryboardSection({
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                    <div className={cn("grid gap-2 p-2", gridCols)}>
                       {segment.items.map((storyboard) => (
                         <StoryboardCard
                           key={storyboard.id}
