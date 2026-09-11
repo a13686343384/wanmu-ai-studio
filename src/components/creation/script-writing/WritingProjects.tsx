@@ -563,18 +563,13 @@ export function WritingProjects() {
                 ))}
               </div>
             </div>
+            <p className="text-[10px] text-zinc-600">正文字数按时长换算（约 7~11 字/秒）</p>
             <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={creating}
-                onClick={() => setOpen(false)}
-              >
+              <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={() => setOpen(false)}>
                 取消
               </Button>
               <Button type="submit" variant="inverse" size="sm" disabled={creating}>
-                {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}创建并进入
+                {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}创建并进入
               </Button>
             </div>
           </form>
