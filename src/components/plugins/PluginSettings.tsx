@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+// StyleTemplatePanel uses useCallback
 import {
   Check,
   ChevronDown,
@@ -229,7 +230,7 @@ export function PluginSettings() {
           <p className="mb-4 text-xs text-zinc-500">
             每个服化道风格类型对应一套提取模板 + 出图提示词模板。创建剧本时 AI 按所选风格使用对应模板提取角色/场景/道具/妆造描述词并生成参考图。
           </p>
-          <StyleTemplatePlaceholder />
+          <StyleTemplatePanel />
         </section>
       </div>
 
@@ -240,35 +241,139 @@ export function PluginSettings() {
   )
 }
 
-/* ── 风格模板占位（后续任务实现完整 CRUD） ── */
-function StyleTemplatePlaceholder() {
-  const presets = [
-    { name: "默认万能", desc: "适用于所有题材的通用模板", isDefault: true },
-    { name: "赛博废土", desc: "赛博朋克 + 废土美学，暗色调、数据纹路、锈蚀金属" },
-    { name: "古风仙侠", desc: "东方古典美学，水墨意境、飘逸服饰、仙气光影" },
-    { name: "都市现代", desc: "当代都市写实风，通勤服饰、玻璃幕墙、自然光" },
-    { name: "末世科幻", desc: "后启示录风格，破败建筑、防护装备、冷峻色调" },
-  ]
+/* ── 风格模板面板（真实 CRUD） ── */
+interface StyleTemplateRow {
+  id: string; name: string; description: string | null; isDefault: boolean
+  templates: { extractionTemplates: Record<string, string>; imagePromptTemplates: Record<string, string> }
+}
+
+function StyleTemplatePanel() {
+  const [templates, setTemplates] = useState<StyleTemplateRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingTpl, setEditingTpl] = useState<StyleTemplateRow | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/style-templates")
+      const data = await res.json()
+      if (res.ok) setTemplates(data.data ?? [])
+    } finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  async function remove(id: string, name: string) {
+    if (!window.confirm(`删除风格模板「${name}」？`)) return
+    const res = await fetch(`/api/style-templates/${id}`, { method: "DELETE" })
+    if (res.ok) { toast.success("已删除"); void load() }
+    else { const d = await res.json(); toast.error(d.error ?? "删除失败") }
+  }
+
+  if (loading) return <Loader2 className="mx-auto h-5 w-5 animate-spin text-zinc-600" />
+
   return (
-    <div className="space-y-2">
-      {presets.map(p => (
-        <div key={p.name} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-zinc-100">{p.name}</span>
-              {p.isDefault && <Badge variant="brand" className="text-[10px]">默认</Badge>}
+    <>
+      <div className="space-y-2">
+        {templates.map(t => (
+          <div key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-100">{t.name}</span>
+                {t.isDefault && <Badge variant="brand" className="text-[10px]">默认</Badge>}
+              </div>
+              <p className="mt-0.5 text-[11px] text-zinc-500">{t.description}</p>
             </div>
-            <p className="mt-0.5 text-[11px] text-zinc-500">{p.desc}</p>
+            <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setEditingTpl(t)}>
+              <Pencil className="mr-1 h-3 w-3" />编辑
+            </Button>
+            {!t.isDefault && (
+              <Button variant="ghost" size="icon-sm" className="hover:text-rose-300" onClick={() => void remove(t.id, t.name)}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
-          <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => toast.info("模板编辑功能即将上线")}>
-            <Pencil className="mr-1 h-3 w-3" />编辑
-          </Button>
-        </div>
-      ))}
-      <Button variant="outline" size="sm" className="w-full" onClick={() => toast.info("自定义模板功能即将上线")}>
+        ))}
+      </div>
+      <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => setEditingTpl({ id: "", name: "", description: "", isDefault: false, templates: { extractionTemplates: { character: "", scene: "", prop: "", costume: "" }, imagePromptTemplates: { character: "", scene: "", prop: "", costume: "" } } })}>
         <Plus className="mr-1 h-3 w-3" />新建风格模板
       </Button>
-    </div>
+
+      {editingTpl && (
+        <StyleTemplateEditDialog template={editingTpl} onClose={() => setEditingTpl(null)} onSaved={() => { setEditingTpl(null); void load() }} />
+      )}
+    </>
+  )
+}
+
+const ASSET_KINDS = [
+  { key: "character", label: "角色" },
+  { key: "scene", label: "场景" },
+  { key: "prop", label: "道具" },
+  { key: "costume", label: "妆造" },
+] as const
+
+function StyleTemplateEditDialog({ template, onClose, onSaved }: { template: StyleTemplateRow; onClose: () => void; onSaved: () => void }) {
+  const isNew = !template.id
+  const [name, setName] = useState(template.name)
+  const [description, setDescription] = useState(template.description ?? "")
+  const [extraction, setExtraction] = useState(template.templates.extractionTemplates)
+  const [imagePrompt, setImagePrompt] = useState(template.templates.imagePromptTemplates)
+  const [tab, setTab] = useState<"extraction" | "image">("extraction")
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!name.trim()) { toast.error("名称不能为空"); return }
+    setSaving(true)
+    try {
+      const body = { name: name.trim(), description, templates: { extractionTemplates: extraction, imagePromptTemplates: imagePrompt } }
+      const res = isNew
+        ? await fetch("/api/style-templates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+        : await fetch(`/api/style-templates/${template.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "保存失败")
+      toast.success(isNew ? "模板已创建" : "模板已更新")
+      onSaved()
+    } catch (e) { toast.error(e instanceof Error ? e.message : "保存失败") }
+    finally { setSaving(false) }
+  }
+
+  const currentTemplates = tab === "extraction" ? extraction : imagePrompt
+  const setCurrentTemplates = tab === "extraction" ? setExtraction : setImagePrompt
+
+  return (
+    <Dialog open onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isNew ? "新建风格模板" : `编辑 · ${template.name}`}</DialogTitle>
+          <DialogDescription>配置该风格的提取模板和出图提示词模板。提取模板决定 AI 输出什么格式的描述词，出图模板决定生成参考图时的 prompt。</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>风格名称</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="如：赛博废土" /></div>
+          <div className="space-y-1.5"><Label>风格描述</Label><Input value={description} onChange={e => setDescription(e.target.value)} placeholder="一句话描述该风格特征" /></div>
+        </div>
+        <Tabs value={tab} onValueChange={v => setTab(v as "extraction" | "image")}>
+          <TabsList className="w-full">
+            <TabsTrigger value="extraction" className="flex-1">提取模板（AI 输出格式）</TabsTrigger>
+            <TabsTrigger value="image" className="flex-1">出图模板（生图 prompt）</TabsTrigger>
+          </TabsList>
+          <TabsContent value={tab} className="space-y-3 pt-3">
+            {ASSET_KINDS.map(({ key, label }) => (
+              <div key={key} className="space-y-1.5">
+                <Label className="text-xs">{label} — {tab === "extraction" ? "提取模板" : "出图模板"}</Label>
+                <Textarea rows={6} value={currentTemplates[key] ?? ""} onChange={e => setCurrentTemplates({ ...currentTemplates, [key]: e.target.value })} className="font-mono text-[11px] leading-relaxed" placeholder={`输入${label}的${tab === "extraction" ? "提取" : "出图"}模板...`} />
+              </div>
+            ))}
+          </TabsContent>
+        </Tabs>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="inverse" onClick={() => void save()} disabled={saving || !name.trim()}>
+            {saving ? <Loader2 className="animate-spin" /> : <Check />}保存
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
