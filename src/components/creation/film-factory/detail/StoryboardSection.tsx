@@ -50,6 +50,10 @@ export function StoryboardSection({
   onGenerateVideo,
   onEdit,
 }: {
+  scriptId?: string
+  episodeId?: string
+  reviewContextKey?: string
+  onEnterVideo?: () => void
   storyboards: StoryboardDTO[]
   loading: boolean
   busyId: string | null
