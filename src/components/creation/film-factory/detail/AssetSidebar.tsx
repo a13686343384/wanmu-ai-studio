@@ -837,9 +837,12 @@ function CharacterCard({
           </span>
         </div>
 
-        {/* 悬浮操作条（图片右下角）：下载原图 / 上传本地替换 / 编辑 / 更多 */}
-        {character.imageUrl && (
-          <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        {/* 悬浮操作条（右下角）：有图=下载/上传/编辑/更多；无图=生成/上传/编辑/删除 */}
+        <div className={cn(
+          "absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1",
+          character.imageUrl ? "opacity-0 transition-opacity duration-150 group-hover:opacity-100" : "opacity-100",
+        )}>
+          {character.imageUrl ? (
             <ImageActionButton
               label="下载原图"
               disabled={busy}
@@ -847,20 +850,40 @@ function CharacterCard({
             >
               <Download className="h-3 w-3" />
             </ImageActionButton>
+          ) : (
             <ImageActionButton
-              label="上传本地替换参考图"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="h-3 w-3" />
-            </ImageActionButton>
-            <ImageActionButton
-              label="编辑"
+              label="生成"
               disabled={busy}
               onClick={() => setGenOpen(true)}
             >
-              <Pencil className="h-3 w-3" />
+              <Sparkles className="h-3 w-3" />
             </ImageActionButton>
+          )}
+          <ImageActionButton
+            label="上传"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-3 w-3" />
+          </ImageActionButton>
+          <ImageActionButton
+            label="编辑"
+            disabled={busy}
+            onClick={() => setGenOpen(true)}
+          >
+            <Pencil className="h-3 w-3" />
+          </ImageActionButton>
+          {!character.imageUrl && (
+            <ImageActionButton
+              label="删除"
+              disabled={busy}
+              onClick={() => setDeleteOpen(true)}
+              className="bg-rose-950/90 text-rose-200 ring-rose-500/40 hover:bg-rose-900"
+            >
+              <Trash2 className="h-3 w-3" />
+            </ImageActionButton>
+          )}
+          {character.imageUrl && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -923,8 +946,8 @@ function CharacterCard({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="space-y-0.5 p-2">
@@ -1113,11 +1136,13 @@ function ImageActionButton({
   onClick,
   disabled,
   children,
+  className,
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   children: React.ReactNode
+  className?: string
 }) {
   return (
     <Tooltip>
@@ -1127,7 +1152,7 @@ function ImageActionButton({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className="flex h-[22px] w-[22px] items-center justify-center rounded bg-zinc-950/85 text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+          className={cn("flex h-[22px] w-[22px] items-center justify-center rounded bg-zinc-950/85 text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50", className)}
         >
           {children}
         </button>
@@ -1639,8 +1664,25 @@ function CostumeCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  async function deleteCostume() {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${costume.id}`, { method: "DELETE" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "删除失败")
+      toast.success(`「${costume.name}」已删除`)
+      setDeleteOpen(false)
+      onDone()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   /** 替换：唤起系统文件选择框，上传后直接替换已出图 */
   async function uploadReplace(file: File) {
@@ -1763,28 +1805,38 @@ function CostumeCard({
                 : "待生成"}
         </span>
 
-        {/* 悬浮操作条（右下）：重出 / 替换 */}
-        <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button
-            type="button"
-            aria-label="重出"
-            disabled={busy}
-            onClick={() => setRegenOpen(true)}
-            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            <RefreshCw className="h-3 w-3" />
-            重出
-          </button>
-          <button
-            type="button"
-            aria-label="替换"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            <Upload className="h-3 w-3" />
-            替换
-          </button>
+        {/* 悬浮操作条（右下）：有图=重出/替换；无图=生成/上传/编辑/删除 */}
+        <div className={cn(
+          "absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1",
+          costume.imageUrl ? "opacity-0 transition-opacity duration-150 group-hover:opacity-100" : "opacity-100",
+        )}>
+          {costume.imageUrl ? (
+            <>
+              <button type="button" aria-label="重出" disabled={busy} onClick={() => setRegenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <RefreshCw className="h-3 w-3" />重出
+              </button>
+              <button type="button" aria-label="替换" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />替换
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" aria-label="生成" disabled={busy} onClick={() => setRegenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />生成
+              </button>
+              <button type="button" aria-label="上传" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />上传
+              </button>
+              <button type="button" aria-label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-rose-950/90 px-1.5 text-[10px] text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50">
+                <Trash2 className="h-3 w-3" />删除
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1843,6 +1895,22 @@ function CostumeCard({
             >
               重新出图
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除造型（确认） */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除造型</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            确定要删除「{costume.name}」吗？此操作不可恢复。
+          </p>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(false)}>取消</Button>
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => void deleteCostume()}>删除</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2015,46 +2083,33 @@ function PropCard({
                 : "待生成"}
         </span>
 
-        {/* 悬浮操作条（右下）：重出 / 替换 / 编辑 / 删除 */}
-        <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button
-            type="button"
-            aria-label="重出"
-            disabled={busy}
-            onClick={() => setRegenOpen(true)}
-            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            <RefreshCw className="h-3 w-3" />
-            重出
+        {/* 悬浮操作条（右下）：有图=重出/替换/编辑/删除；无图=生成/上传/编辑/删除 */}
+        <div className={cn(
+          "absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1",
+          prop.imageUrl ? "opacity-0 transition-opacity duration-150 group-hover:opacity-100" : "opacity-100",
+        )}>
+          {prop.imageUrl ? (
+            <button type="button" aria-label="重出" disabled={busy} onClick={() => setRegenOpen(true)}
+              className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+              <RefreshCw className="h-3 w-3" />重出
+            </button>
+          ) : (
+            <button type="button" aria-label="生成" disabled={busy} onClick={() => setRegenOpen(true)}
+              className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+              <Sparkles className="h-3 w-3" />生成
+            </button>
+          )}
+          <button type="button" aria-label={prop.imageUrl ? "替换" : "上传"} disabled={busy} onClick={() => fileRef.current?.click()}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+            <Upload className="h-3 w-3" />{prop.imageUrl ? "替换" : "上传"}
           </button>
-          <button
-            type="button"
-            aria-label="替换"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            <Upload className="h-3 w-3" />
-            替换
+          <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+            <Pencil className="h-3 w-3" />编辑
           </button>
-          <button
-            type="button"
-            aria-label="编辑"
-            disabled={busy}
-            onClick={() => setEditOpen(true)}
-            className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            <Pencil className="h-3 w-3" />
-            编辑
-          </button>
-          <button
-            type="button"
-            aria-label="删除"
-            disabled={busy}
-            onClick={() => setDeleteOpen(true)}
-            className="flex h-[22px] w-[22px] items-center justify-center rounded bg-rose-950/90 text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50"
-          >
-            <Trash2 className="h-3 w-3" />
+          <button type="button" aria-label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
+            className="flex h-[22px] items-center gap-1 rounded bg-rose-950/90 px-1.5 text-[10px] text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50">
+            <Trash2 className="h-3 w-3" />删除
           </button>
         </div>
       </div>
@@ -2458,30 +2513,41 @@ function SceneCard({
           </span>
         </div>
 
-        {/* 悬浮操作条（图片右下角），更多菜单与角色基本一致 */}
-        {scene.imageUrl && (
-          <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-            <ImageActionButton
-              label="下载原图"
-              disabled={busy}
-              onClick={downloadImage}
-            >
-              <Download className="h-3 w-3" />
-            </ImageActionButton>
-            <ImageActionButton
-              label="上传本地替换参考图"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="h-3 w-3" />
-            </ImageActionButton>
-            <ImageActionButton
-              label="编辑"
-              disabled={busy}
-              onClick={() => setGenOpen(true)}
-            >
-              <Pencil className="h-3 w-3" />
-            </ImageActionButton>
+        {/* 悬浮操作条（右下角）：有图=下载/上传/编辑/更多；无图=生成/上传/编辑/删除 */}
+        <div className={cn(
+          "absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1",
+          scene.imageUrl ? "opacity-0 transition-opacity duration-150 group-hover:opacity-100" : "opacity-100",
+        )}>
+          {scene.imageUrl ? (
+            <>
+              <ImageActionButton label="下载原图" disabled={busy} onClick={downloadImage}>
+                <Download className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
+                <Upload className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+                <Pencil className="h-3 w-3" />
+              </ImageActionButton>
+            </>
+          ) : (
+            <>
+              <ImageActionButton label="生成" disabled={busy} onClick={() => setGenOpen(true)}>
+                <Sparkles className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
+                <Upload className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+                <Pencil className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
+                className="bg-rose-950/90 text-rose-200 ring-rose-500/40 hover:bg-rose-900">
+                <Trash2 className="h-3 w-3" />
+              </ImageActionButton>
+            </>
+          )}
+          {scene.imageUrl && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -2539,8 +2605,8 @@ function SceneCard({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="space-y-0.5 p-2">
