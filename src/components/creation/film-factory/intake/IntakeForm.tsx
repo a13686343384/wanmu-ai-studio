@@ -129,71 +129,79 @@ export function IntakeForm({
   return (
     <>
       <main
-        className={embedded ? "" : "mx-auto w-full max-w-6xl px-4 py-6 lg:px-6"}
+        className={
+          embedded
+            ? "flex min-h-0 flex-1 flex-col"
+            : "mx-auto w-full max-w-6xl px-4 py-6 lg:px-6"
+        }
       >
-        {/* 头部 */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              {!embedded && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  asChild
-                  aria-label="返回影视工厂"
-                >
-                  <Link href="/creation/film-factory">
-                    <ArrowLeft className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-              <h1 className="text-lg font-semibold tracking-tight text-zinc-50">
-                新建剧本
-              </h1>
-              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
-                Intake
-              </span>
-              <span className="text-[11px] text-zinc-600">· 立项台</span>
+        {/* 头部（固定） */}
+        <div className="shrink-0 px-5 pt-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                {!embedded && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    asChild
+                    aria-label="返回影视工厂"
+                  >
+                    <Link href="/creation/film-factory">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
+                <h1 className="text-lg font-semibold tracking-tight text-zinc-50">
+                  新建剧本
+                </h1>
+                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+                  Intake
+                </span>
+                <span className="text-[11px] text-zinc-600">· 立项台</span>
+              </div>
+
+              <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-500">
+                粘贴你的剧本（或文案），点「AI 智能立项」—— AI 通读全本后推荐集数
+                / 单集时长 / 三幕结构 / 题材 / 视觉风格 /
+                服化道，审阅微调后再创建。
+              </p>
             </div>
 
-            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-500">
-              粘贴你的剧本（或文案），点「AI 智能立项」—— AI 通读全本后推荐集数
-              / 单集时长 / 三幕结构 / 题材 / 视觉风格 /
-              服化道，审阅微调后再创建。
-            </p>
-          </div>
-
-          {!embedded && (
-            <Button variant="ghost" size="icon-sm" asChild aria-label="关闭">
-              <Link href="/creation/film-factory">
-                <X className="h-4 w-4" />
-              </Link>
-            </Button>
-          )}
-        </div>
-
-        {/* 双栏 */}
-        <div className="mt-5 grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
-            <ScriptMaterialPanel
-              title={title}
-              content={content}
-              onTitleChange={setTitle}
-              onContentChange={setContent}
-              errors={errors}
-            />
-          </div>
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
-            <ConfigPanel config={config} onChange={patchConfig} />
+            {!embedded && (
+              <Button variant="ghost" size="icon-sm" asChild aria-label="关闭">
+                <Link href="/creation/film-factory">
+                  <X className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* 底部操作栏 */}
+        {/* 双栏（可滚动） */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+              <ScriptMaterialPanel
+                title={title}
+                content={content}
+                onTitleChange={setTitle}
+                onContentChange={setContent}
+                errors={errors}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+              <ConfigPanel config={config} onChange={patchConfig} />
+            </div>
+          </div>
+        </div>
+
+        {/* 底部操作栏（固定） */}
         <div
           className={
             embedded
-              ? "mt-5 flex items-center justify-end gap-3 border-t border-zinc-800/80 pt-4"
+              ? "shrink-0 flex items-center justify-end gap-3 border-t border-zinc-800/80 px-5 py-3"
               : "sticky bottom-0 mt-6 flex items-center justify-between gap-3 border-t border-zinc-800/80 bg-zinc-950/85 py-3 backdrop-blur"
           }
         >
