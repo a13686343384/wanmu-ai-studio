@@ -217,6 +217,18 @@ export function ReviewDialog({
 
           <p className="mt-2.5 text-xs leading-relaxed text-zinc-400">{analysis.audienceNotes}</p>
 
+          {/* 时代 + 基调 */}
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+              <p className="text-[10px] text-zinc-500">时代</p>
+              <p className="text-xs text-zinc-300">{analysis.era}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+              <p className="text-[10px] text-zinc-500">基调</p>
+              <p className="text-xs text-zinc-300">{analysis.tone}</p>
+            </div>
+          </div>
+
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <p className="mb-1.5 text-[11px] font-medium text-emerald-400">允许内容</p>
@@ -431,6 +443,10 @@ export function ReviewDialog({
             ))}
           </div>
         </section>
+
+        <p className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[10px] leading-relaxed text-zinc-500">
+          建档只做会诊 6（出诊断报告，暂不改正文）；进详情页确认后的一键修改/台词按实际生成步数另计。余额不足会拦。
+        </p>
 
         <DialogFooter className="sm:justify-between">
           <Button variant="ghost" onClick={onBack} disabled={submitting}>
