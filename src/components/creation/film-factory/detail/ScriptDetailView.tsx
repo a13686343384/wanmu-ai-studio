@@ -200,6 +200,16 @@ export function ScriptDetailView({
   const totalAssets =
     script.characters.length + script.scenes.length + script.props.length
 
+  // 各类资产缺图数量（驱动「下一步·拆分镜」的禁用与灰字提示）
+  const missingAssets = {
+    characters: script.characters.filter((item) => !item.imageUrl).length,
+    scenes: script.scenes.filter((item) => !item.imageUrl).length,
+    props: script.props.filter((item) => !item.imageUrl).length,
+  }
+  const allAssetsImaged =
+    totalAssets > 0 &&
+    missingAssets.characters + missingAssets.scenes + missingAssets.props === 0
+
   // 稳定引用：StoryboardCard 已用 React.memo 包裹，避免父组件重渲染导致全网格失效
   const handleEditStoryboard = useCallback((storyboard: StoryboardDTO) => {
     setEditing(storyboard)
@@ -399,21 +409,32 @@ export function ScriptDetailView({
               </span>
 
               <div className="ml-auto flex items-center gap-1.5">
+                {/* 需求9：资产未出齐时拆分镜按钮禁用，左侧灰字提示各类缺失数 */}
+                {script.status === "assets" &&
+                  totalAssets > 0 &&
+                  !allAssetsImaged && (
+                    <span className="text-[11px] text-zinc-600">
+                      （
+                      {missingAssets.characters > 0 && `角色 ${missingAssets.characters} 张 `}
+                      {missingAssets.scenes > 0 && `场景 ${missingAssets.scenes} 张 `}
+                      {missingAssets.props > 0 && `道具 ${missingAssets.props} 张 `}
+                      关键资产未生成，点右栏「重新出图」补齐）
+                    </span>
+                  )}
                 <Button
                   variant="brand"
                   size="sm"
                   className="h-7"
-                  disabled={generating}
+                  disabled={
+                    generating ||
+                    (script.status === "assets" &&
+                      totalAssets > 0 &&
+                      !allAssetsImaged)
+                  }
                   onClick={runNextStep}
                 >
                   <Wand2 className="h-3.5 w-3.5" />
-                  {script.status === "assets" &&
-                  totalAssets > 0 &&
-                  [
-                    ...script.characters,
-                    ...script.scenes,
-                    ...script.props,
-                  ].every((item) => item.imageUrl)
+                  {script.status === "assets" && totalAssets > 0
                     ? "下一步 · 拆分镜"
                     : (NEXT_STEP_LABEL[script.status] ?? "下一步")}
                 </Button>
