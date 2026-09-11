@@ -2,14 +2,18 @@
 
 import { useState } from "react"
 import {
+  Ban,
   Clapperboard,
+  Download,
   ImageIcon,
   Loader2,
+  Music,
   Scissors,
   Sparkles,
   Video,
   Wand2,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -21,6 +25,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
 import { StoryboardChecks } from "./StoryboardChecks"
 import { SegmentRefsDialog, SegmentAssetsDialog } from "./SegmentDialogs"
+import { NegativePromptDialog } from "./NegativePromptDialog"
 import { cn } from "@/lib/utils"
 
 /**
@@ -29,6 +34,7 @@ import { cn } from "@/lib/utils"
  * 已拆分镜时展示镜头卡片网格。
  */
 export function StoryboardSection({
+  scriptId,
   storyboards,
   loading,
   busyId,
@@ -86,9 +92,10 @@ export function StoryboardSection({
   onGenerateVideo: (storyboard: StoryboardDTO) => void
   onEdit: (storyboard: StoryboardDTO) => void
 }) {
-  const [filter, setFilter] = useState<"all" | "image" | "video">("all")
+  const [filter, setFilter] = useState<"all" | "image" | "video" | "bgm">("all")
   const [refsSegment, setRefsSegment] = useState<string | null>(null)
   const [assetsSegment, setAssetsSegment] = useState<string | null>(null)
+  const [negPromptOpen, setNegPromptOpen] = useState(false)
   const filtered =
     filter === "image"
       ? storyboards.filter((item) => item.imageUrl)
@@ -152,6 +159,7 @@ export function StoryboardSection({
                   { value: "all", label: "全部", icon: Clapperboard },
                   { value: "image", label: "已出图", icon: ImageIcon },
                   { value: "video", label: "已出视频", icon: Video },
+                  { value: "bgm", label: "BGM", icon: Music },
                 ] as const
               ).map((option) => {
                 const Icon = option.icon
@@ -175,6 +183,20 @@ export function StoryboardSection({
                 )
               })}
             </div>
+          )}
+
+          {storyboards.length > 0 && (
+            <>
+              <Button variant="ghost" size="icon-sm" className="h-7 w-7" title="打包下载本集全部图片" onClick={() => toast.info("下载功能即将上线")}>
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" className="h-7 w-7" title="打包下载本集全部 BGM" onClick={() => toast.info("下载功能即将上线")}>
+                <Music className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" className="h-7 w-7" title="视频禁止项 (反向提示词)" onClick={() => setNegPromptOpen(true)}>
+                <Ban className="h-3.5 w-3.5" />
+              </Button>
+            </>
           )}
 
           <Button
@@ -276,7 +298,17 @@ export function StoryboardSection({
             </p>
           </div>
         )}
-        {!splitPhase?.active && !loading && storyboards.length > 0 && (
+        {/* BGM 视图（原型图35） */}
+        {filter === "bgm" && !splitPhase?.active && (
+          <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-center">
+            <Music className="h-5 w-5 text-zinc-600" />
+            <p className="text-sm text-zinc-400">🎵 本集 BGM · 后期声音</p>
+            <p className="max-w-md text-xs leading-relaxed text-zinc-600">
+              还没生成本集 BGM。点右上「批量生成」→ 选「后期 BGM」，配好音频模型 / 时长 / 风格即可生成。
+            </p>
+          </div>
+        )}
+        {filter !== "bgm" && !splitPhase?.active && !loading && storyboards.length > 0 && (
           <StoryboardChecks
             items={storyboards}
             aspectRatio={aspectRatio}
@@ -294,7 +326,7 @@ export function StoryboardSection({
               <Skeleton key={index} className="aspect-video rounded-xl" />
             ))}
           </div>
-        ) : filtered.length === 0 && storyboards.length > 0 ? (
+        ) : filter === "bgm" ? null : filtered.length === 0 && storyboards.length > 0 ? (
           <div className="flex h-full min-h-[220px] items-center justify-center text-center text-xs text-zinc-600">
             没有符合筛选条件的镜头
           </div>
@@ -426,6 +458,12 @@ export function StoryboardSection({
             />
           )
         })()}
+
+      <NegativePromptDialog
+        open={negPromptOpen}
+        onOpenChange={setNegPromptOpen}
+        scriptId={scriptId ?? ""}
+      />
     </div>
   )
 }
