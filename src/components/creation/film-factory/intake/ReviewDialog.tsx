@@ -342,6 +342,16 @@ export function ReviewDialog({
               ⚠ 这条比「视觉风格」优先级更高 —— 它告诉 AI 这是哪个时代 / 角色穿什么 / 场景长啥样，
               选错了会出现「都市言情变古装宫廷」这类穿帮。
             </p>
+            {!COSTUME_PRESETS.includes(values.costumeStyle) && values.costumeStyle.trim() && (
+              <p className="rounded-md border border-sky-500/30 bg-sky-500/[0.06] px-2 py-1.5 text-[10px] leading-relaxed text-sky-300/90">
+                💡 你选择了自定义风格「{values.costumeStyle}」。AI 将使用默认万能模板提取资产描述词和生成参考图。
+                如需为该风格配置专属模板，请前往{" "}
+                <a href="/ai-settings" target="_blank" rel="noopener noreferrer" className="underline hover:text-sky-200">
+                  配置 → 风格模板
+                </a>{" "}
+                新建并命名一致。
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
