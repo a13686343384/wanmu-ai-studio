@@ -89,13 +89,27 @@ function sceneSheet(
     .join("\n")
 }
 
+/**
+ * 构建资产出图提示词。
+ * 如果传入了 styleImageTemplate（从 StyleTemplate 表加载），则使用模板 + 占位符替换；
+ * 否则回退到内置默认模板。
+ */
 export function buildAssetPrompt(
   context: AssetPromptContext,
   kind: AssetKind,
   name: string,
   description: string,
   extra?: string | null,
+  styleImageTemplate?: string | null,
 ): string {
+  if (styleImageTemplate) {
+    const styleContext = STYLE_LINE(context)
+    return styleImageTemplate
+      .replace(/\{\{STYLE_CONTEXT\}\}/g, styleContext)
+      .replace(/\{\{name\}\}/g, name)
+      .replace(/\{\{description\}\}/g, description)
+      .replace(/\{\{extra\}\}/g, extra ?? "")
+  }
   if (kind === "scene") return sceneSheet(context, name, description, extra)
   if (kind === "prop") return propSheet(context, name, description, extra)
   return characterSheet(context, name, description, extra)

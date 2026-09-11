@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api"
 import type { AIService } from "@/services/ai/types"
 import type { AssetGenerationConfig } from "@/lib/assets/config"
 import { buildAssetPrompt } from "@/lib/asset-prompt"
+import { loadStyleTemplate } from "@/lib/style-templates"
 
 type Kind = "character" | "scene" | "prop" | "outfit"
 type Fields = { status: string; imageUrl?: string; prompt?: string }
@@ -40,6 +41,10 @@ export async function generateScriptAssets(
             })
   if (input.ids && rows.length !== new Set(input.ids).size)
     throw new AppError("资产不存在或不属于当前剧本", 404)
+  // 加载风格出图模板
+  const styleTemplate = await loadStyleTemplate(script.costumeStyle ?? null)
+  const kindToTemplateKey = { character: "character", scene: "scene", prop: "prop", outfit: "costume" } as const
+  const styleImageTpl = styleTemplate.imagePromptTemplates[kindToTemplateKey[input.kind]] || null
   const templates = {
     character: script.assetPromptTemplate,
     scene: script.scenePromptTemplate,
@@ -100,6 +105,7 @@ export async function generateScriptAssets(
             name,
             row.description,
             detail,
+            styleImageTpl,
           ),
       ]
         .filter(Boolean)
