@@ -565,3 +565,26 @@ model GenerationTask {
   @@index([state, createdAt])
   @@index([workspaceId, episodeId])
 }
+
+/* ============================================================
+   风格模板包（StyleTemplate）
+   每个服化道风格对应一套提取模板 + 出图提示词模板。
+   templates JSON 结构：
+   {
+     extractionTemplates: { character, scene, prop, costume },
+     imagePromptTemplates: { character, scene, prop, costume }
+   }
+   ============================================================ */
+
+model StyleTemplate {
+  id          String   @id @default(cuid())
+  name        String   // "赛博废土" / "古风仙侠" / "默认万能" ...
+  description String?  // 风格描述
+  isDefault   Boolean  @default(false) // 是否为默认万能模板
+  templates   Json     // { extractionTemplates: {...}, imagePromptTemplates: {...} }
+  workspaceId String   @default("__global__") // "__global__" = 全局预设；其他 = 用户自定义
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, workspaceId])
+}
