@@ -72,7 +72,7 @@ export function ScriptList() {
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
-  const [sort, setSort] = useState<SortKey>("updated")
+  const [sort, setSort] = useState<SortKey>("created")
   const [deleting, setDeleting] = useState<ScriptSummary | null>(null)
   const [editing, setEditing] = useState<ScriptSummary | null>(null)
   const [hintOpen, setHintOpen] = useState(true)
@@ -400,7 +400,7 @@ export function ScriptList() {
             dot="bg-amber-400 animate-pulse"
           />
           <Section
-            title="待描述"
+            title="待推进"
             tag="READY"
             count={ready.length}
             hint="等你下一步"
