@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { ASPECT_RATIOS, DURATIONS, IMAGE_COUNTS, RESOLUTIONS } from "@/lib/constants"
 import { formatNumber } from "@/lib/utils"
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore"
+import { useAiModels } from "@/hooks/useAiModels"
 import { MediaTypeSelector } from "@/components/workbench/MediaTypeSelector"
 import { FeatureSelector } from "@/components/workbench/FeatureSelector"
 import { ModelSelector } from "@/components/workbench/ModelSelector"
@@ -172,8 +173,10 @@ function LyricsSelector() {
 export function ParameterBar({ onGenerate }: { onGenerate: () => void }) {
   const { mediaType, modelId, count, isGenerating, prompt } = useWorkbenchStore()
 
-  // cost 在 live 模式下由后端决定，此处仅展示 mock 模式的预估
-  const cost = 0
+  // 从模型列表动态读取积分消耗
+  const { models: currentModels } = useAiModels(mediaType as "text" | "image" | "video" | "audio")
+  const currentModel = currentModels.find(m => m.id === modelId)
+  const cost = currentModel?.cost ?? 0
   const canGenerate = prompt.trim().length > 0 && !isGenerating
 
   return (

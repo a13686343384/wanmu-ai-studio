@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +42,7 @@ export function CreationCenterDropdown() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="w-80 p-1.5">
-        <DropdownMenuLabel className="px-2 py-1.5 text-xs text-zinc-500">
-          选择创作线
-        </DropdownMenuLabel>
+
         {CREATION_CENTER_ITEMS.map((item) => {
           const Icon = resolveIcon(item.icon)
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -72,6 +70,7 @@ export function CreationCenterDropdown() {
                     {item.description}
                   </span>
                 </span>
+                <ChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-zinc-600" />
               </Link>
             </DropdownMenuItem>
           )

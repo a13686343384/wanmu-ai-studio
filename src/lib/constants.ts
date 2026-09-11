@@ -20,7 +20,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: "工作台", href: "/", icon: "Home" },
   { label: "画布", href: "/canvas", icon: "LayoutGrid" },
   { label: "创作中心", href: "/creation", icon: "Sparkles", hasDropdown: true },
-  { label: "AI 设置", href: "/ai-settings", icon: "Settings" },
+  { label: "插件", href: "/plugins", icon: "Puzzle" },
   { label: "联系我们", href: "/contact", icon: "MessageSquare" },
 ] as const
 
@@ -56,7 +56,7 @@ export const CREATION_CENTER_ITEMS: readonly CreationCenterItem[] = [
     label: "电商设计室",
     href: "/creation/ecommerce",
     icon: "ShoppingBag",
-    description: "商品套图 · A+ 详情页 · 上架文案",
+    description: "商品图、套图、场景图批量产出",
   },
 ] as const
 
@@ -285,7 +285,7 @@ export const SUBTITLE_MODELS: readonly AIModel[] = [
 export const VIDEO_FEATURES = [
   {
     id: "reference-to-video",
-    name: "全能参考视频",
+    name: "全能参考生视频",
     description: "自由组合图片 + ≤15s 视频 + ≤15s 音频",
   },
   {
