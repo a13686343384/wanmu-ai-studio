@@ -463,7 +463,27 @@ export function ScriptDetailView({
     setGenerating(true)
     setProgress(0)
     setProgressLabel("正在提取全剧资产描述词…")
-    const poll = window.setInterval(() => void reloadScript(), 1500)
+    // Poll: detect backend completion even if the fetch hangs (e.g. slow upstream AI).
+    let pollStopped = false
+    const poll = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scripts/${script.id}`)
+        const payload = await res.json()
+        if (!res.ok || pollStopped) return
+        const latest = payload.data as ScriptDetail
+        setScript(latest)
+        if (latest.processingStatus === "completed" && latest.status !== "intake" && latest.status !== "outlining") {
+          pollStopped = true
+          window.clearInterval(poll)
+          setGenerating(false)
+          setProgress(0)
+          setAssetSetupOpen(false)
+          toast.success("资产描述词已提取", {
+            description: "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
+          })
+        }
+      } catch { /* ignore poll errors */ }
+    }, 2000)
     try {
       const kinds = (["characters", "scenes", "props"] as const).filter(
         (kind) => !script[kind].length,
@@ -482,17 +502,20 @@ export function ScriptDetailView({
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error ?? "提取失败")
       }
-      // 请求已受理：先关弹窗，提取在后台进行（顶部进度条 + 完成通知）
-      setAssetSetupOpen(false)
-      setProgress(100)
-      await reloadScript()
-      toast.success("资产描述词已提取", {
-        description:
-          "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
-      })
+      if (!pollStopped) {
+        pollStopped = true
+        setAssetSetupOpen(false)
+        setProgress(100)
+        await reloadScript()
+        toast.success("资产描述词已提取", {
+          description:
+            "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
+        })
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "提取失败")
     } finally {
+      pollStopped = true
       window.clearInterval(poll)
       setGenerating(false)
       setProgress(0)

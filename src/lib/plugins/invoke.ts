@@ -194,6 +194,7 @@ export async function invokeCustomModel(
 
   let responseData: unknown
   try {
+    console.log("[invoke] POST", url, "model=", vars.model_id, "max_tokens=", vars.max_tokens, "temp=", vars.temperature)
     const res = await fetch(url, {
       method,
       headers,
@@ -201,13 +202,16 @@ export async function invokeCustomModel(
       signal: AbortSignal.timeout((action.timeout_sec ?? 300) * 1000),
     })
     responseData = await res.json().catch(() => ({}))
+    console.log("[invoke] response status=", res.status)
     if (!res.ok) {
       const message =
         pickString(responseData, ["error.message", "error"]) ??
         `上游返回 ${res.status}`
+      console.error("[invoke] upstream error:", message, JSON.stringify(responseData).slice(0, 500))
       return { ok: false, error: message }
     }
   } catch (error) {
+    console.error("[invoke] fetch failed:", error instanceof Error ? error.message : error)
     return {
       ok: false,
       error: error instanceof Error ? error.message : "上游请求失败",
