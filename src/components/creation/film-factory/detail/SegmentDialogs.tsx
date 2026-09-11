@@ -6,6 +6,7 @@ import {
   Clapperboard,
   Image as ImageIcon,
   Loader2,
+  Plus,
   Users,
   Wand2,
 } from "lucide-react"
@@ -71,17 +72,31 @@ export function SegmentRefsDialog({
   scriptId?: string
   segmentId?: string
 }) {
-  const [drafts, setDrafts] = useState<Record<string, ShotRefs>>({})
-  const [initial, setInitial] = useState<Record<string, ShotRefs>>({})
+  // Per-shot snapshots (read on open, written back on save)
+  const [snapshots, setSnapshots] = useState<Record<string, ShotRefs>>({})
   const [revisions, setRevisions] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
-  const [source, setSource] = useState("")
+
+  // Aggregated selection state
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
+  const [selectedChars, setSelectedChars] = useState<Set<string>>(new Set())
+  const [costumeSelections, setCostumeSelections] = useState<
+    Record<string, string | null>
+  >({})
+  const [selectedProps, setSelectedProps] = useState<Set<string>>(new Set())
+
+  // Initialize from per-shot refs on open
   useEffect(() => {
     if (!open) return
-    const next: Record<string, ShotRefs> = {}
+    const snaps: Record<string, ShotRefs> = {}
+    const sceneVotes = new Map<string, number>()
+    const charVotes = new Map<string, number>()
+    const propVotes = new Map<string, number>()
+    const costumeMap: Record<string, string | null> = {}
+
     for (const item of items) {
       const text = `${item.description} ${item.dialogue ?? ""}`
-      next[item.id] = readShotRefs(item.generationParams) ?? {
+      const refs = readShotRefs(item.generationParams) ?? {
         sceneId: assets.scenes.find((a) => text.includes(a.name))?.id ?? null,
         cast: assets.characters
           .filter((a) => text.includes(a.name))
@@ -90,22 +105,51 @@ export function SegmentRefsDialog({
           .filter((a) => text.includes(a.name))
           .map((a) => a.id),
       }
+      snaps[item.id] = refs
+
+      if (refs.sceneId) {
+        sceneVotes.set(refs.sceneId, (sceneVotes.get(refs.sceneId) ?? 0) + 1)
+      }
+      for (const c of refs.cast) {
+        charVotes.set(c.characterId, (charVotes.get(c.characterId) ?? 0) + 1)
+        // Use first encountered costume as default
+        if (!(c.characterId in costumeMap)) {
+          costumeMap[c.characterId] = c.costumeId
+        }
+      }
+      for (const pid of refs.propIds) {
+        propVotes.set(pid, (propVotes.get(pid) ?? 0) + 1)
+      }
     }
-    setDrafts(next)
-    setInitial(next)
-    setSource("")
+
+    setSnapshots(snaps)
     setRevisions(
       Object.fromEntries(
         items.map((i) => [i.id, getRefsRevision(i.generationParams)]),
       ),
     )
-    // 仅打开时取快照，后台刷新不能覆盖正在编辑的内容。
+
+    // Pick majority scene (or null if no consensus)
+    let bestScene: string | null = null
+    let bestCount = 0
+    for (const [id, count] of sceneVotes) {
+      if (count > bestCount) {
+        bestScene = id
+        bestCount = count
+      }
+    }
+    setSelectedSceneId(bestScene)
+    setSelectedChars(new Set(charVotes.keys()))
+    setCostumeSelections(costumeMap)
+    setSelectedProps(new Set(propVotes.keys()))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // Usage map: asset id → shot numbers that reference it
   const usage = useMemo(() => {
     const map = new Map<string, number[]>()
     for (const item of items) {
-      const r = drafts[item.id]
+      const r = snapshots[item.id]
       if (!r) continue
       for (const id of [
         r.sceneId,
@@ -117,26 +161,90 @@ export function SegmentRefsDialog({
       }
     }
     return map
-  }, [drafts, items])
-  const label = (id: string) =>
-    usage.has(id) ? `用于 ${usage.get(id)!.join("/")} 镜` : "未引用"
-  const update = (id: string, r: ShotRefs) =>
-    setDrafts((prev) => ({ ...prev, [id]: r }))
+  }, [snapshots, items])
+
+  // Independent scenes: shots whose sceneId differs from the aggregated selection
+  const independentScenes = useMemo(() => {
+    const result: { sceneName: string; shots: number[] }[] = []
+    const sceneNameMap = new Map(assets.scenes.map((s) => [s.id, s.name]))
+    const indMap = new Map<string, number[]>()
+    for (const item of items) {
+      const r = snapshots[item.id]
+      if (!r) continue
+      if (r.sceneId && r.sceneId !== selectedSceneId) {
+        const arr = indMap.get(r.sceneId) ?? []
+        arr.push(item.number)
+        indMap.set(r.sceneId, arr)
+      }
+    }
+    for (const [sid, shots] of indMap) {
+      result.push({ sceneName: sceneNameMap.get(sid) ?? sid, shots })
+    }
+    return result
+  }, [snapshots, items, selectedSceneId, assets.scenes])
+
+  const toggleChar = (charId: string) => {
+    setSelectedChars((prev) => {
+      const next = new Set(prev)
+      if (next.has(charId)) next.delete(charId)
+      else next.add(charId)
+      return next
+    })
+  }
+
+  const setCostume = (charId: string, costumeId: string | null) => {
+    setCostumeSelections((prev) => ({ ...prev, [charId]: costumeId }))
+  }
+
+  const toggleProp = (propId: string) => {
+    setSelectedProps((prev) => {
+      const next = new Set(prev)
+      if (next.has(propId)) next.delete(propId)
+      else next.add(propId)
+      return next
+    })
+  }
+
+  const selectedCharCount = selectedChars.size
+
   async function save() {
     setSaving(true)
     try {
-      // 未保存过默认引用也必须写入；已存且未改的独立镜头不提交。
+      // Build new refs for each shot based on aggregated state.
+      // Only patch shots whose refs actually changed.
       const patches = items
-        .filter(
-          (i) =>
-            readShotRefs(i.generationParams) === null ||
-            JSON.stringify(drafts[i.id]) !== JSON.stringify(initial[i.id]),
-        )
-        .map((i) => ({
-          storyboardId: i.id,
-          revision: revisions[i.id],
-          refs: drafts[i.id],
-        }))
+        .map((item) => {
+          const oldRefs = snapshots[item.id]
+          // Preserve per-shot independent scenes: if the shot had a different
+          // non-null sceneId before editing, keep it instead of overwriting.
+          const sceneId =
+            oldRefs.sceneId && oldRefs.sceneId !== selectedSceneId
+              ? oldRefs.sceneId
+              : selectedSceneId
+          const newRefs: ShotRefs = {
+            sceneId,
+            cast: [...selectedChars].map((cid) => ({
+              characterId: cid,
+              costumeId: costumeSelections[cid] ?? null,
+            })),
+            propIds: [...selectedProps],
+          }
+          const changed =
+            JSON.stringify(oldRefs) !== JSON.stringify(newRefs)
+          return changed
+            ? {
+                storyboardId: item.id,
+                revision: revisions[item.id],
+                refs: newRefs,
+              }
+            : null
+        })
+        .filter(Boolean) as {
+        storyboardId: string
+        revision: number
+        refs: ShotRefs
+      }[]
+
       if (patches.length) {
         const segment = segmentId ?? items[0]?.segmentId
         const url =
@@ -167,8 +275,7 @@ export function SegmentRefsDialog({
       setSaving(false)
     }
   }
-  const selectClass =
-    "w-full rounded border border-zinc-700 bg-zinc-900 p-2 text-xs"
+
   return (
     <Dialog
       open={open}
@@ -180,177 +287,209 @@ export function SegmentRefsDialog({
         <DialogHeader>
           <DialogTitle>编辑整段引用 · {segmentTitle}</DialogTitle>
           <DialogDescription>
-            逐镜保留场景、人物造型和道具；整段替换仅影响使用原场景的镜头。
+            当前展示本段{items.length}个分镜的引用合集；取消错误项并选中新项，只会替换原先用到错误引用的镜头。
           </DialogDescription>
         </DialogHeader>
-        <fieldset disabled={saving} className="space-y-4">
-          <div className="rounded-lg border border-zinc-800 p-3">
-            <Label>整段场景替换</Label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <select
-                aria-label="原场景"
-                className={selectClass}
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
+        <fieldset disabled={saving} className="space-y-6">
+          {/* ── 场景区 ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>场景</Label>
+              <span className="text-[10px] text-zinc-500">
+                {selectedSceneId ? "已选择" : "未选择"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {assets.scenes.map((scene) => {
+                const usedBy = usage.get(scene.id) ?? []
+                const isSelected = selectedSceneId === scene.id
+                return (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedSceneId(isSelected ? null : scene.id)
+                    }
+                    className={cn(
+                      "relative rounded-lg border p-2 text-left transition-colors",
+                      isSelected
+                        ? "border-orange-500 bg-orange-500/10"
+                        : "border-zinc-800 hover:border-zinc-700",
+                    )}
+                  >
+                    {scene.imageUrl ? (
+                      <img
+                        src={scene.imageUrl}
+                        alt={scene.name}
+                        className="aspect-video w-full rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex aspect-video w-full items-center justify-center rounded bg-zinc-900">
+                        <Box className="h-4 w-4 text-zinc-700" />
+                      </div>
+                    )}
+                    <p className="mt-1 truncate text-[10px] text-zinc-300">
+                      {scene.name}
+                    </p>
+                    {usedBy.length > 0 && (
+                      <span className="text-[10px] text-zinc-500">
+                        用于 {usedBy.join("/")} 镜
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-700 p-2 text-zinc-500 hover:border-zinc-600"
               >
-                <option value="">选择要替换的场景</option>
-                {assets.scenes
-                  .filter((a) => usage.has(a.id))
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} · {label(a.id)}
-                    </option>
-                  ))}
-              </select>
-              <select
-                aria-label="替换为场景"
-                className={selectClass}
-                value=""
-                disabled={!source}
-                onChange={(e) => {
-                  const target = e.target.value
-                  setDrafts((prev) =>
-                    Object.fromEntries(
-                      Object.entries(prev).map(([id, r]) => [
-                        id,
-                        replaceScene(r, source, target || null),
-                      ]),
-                    ),
-                  )
-                  setSource("")
-                }}
-              >
-                <option value="">选择新场景</option>
-                {assets.scenes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+                <Plus className="h-4 w-4" />
+                <span className="mt-1 text-[10px]">新增引用</span>
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {[...assets.scenes, ...assets.characters, ...assets.props]
-              .filter((a) => usage.has(a.id))
-              .map((a) => (
-                <span
-                  className="rounded bg-zinc-800 px-2 py-1 text-[11px]"
-                  key={a.id}
-                >
-                  {a.name} · {label(a.id)}
-                </span>
-              ))}
-          </div>
-          {items.map((item) => {
-            const r = drafts[item.id]
-            if (!r) return null
-            return (
-              <div
-                key={item.id}
-                className="space-y-3 rounded-lg border border-zinc-800 p-3"
-              >
-                <p className="text-sm font-medium">第 {item.number} 镜</p>
-                <p className="line-clamp-2 text-xs text-zinc-500">
-                  {item.description}
-                </p>
-                <select
-                  aria-label={`第${item.number}镜场景`}
-                  className={selectClass}
-                  value={r.sceneId ?? ""}
-                  onChange={(e) =>
-                    update(item.id, { ...r, sceneId: e.target.value || null })
-                  }
-                >
-                  <option value="">无场景引用</option>
-                  {assets.scenes.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="space-y-2">
-                  <Label>人物与造型</Label>
-                  {assets.characters.map((c) => {
-                    const selected = r.cast.find((v) => v.characterId === c.id)
-                    return (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-2 text-xs"
-                      >
-                        <label className="flex min-w-24 items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selected)}
-                            onChange={() =>
-                              update(item.id, {
-                                ...r,
-                                cast: selected
-                                  ? r.cast.filter((v) => v.characterId !== c.id)
-                                  : [
-                                      ...r.cast,
-                                      { characterId: c.id, costumeId: null },
-                                    ],
-                              })
-                            }
-                          />
-                          {c.name}
-                        </label>
-                        {selected && (
-                          <select
-                            aria-label={`第${item.number}镜${c.name}造型`}
-                            className={selectClass}
-                            value={selected.costumeId ?? ""}
-                            onChange={(e) =>
-                              update(item.id, {
-                                ...r,
-                                cast: r.cast.map((v) =>
-                                  v.characterId === c.id
-                                    ? {
-                                        ...v,
-                                        costumeId: e.target.value || null,
-                                      }
-                                    : v,
-                                ),
-                              })
-                            }
-                          >
-                            <option value="">人物默认造型</option>
-                            {c.costumes.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {assets.props.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={r.propIds.includes(p.id)}
-                        onChange={() =>
-                          update(item.id, {
-                            ...r,
-                            propIds: r.propIds.includes(p.id)
-                              ? r.propIds.filter((v) => v !== p.id)
-                              : [...r.propIds, p.id],
-                          })
-                        }
+
+          {/* ── 单镜独立场景提示 ── */}
+          {independentScenes.length > 0 && (
+            <p className="text-[10px] text-amber-400">
+              ⚠ 单镜独立场景：
+              {independentScenes
+                .map(
+                  (s) =>
+                    `${s.sceneName} 用于${s.shots.join("/")}镜`,
+                )
+                .join("；")}
+            </p>
+          )}
+
+          {/* ── 人物与造型区 ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>人物与造型</Label>
+              <span className="text-[10px] text-zinc-500">
+                已选 {selectedCharCount}/{assets.characters.length} 人
+              </span>
+            </div>
+            <div className="space-y-2">
+              {assets.characters.map((char) => {
+                const isSelected = selectedChars.has(char.id)
+                const currentCostume = costumeSelections[char.id] ?? null
+                return (
+                  <div
+                    key={char.id}
+                    className={cn(
+                      "flex items-start gap-3 rounded-lg border p-2 transition-colors",
+                      isSelected
+                        ? "border-orange-500/50 bg-orange-500/5"
+                        : "border-zinc-800",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleChar(char.id)}
+                      className="mt-1"
+                    />
+                    {char.imageUrl ? (
+                      <img
+                        src={char.imageUrl}
+                        alt={char.name}
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
                       />
-                      {p.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-900">
+                        <Users className="h-4 w-4 text-zinc-700" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-zinc-200">
+                        {char.name}
+                      </p>
+                      {isSelected && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setCostume(char.id, null)}
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[10px]",
+                              currentCostume === null
+                                ? "border-orange-500 bg-orange-500/20 text-orange-300"
+                                : "border-zinc-700 text-zinc-400",
+                            )}
+                          >
+                            自动/默认
+                          </button>
+                          {char.costumes.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setCostume(char.id, c.id)}
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-[10px]",
+                                currentCostume === c.id
+                                  ? "border-orange-500 bg-orange-500/20 text-orange-300"
+                                  : "border-zinc-700 text-zinc-400",
+                              )}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── 道具区 ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>道具</Label>
+              <span className="text-[10px] text-zinc-500">
+                已选 {selectedProps.size}/{assets.props.length} 个
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {assets.props.map((prop) => {
+                const isSelected = selectedProps.has(prop.id)
+                return (
+                  <button
+                    key={prop.id}
+                    type="button"
+                    onClick={() => toggleProp(prop.id)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border p-2 transition-colors",
+                      isSelected
+                        ? "border-orange-500 bg-orange-500/10"
+                        : "border-zinc-800 hover:border-zinc-700",
+                    )}
+                  >
+                    {prop.imageUrl ? (
+                      <img
+                        src={prop.imageUrl}
+                        alt={prop.name}
+                        className="h-8 w-8 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-zinc-900">
+                        <Box className="h-3 w-3 text-zinc-700" />
+                      </div>
+                    )}
+                    <span className="text-[10px] text-zinc-300">
+                      {prop.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── 底部说明 ── */}
+          <p className="text-[10px] leading-relaxed text-zinc-500">
+            整段保存按差异应用：取消的引用会从使用它的镜头移除，新选引用会补到对应镜头；各镜独立设置的插叙场景会保留，旧产物只标记待重生成，不会自动扣费。
+          </p>
         </fieldset>
         <div className="flex justify-end gap-2">
           <Button
