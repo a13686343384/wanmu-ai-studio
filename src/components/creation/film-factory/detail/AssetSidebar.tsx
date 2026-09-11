@@ -498,12 +498,13 @@ export function AssetSidebar({
                     className="border-none bg-transparent"
                   />
                 ) : (
-                  characters.map((character) => (
+                  characters.map((character, idx) => (
                     <CharacterCard
                       key={character.id}
                       character={character}
                       characters={characters}
                       scriptId={scriptId}
+                      index={idx + 1}
                       onDone={onRefresh}
                     />
                   ))
@@ -518,6 +519,9 @@ export function AssetSidebar({
             className="min-h-0 flex-1 overflow-hidden px-2.5 pb-2.5"
           >
             <div className="flex h-full flex-col">
+              <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
+                同一角色的多套穿着/形态。人物是父级，造型是其子集；新增后可独立出图并用于分镜引用。
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -530,7 +534,7 @@ export function AssetSidebar({
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                生成造型图（未出图的）
+                新建造型
               </Button>
               <OutfitList
                 characters={characters}
@@ -547,6 +551,9 @@ export function AssetSidebar({
             className="min-h-0 flex-1 overflow-hidden px-2.5 pb-2.5"
           >
             <div className="flex h-full flex-col">
+              <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
+                道具可独立存在，也可关联人物作为跨造型一致性锚点；新增后可编辑立出图并用于分镜引用。
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -559,7 +566,7 @@ export function AssetSidebar({
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                生成道具图
+                新建道具
               </Button>
               <div className="studio-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
                 {props.length === 0 ? (
@@ -676,11 +683,13 @@ function CharacterCard({
   character,
   characters,
   scriptId,
+  index,
   onDone,
 }: {
   character: AssetDTO
   characters: AssetDTO[]
   scriptId: string
+  index?: number
   onDone: () => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -805,6 +814,13 @@ function CharacterCard({
               <Users className="h-5 w-5 text-zinc-700" />
             )}
           </div>
+        )}
+
+        {/* 编号标签（左上角） */}
+        {index != null && (
+          <span className="absolute left-1.5 top-1.5 rounded bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 ring-1 ring-zinc-800">
+            C{index}
+          </span>
         )}
 
         {/* 状态 + 锁定徽标（右上角） */}
