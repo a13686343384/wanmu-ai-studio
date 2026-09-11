@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Sparkles, X } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ScriptMaterialPanel } from "@/components/creation/film-factory/intake/ScriptMaterialPanel"
@@ -52,6 +52,15 @@ export function IntakeForm({
 
   const [analyzing, setAnalyzing] = useState(false)
   const [progressLabel, setProgressLabel] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // 实时计时
+  useEffect(() => {
+    if (!analyzing) { setElapsed(0); return }
+    const timer = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(timer)
+  }, [analyzing])
 
   const [scriptId, setScriptId] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null)
@@ -75,9 +84,17 @@ export function IntakeForm({
     return Object.keys(next).length === 0
   }
 
+  function cancelAnalysis() {
+    abortRef.current?.abort()
+    setAnalyzing(false)
+    setProgressLabel(null)
+  }
+
   async function startAnalysis() {
     if (!validate()) return
 
+    const controller = new AbortController()
+    abortRef.current = controller
     setAnalyzing(true)
     setProgressLabel("正在保存剧本建档信息…")
 
@@ -86,6 +103,7 @@ export function IntakeForm({
       const createRes = await fetch("/api/scripts", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           title: title.trim(),
           content,
@@ -109,7 +127,10 @@ export function IntakeForm({
       // 2) AI 分析
       const analyzeRes = await fetch(`/api/scripts/${id}/analyze`, {
         method: "POST",
+        signal: controller.signal,
       })
+      // 切换到第二阶段文案
+      setProgressLabel("正在推断题材 / 时代 / 视觉风格…")
       const analyzed = await analyzeRes.json()
       if (!analyzeRes.ok) throw new Error(analyzed.error ?? "AI 分析失败")
 
@@ -117,10 +138,12 @@ export function IntakeForm({
       setAnalysis(analyzed.data.analysis as ScriptAnalysis)
       setReviewOpen(true)
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return
       toast.error(
         error instanceof Error ? error.message : "AI 立项失败，请重试",
       )
     } finally {
+      abortRef.current = null
       setAnalyzing(false)
       setProgressLabel(null)
     }
@@ -199,44 +222,60 @@ export function IntakeForm({
         <div
           className={
             embedded
-              ? "shrink-0 flex items-center justify-end gap-3 border-t border-zinc-800/80 px-5 py-3"
-              : "sticky bottom-0 mt-6 flex items-center justify-between gap-3 border-t border-zinc-800/80 bg-zinc-950/85 py-3 backdrop-blur"
+              ? "shrink-0 space-y-2 border-t border-zinc-800/80 px-5 py-3"
+              : "sticky bottom-0 mt-6 space-y-2 border-t border-zinc-800/80 bg-zinc-950/85 py-3 backdrop-blur"
           }
         >
-          {!embedded && (
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/creation/film-factory")}
-            >
-              关闭
-            </Button>
-          )}
+          {/* 内联 loading 条（原型图3/4） */}
+          <AnalysisLoading
+            active={analyzing}
+            label={progressLabel}
+            onCancel={cancelAnalysis}
+          />
 
-          <div
-            className={
-              embedded
-                ? "ml-auto flex items-center gap-3"
-                : "flex items-center gap-3"
-            }
-          >
-            <span className="hidden text-[11px] text-zinc-600 sm:block">
-              预计消耗{" "}
-              {config.processingMode === "consult_optimize" ? "5" : "5"} 积分 ·
-              按实际步数累计
-            </span>
-            <Button
-              variant="inverse"
-              onClick={() => void startAnalysis()}
-              disabled={analyzing}
+          <div className="flex items-center justify-between gap-3">
+            {!embedded && (
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/creation/film-factory")}
+              >
+                关闭
+              </Button>
+            )}
+
+            <div
+              className={
+                embedded
+                  ? "ml-auto flex items-center gap-3"
+                  : "flex items-center gap-3"
+              }
             >
-              <Sparkles />
-              AI 智能立项
-            </Button>
+              <span className="hidden text-[11px] text-zinc-600 sm:block">
+                预计消耗{" "}
+                {config.processingMode === "consult_optimize" ? "5" : "5"} 积分 ·
+                按实际步数累计
+              </span>
+              <Button
+                variant="inverse"
+                onClick={() => void startAnalysis()}
+                disabled={analyzing}
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    分析中 {elapsed}s
+                  </>
+                ) : (
+                  <>
+                    <Sparkles />
+                    AI 智能立项
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </main>
-
-      <AnalysisLoading active={analyzing} label={progressLabel} />
 
       {analysis && scriptId && (
         <ReviewDialog
