@@ -158,11 +158,13 @@ export function IntakeForm({
             </p>
           </div>
 
-          <Button variant="ghost" size="icon-sm" asChild aria-label="关闭">
-            <Link href="/creation/film-factory">
-              <X className="h-4 w-4" />
-            </Link>
-          </Button>
+          {!embedded && (
+            <Button variant="ghost" size="icon-sm" asChild aria-label="关闭">
+              <Link href="/creation/film-factory">
+                <X className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* 双栏 */}
@@ -183,12 +185,20 @@ export function IntakeForm({
         </div>
 
         {/* 底部操作栏 */}
-        <div className="sticky bottom-0 mt-6 flex items-center justify-between gap-3 border-t border-zinc-800/80 bg-zinc-950/85 py-3 backdrop-blur">
-          <Button variant="ghost" onClick={() => router.push("/creation/film-factory")}>
-            关闭
-          </Button>
+        <div
+          className={
+            embedded
+              ? "mt-5 flex items-center justify-end gap-3 border-t border-zinc-800/80 pt-4"
+              : "sticky bottom-0 mt-6 flex items-center justify-between gap-3 border-t border-zinc-800/80 bg-zinc-950/85 py-3 backdrop-blur"
+          }
+        >
+          {!embedded && (
+            <Button variant="ghost" onClick={() => router.push("/creation/film-factory")}>
+              关闭
+            </Button>
+          )}
 
-          <div className="flex items-center gap-3">
+          <div className={embedded ? "ml-auto flex items-center gap-3" : "flex items-center gap-3"}>
             <span className="hidden text-[11px] text-zinc-600 sm:block">
               预计消耗 {config.processingMode === "consult_optimize" ? "5" : "5"} 积分 · 按实际步数累计
             </span>

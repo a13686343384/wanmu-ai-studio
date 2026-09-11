@@ -61,7 +61,7 @@ export function ScriptMaterialPanel({
           onChange={(event) => onContentChange(event.target.value)}
           rows={22}
           placeholder={"把你的完整剧本粘贴进来 —— 越完整 AI 判定越准。\n\n【分集格式 · 强烈推荐】想精确控制每集在哪切开，用下面任一种标记（不加也行，AI 会按时长均分）：\n\n方式一 · 集标题行\n第1集 重生归来\n……\n\n方式二 · 分隔线\n……\n---\n……"}
-          className="min-h-[420px] resize-y font-mono text-xs leading-relaxed"
+          className="min-h-[420px] resize-none font-mono text-xs leading-relaxed"
         />
         {errors?.content && <p className="text-xs text-rose-400">{errors.content}</p>}
       </div>
