@@ -28,6 +28,7 @@ import { OptionPills } from "@/components/creation/film-factory/intake/OptionCar
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import type { ScriptAnalysis } from "@/services/ai/types"
+import { FinalizeProgress } from "@/components/creation/film-factory/intake/FinalizeProgress"
 
 export interface ReviewValues {
   title: string
@@ -149,6 +150,7 @@ export function ReviewDialog({
     targetAspect: initialAspect,
   })
   const [submitting, setSubmitting] = useState(false)
+  const [finalizing, setFinalizing] = useState(false)
 
   useEffect(() => {
     setValues((current) => ({
@@ -169,32 +171,26 @@ export function ReviewDialog({
     setValues((current) => ({ ...current, ...next }))
   }
 
-  async function create() {
-    setSubmitting(true)
-    try {
-      const res = await fetch(`/api/scripts/${scriptId}/finalize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(values),
-      })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error ?? "创建剧本失败")
+  function create() {
+    setFinalizing(true)
+  }
 
-      toast.success("剧本已创建", {
-        description: `共 ${payload.data.totalEpisodes} 集，已生成分集大纲`,
-      })
-      onOpenChange(false)
-      window.location.href = `/creation/film-factory/${scriptId}`
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "创建剧本失败")
-    } finally {
-      setSubmitting(false)
-    }
+  function handleFinalizeComplete(_id: string) {
+    setFinalizing(false)
+    onOpenChange(false)
+    window.location.href = `/creation/film-factory/${scriptId}`
+  }
+
+  function handleFinalizeBackground() {
+    setFinalizing(false)
+    onOpenChange(false)
+    window.location.href = "/creation/film-factory"
   }
 
   const totalMinutes = Math.round((values.totalEpisodes * values.episodeDuration) / 60)
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
@@ -452,5 +448,14 @@ export function ReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <FinalizeProgress
+      open={finalizing}
+      scriptId={scriptId}
+      values={values as unknown as Record<string, unknown>}
+      onComplete={handleFinalizeComplete}
+      onBackground={handleFinalizeBackground}
+    />
+    </>
   )
 }
