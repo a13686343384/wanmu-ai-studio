@@ -65,7 +65,9 @@ test.describe("影视工厂", () => {
       await expect(page.getByText(label, { exact: true })).toBeVisible()
     }
     await expect(page.getByPlaceholder("搜索剧本标题…")).toBeVisible()
-    await expect(page.getByRole("link", { name: /新建剧本/ })).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: /新建剧本/ }),
+    ).toBeVisible()
   })
 
   test("INTAKE 表单校验必填项", async ({ page }) => {
