@@ -78,6 +78,7 @@ export function ScriptList() {
   const [hintOpen, setHintOpen] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [resumingScript, setResumingScript] = useState<ScriptSummary | null>(null)
   const [stopAllOpen, setStopAllOpen] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return []
@@ -252,6 +253,7 @@ export function ScriptList() {
               onTogglePin={togglePin}
               onEdit={setEditing}
               onDelete={setDeleting}
+              onResumeIntake={(s) => { setResumingScript(s); setCreateOpen(true) }}
             />
           ))}
         </div>
@@ -455,7 +457,7 @@ export function ScriptList() {
       />
 
       {/* 新建剧本（INTAKE 弹窗） */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(v) => { setCreateOpen(v); if (!v) setResumingScript(null) }}>
         <DialogContent
           className="flex max-h-[92vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
           onPointerDownOutside={(e) => e.preventDefault()}
@@ -464,7 +466,11 @@ export function ScriptList() {
           <DialogHeader className="sr-only">
             <DialogTitle>新建剧本</DialogTitle>
           </DialogHeader>
-          <IntakeForm embedded />
+          <IntakeForm
+            embedded
+            resumeScriptId={resumingScript?.id}
+            onFinished={() => { setCreateOpen(false); setResumingScript(null); void load() }}
+          />
         </DialogContent>
       </Dialog>
 

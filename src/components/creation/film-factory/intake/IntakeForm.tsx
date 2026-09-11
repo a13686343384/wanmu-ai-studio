@@ -37,11 +37,14 @@ const DEFAULT_CONFIG: IntakeConfig = {
 export function IntakeForm({
   embedded = false,
   onFinished,
+  resumeScriptId,
 }: {
   /** embedded：在弹窗中渲染，隐藏外层留白与返回按钮 */
   embedded?: boolean
   /** 创建完成后回调（弹窗模式用于关闭弹窗） */
   onFinished?: () => void
+  /** 恢复已有剧本的 INTAKE 流程（建档中的卡片点击时传入） */
+  resumeScriptId?: string | null
 } = {}) {
   const router = useRouter()
 
@@ -49,6 +52,7 @@ export function IntakeForm({
   const [content, setContent] = useState("")
   const [config, setConfig] = useState<IntakeConfig>(DEFAULT_CONFIG)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
+  const [resuming, setResuming] = useState(false)
 
   const [analyzing, setAnalyzing] = useState(false)
   const [progressLabel, setProgressLabel] = useState<string | null>(null)
@@ -65,6 +69,44 @@ export function IntakeForm({
   const [scriptId, setScriptId] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+
+  // 恢复已有剧本：从 API 获取数据，直接进入审阅步骤
+  useEffect(() => {
+    if (!resumeScriptId) return
+    setResuming(true)
+    fetch(`/api/scripts/${resumeScriptId}`)
+      .then(r => r.json())
+      .then(payload => {
+        if (!payload.data) return
+        const s = payload.data
+        setTitle(s.title ?? "")
+        setContent(s.content ?? "")
+        setScriptId(s.id)
+        if (s.workType) setConfig(c => ({ ...c, workType: s.workType }))
+        if (s.targetAspect) setConfig(c => ({ ...c, targetAspect: s.targetAspect }))
+        // 如果已有分析结果（status !== intake），直接跳到审阅
+        if (s.genre || s.narrativeStyle) {
+          setAnalysis({
+            genre: s.genre ?? "",
+            narrativeStyle: s.narrativeStyle ?? "",
+            visualStyle: s.visualStyle ?? "",
+            costumeStyle: s.costumeStyle ?? "",
+            era: s.era ?? "",
+            tone: s.tone ?? "",
+            audienceNotes: s.audienceNotes ?? "",
+            allowed: Array.isArray(s.allowedContent) ? s.allowedContent : [],
+            forbidden: Array.isArray(s.forbiddenContent) ? s.forbiddenContent : [],
+            recommendedEpisodes: s.totalEpisodes ?? 12,
+            recommendedDuration: s.episodeDuration ?? 90,
+            treatment: "",
+            episodeIdeas: [],
+          })
+          setReviewOpen(true)
+        }
+      })
+      .catch(() => toast.error("恢复建档状态失败"))
+      .finally(() => setResuming(false))
+  }, [resumeScriptId])
 
   // 统计正文里的分集标记（【第N集 …】），供审阅弹窗按标记切集
   const markedEpisodes = (() => {

@@ -44,12 +44,15 @@ export function ScriptCard({
   onTogglePin,
   onEdit,
   onDelete,
+  onResumeIntake,
 }: {
   script: ScriptSummary
   pinned?: boolean
   onTogglePin?: (script: ScriptSummary) => void
   onEdit?: (script: ScriptSummary) => void
   onDelete: (script: ScriptSummary) => void
+  /** 建档中的剧本点击时恢复 INTAKE 弹窗 */
+  onResumeIntake?: (script: ScriptSummary) => void
 }) {
   const router = useRouter()
   const processing = script.processingStatus === "processing"
@@ -58,10 +61,14 @@ export function ScriptCard({
 
   const stageIndex = WORKFLOW_STAGES.findIndex((stage) => stage.key === script.status)
 
-  // 整卡可点：点在按钮/链接/菜单上不触发进入详情
+  // 整卡可点：建档中→恢复弹窗；其他→进详情
   function openDetail(event: React.MouseEvent) {
     if ((event.target as HTMLElement).closest("button, a, [role='menuitem']")) return
-    router.push(`/creation/film-factory/${script.id}`)
+    if (processing && onResumeIntake) {
+      onResumeIntake(script)
+    } else {
+      router.push(`/creation/film-factory/${script.id}`)
+    }
   }
 
   return (
