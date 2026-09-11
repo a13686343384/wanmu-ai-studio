@@ -382,11 +382,9 @@ export function ScriptList() {
             title="还没有剧本"
             description="点击「新建剧本」粘贴你的剧本，AI 会通读全本并推荐集数 / 时长 / 三幕结构"
             action={
-              <Button variant="inverse" size="sm" asChild>
-                <Link href="/creation/film-factory/new">
-                  <Plus />
-                  新建剧本
-                </Link>
+              <Button variant="inverse" size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus />
+                新建剧本
               </Button>
             }
           />
