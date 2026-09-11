@@ -1,11 +1,13 @@
 "use client"
+import { useState } from "react"
 import type { StoryboardDTO } from "./StoryboardCard"
 import { Button } from "@/components/ui/button"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 /**
- * 出片前检查（原型 image8）：
- * 顶部横幅「X 项必须先解决 · Y 项建议补齐」；
- * 必须解决（红，带跳转动作）/ 建议补齐（橙）/ 相邻段落衔接建议（带优先级 chips）。
+ * 出片前检查（原型 image7）：
+ * 紧凑红条横幅 + 可折叠详情面板。
+ * 默认只显示一行横幅；点击展开后显示完整问题列表。
  */
 export function StoryboardChecks({
   items,
@@ -20,6 +22,8 @@ export function StoryboardChecks({
   onGenerateImage: (item: StoryboardDTO) => void
   busy: boolean
 }) {
+  const [expanded, setExpanded] = useState(false)
+
   const mustFix = items.filter(
     (item) =>
       !item.description.trim() ||
@@ -37,33 +41,53 @@ export function StoryboardChecks({
         pair.previous.camera !== pair.current.camera,
     )
   const total = mustFix.length + suggestions.length + transitions.length
-  if (total === 0) {
-    return (
-      <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2 text-xs text-emerald-300">
-        出片前检查 · 全部通过，可以批量生成
-      </div>
-    )
-  }
-  return (
-    <div className="mb-3 space-y-2 text-xs">
-      {/* 顶部横幅 */}
-      <div className="flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/[0.08] px-3 py-2">
-        <span className="h-2 w-2 rounded-full bg-rose-500" />
-        <span className="font-medium text-rose-300">
-          出片前检查 · {mustFix.length > 0 && `${mustFix.length} 项必须先解决`}
-          {mustFix.length > 0 && suggestions.length > 0 && " · "}
-          {suggestions.length > 0 && `${suggestions.length} 项建议补齐`}
-        </span>
-        <span className="ml-auto text-[10px] text-zinc-500">
-          当前画幅 {aspectRatio} · 分镜图可批量生成
-        </span>
-      </div>
+  const hasIssues = mustFix.length > 0 || suggestions.length > 0
+  const allPassed = total === 0
 
-      <details open={mustFix.length > 0} className="rounded-lg border border-zinc-800 bg-zinc-900/50">
-        <summary className="cursor-pointer px-3 py-2 text-zinc-300">
-          出片前检查 · 建议与问题
-        </summary>
-        <div className="space-y-2 border-t border-zinc-800 p-3">
+  return (
+    <div className="mb-3" data-testid="storyboard-checks">
+      {/* ── 外层：横幅（始终可见） ── */}
+      {allPassed ? (
+        /* 校验通过：绿色横幅 */
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+          <span className="text-emerald-300">校验通过，可以批量生成</span>
+        </div>
+      ) : hasIssues ? (
+        /* 有问题：红色横幅 */
+        <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+          <span className="text-rose-300">
+            出片前检查：{mustFix.length} 项必须优先改 · {suggestions.length} 项建议补齐
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-6 text-[10px]"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? "收起" : "展开"}
+          </Button>
+        </div>
+      ) : (
+        /* 仅有衔接建议、无阻塞/建议项：灰色横幅 */
+        <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-xs">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+          <span className="text-zinc-400">尚未完成出片前检查</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-6 text-[10px]"
+            onClick={() => setExpanded(true)}
+          >
+            展开
+          </Button>
+        </div>
+      )}
+
+      {/* ── 内层：折叠详情面板 ── */}
+      {expanded && !allPassed && (
+        <div className="mt-2 space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-xs">
           <p className="text-zinc-500">
             多段生成时：每段独立生成，锁住空间 / 调度 / 光影不漂移。同景别顺延优先「
             <span className="rounded bg-zinc-800 px-1">视频延长</span>」；跨空间 / 多人补「
@@ -145,7 +169,7 @@ export function StoryboardChecks({
             </>
           )}
         </div>
-      </details>
+      )}
     </div>
   )
 }
