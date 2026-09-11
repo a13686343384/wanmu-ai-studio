@@ -178,22 +178,20 @@ export function IntakeForm({
           </div>
         </div>
 
-        {/* 双栏（可滚动） */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
-              <ScriptMaterialPanel
-                title={title}
-                content={content}
-                onTitleChange={setTitle}
-                onContentChange={setContent}
-                errors={errors}
-              />
-            </div>
+        {/* 双栏：左侧原料固定高度，右侧参数配置独立滚动 */}
+        <div className="min-h-0 flex-1 grid gap-6 px-5 py-4 lg:grid-cols-[1.15fr_1fr]">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <ScriptMaterialPanel
+              title={title}
+              content={content}
+              onTitleChange={setTitle}
+              onContentChange={setContent}
+              errors={errors}
+            />
+          </div>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
-              <ConfigPanel config={config} onChange={patchConfig} />
-            </div>
+          <div className="min-h-0 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <ConfigPanel config={config} onChange={patchConfig} />
           </div>
         </div>
 
