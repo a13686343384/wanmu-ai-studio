@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
 import { StoryboardChecks } from "./StoryboardChecks"
 import { SegmentRefsDialog, SegmentAssetsDialog } from "./SegmentDialogs"
+import { groupShots } from "@/lib/workflow/episode-state"
 import { cn } from "@/lib/utils"
 
 /**
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils"
  * 已拆分镜时展示镜头卡片网格。
  */
 export function StoryboardSection({
+  scriptId, episodeId, onEnterVideo, reviewContextKey,
   storyboards,
   loading,
   busyId,
@@ -50,6 +52,10 @@ export function StoryboardSection({
   onGenerateVideo,
   onEdit,
 }: {
+  scriptId: string
+  episodeId: string
+  reviewContextKey?: string
+  onEnterVideo: () => void
   storyboards: StoryboardDTO[]
   loading: boolean
   busyId: string | null
@@ -92,24 +98,8 @@ export function StoryboardSection({
         ? storyboards.filter((item) => item.videoUrl)
         : storyboards
 
-  // 镜组（段）分组：同 segmentTitle 的连续分镜为一段；无标题时按每 6 镜自动分组
-  const segments = (() => {
-    const groups: { title: string; items: StoryboardDTO[] }[] = []
-    for (const item of filtered) {
-      const title = item.segmentTitle?.trim()
-      const last = groups[groups.length - 1]
-      if (title && last?.title === title) last.items.push(item)
-      else if (title) groups.push({ title, items: [item] })
-      else if (last && !last.title.startsWith("B") && !item.segmentTitle)
-        last.items.push(item)
-      else
-        groups.push({
-          title: `B${String(groups.length + 1).padStart(2, "0")}·镜组`,
-          items: [item],
-        })
-    }
-    return groups
-  })()
+  const [reviewValid, setReviewValid] = useState(false)
+  const segments = groupShots(storyboards).map(group => ({...group, items:group.items.filter(item=>filtered.includes(item))})).filter(group=>group.items.length>0)
   const totalDuration = Math.round(
     filtered.reduce((sum, item) => sum + (item.duration ?? 0), 0),
   )
@@ -201,7 +191,7 @@ export function StoryboardSection({
               size="sm"
               className="h-7"
               onClick={onBatchVideo}
-              disabled={!hasEpisode || batchVideoBusy}
+              disabled={!hasEpisode || batchVideoBusy || !reviewValid}
             >
               {batchVideoBusy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -215,8 +205,8 @@ export function StoryboardSection({
               variant="inverse"
               size="sm"
               className="h-7"
-              onClick={() => setAssetsSegment("__all__")}
-              disabled={!hasEpisode}
+              onClick={() => setAssetsSegment(segments[0]?.id ?? null)}
+              disabled={!hasEpisode || !reviewValid}
             >
               <Scissors className="h-3.5 w-3.5" />
               批量生成
@@ -236,6 +226,11 @@ export function StoryboardSection({
         </div>
       </div>
 
+      {!videoMode && storyboards.length > 0 && (
+        <div className="flex justify-end border-b border-zinc-800 px-3 py-2">
+          <Button size="sm" variant="outline" disabled={!reviewValid} onClick={onEnterVideo}>进入视频阶段</Button>
+        </div>
+      )}
       {generating && !splitPhase?.active && (
         <div className="space-y-1.5 border-b border-zinc-800/80 px-3 py-2.5">
           <div className="flex items-center justify-between text-[11px]">
@@ -252,34 +247,34 @@ export function StoryboardSection({
       )}
 
       {/* 拆分/生成阶段：顶部「分镜 ■停止」chip（原型 image5） */}
-      {splitPhase?.active && (
+      {splitPhase?.active && splitPhase.mode !== "video" && (
         <div className="flex items-center justify-end border-b border-zinc-800/80 px-3 py-1.5">
-          <span className="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-300">
-            <span className="tabular-nums">
-              分镜 {progressLabel ? `· ${progressLabel}` : ""}
-            </span>
-            <span
-              aria-hidden
-              className="ml-1 inline-block h-2.5 w-2.5 rounded-[2px] bg-amber-400"
-            />
-            停止
+          <span className="flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-300">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>生成中 · 暂停</span>
           </span>
         </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {/* 拆分进行中：居中「AI 正在拆分镜…」（原型 image4/5） */}
-        {splitPhase?.active && (
+        {splitPhase?.active && splitPhase.mode !== "video" && (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
             <p className="text-sm text-zinc-300">{splitPhase.label}</p>
             <p className="text-[11px] text-zinc-600">
-              预计 5-10 秒，完成后自动生成到下方
+              预计 15-90 秒，角色 bible 也会自动生成
             </p>
           </div>
         )}
         {!splitPhase?.active && !loading && storyboards.length > 0 && (
           <StoryboardChecks
+            key={episodeId}
+            scriptId={scriptId}
+            episodeId={episodeId}
+            reviewContextKey={reviewContextKey}
+            onValidityChange={setReviewValid}
+            onSegmentAssets={(item) => setAssetsSegment(item.segmentId ?? null)}
             items={storyboards}
             aspectRatio={aspectRatio}
             onEdit={onEdit}
@@ -332,7 +327,7 @@ export function StoryboardSection({
                   .toFixed(1)
                 return (
                   <section
-                    key={segment.title + segment.items[0]?.id}
+                    key={segment.id}
                     className="rounded-xl border border-zinc-800 bg-zinc-900/30"
                   >
                     {/* 段头（原型：段标题 + 时长/镜数 + 状态 chips + 建议） */}
@@ -344,8 +339,8 @@ export function StoryboardSection({
                         {segDuration}s · {segment.items.length} 个镜头
                       </span>
                       {!allImaged && (
-                        <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] text-rose-300">
-                          拆分镜未生成 {missingImages.length}
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                          分镜图未出齐
                         </span>
                       )}
                       {allImaged && (
@@ -356,24 +351,20 @@ export function StoryboardSection({
                       <button
                         type="button"
                         disabled={busyId !== null || generating}
-                        onClick={() => setAssetsSegment(segment.title)}
+                        onClick={() => setAssetsSegment(segment.id)}
                         className="ml-auto rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 transition-colors hover:border-orange-500/60 hover:text-orange-300 disabled:opacity-50"
                       >
-                        段资产
+                        生成新资产
                       </button>
                       <button
                         type="button"
                         disabled={busyId !== null || generating}
-                        onClick={() => setRefsSegment(segment.title)}
+                        onClick={() => setRefsSegment(segment.id)}
                         className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 transition-colors hover:border-orange-500/60 hover:text-orange-300 disabled:opacity-50"
                       >
                         编辑引用
                       </button>
-                      {missingImages.length > 0 && (
-                        <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] text-rose-300">
-                          建议优先补齐
-                        </span>
-                      )}
+
                     </div>
                     <div className={cn("grid gap-2 p-2", gridCols)}>
                       {segment.items.map((storyboard) => (
@@ -386,7 +377,7 @@ export function StoryboardSection({
                           onGenerateImage={onGenerateImage}
                           onGenerateVideo={onGenerateVideo}
                           onEdit={onEdit}
-                          onEditRefs={() => setRefsSegment(segment.title)}
+                          onEditRefs={() => setRefsSegment(segment.id)}
                         />
                       ))}
                     </div>
@@ -400,10 +391,12 @@ export function StoryboardSection({
 
       {refsSegment &&
         (() => {
-          const segment = segments.find((s) => s.title === refsSegment)
+          const segment = segments.find((s) => s.id === refsSegment)
           if (!segment) return null
           return (
             <SegmentRefsDialog
+              scriptId={scriptId}
+              segmentId={segment.id}
               open
               onOpenChange={(open) => !open && setRefsSegment(null)}
               segmentTitle={segment.title}
@@ -416,13 +409,12 @@ export function StoryboardSection({
 
       {assetsSegment &&
         (() => {
-          const segment =
-            assetsSegment === "__all__"
-              ? { title: "本集全部分镜", items: storyboards }
-              : segments.find((s) => s.title === assetsSegment)
+          const segment = segments.find((s) => s.id === assetsSegment)
           if (!segment) return null
           return (
             <SegmentAssetsDialog
+              scriptId={scriptId}
+              segmentId={segment.id}
               open
               onOpenChange={(open) => !open && setAssetsSegment(null)}
               segmentTitle={segment.title}
