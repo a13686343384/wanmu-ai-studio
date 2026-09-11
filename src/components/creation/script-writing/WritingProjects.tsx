@@ -112,7 +112,7 @@ function WritingCard({
       <div className="space-y-2.5 p-3.5">
         {/* 编号 + 日期 */}
         <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-zinc-500">
-          <span>WR-{project.id.slice(-4).toUpperCase()}</span>
+          <span>SC-{project.id.slice(-4).toUpperCase()}</span>
           <span>{project.createdAt.slice(0, 10)}</span>
         </div>
 
@@ -132,7 +132,7 @@ function WritingCard({
                 : "bg-sky-500/15 text-sky-300"
             }`}
           >
-            {hasBlueprint ? "创作中" : "待构思"}
+            {hasBlueprint ? "大纲就绪" : "草稿"}
           </span>
 
           <DropdownMenu>
@@ -319,15 +319,15 @@ export function WritingProjects() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
-              Writing Room
+              SCREENWRITING DESK
             </span>
             <Badge variant="brand" className="font-normal">
-              编剧工坊
+              编剧车间
             </Badge>
           </div>
           <h1 className="mt-2 text-xl font-semibold tracking-tight text-zinc-50">剧本创作</h1>
           <p className="mt-1 text-xs text-zinc-500">
-            从一句灵感开始，和编剧 Agent 一起把大纲磨成好故事。
+            选一套爆款配方，跟编剧 Agent 对话打磨大纲，再逐集展开成品级正文。
           </p>
         </div>
 
@@ -336,14 +336,14 @@ export function WritingProjects() {
             [
               { label: "剧本", value: projects.length, color: "text-zinc-100" },
               {
-                label: "已有蓝图",
-                value: projects.filter((item) => item.document.blueprint).length,
+                label: "创作中",
+                value: projects.filter((item) => item.document.blueprint && !item.importedScriptId).length,
                 color: "text-amber-300",
               },
               {
-                label: "已导入",
+                label: "已完成",
                 value: projects.filter((item) => item.importedScriptId).length,
-                color: "text-sky-300",
+                color: "text-emerald-300",
               },
             ] as const
           ).map((stat) => (
@@ -367,7 +367,7 @@ export function WritingProjects() {
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索剧名或故事核心…"
+            placeholder="搜索剧名 / 题材 / 灵感…"
             aria-label="搜索剧本"
             className="h-8 w-56 pl-8 text-xs"
           />
