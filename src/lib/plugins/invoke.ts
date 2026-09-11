@@ -171,12 +171,16 @@ export async function invokeCustomModel(
 
   const headers: Record<string, string> = { "content-type": "application/json" }
   const auth = config.auth ?? {}
-  if (auth.header && auth.header !== "x-goog-api-key") {
+  if (auth.header === "x-goog-api-key") {
+    headers[auth.header] = config.apiKey ?? ""
+  } else if (auth.header) {
     const scheme = auth.scheme ?? "Bearer"
     headers[auth.header] = `${scheme} ${config.apiKey ?? ""}`.trim()
+  } else if (config.apiKey) {
+    // Default: when auth.header is not configured but apiKey exists,
+    // use standard Authorization: Bearer header (Qwen / DeepSeek / OpenAI compatible).
+    headers["authorization"] = `Bearer ${config.apiKey}`
   }
-  if (auth.header === "x-goog-api-key")
-    headers[auth.header] = config.apiKey ?? ""
   for (const [key, value] of Object.entries(auth.extra_headers ?? {})) {
     headers[key] = value
   }
