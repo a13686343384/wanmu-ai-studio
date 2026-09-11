@@ -456,7 +456,11 @@ export function ScriptList() {
 
       {/* 新建剧本（INTAKE 弹窗） */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden p-0 sm:max-w-4xl">
+        <DialogContent
+          className="flex max-h-[92vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>新建剧本</DialogTitle>
           </DialogHeader>
