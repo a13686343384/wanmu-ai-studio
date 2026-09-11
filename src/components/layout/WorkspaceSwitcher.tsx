@@ -54,7 +54,10 @@ export function WorkspaceSwitcher({
         const valid = stored && payload.data.some((w) => w.id === stored)
         const next = valid ? stored : (payload.data[0]?.id ?? null)
         setActiveId(next)
-        if (next && typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, next)
+        if (next && typeof window !== "undefined") {
+          window.localStorage.setItem(ACTIVE_KEY, next)
+          if(stored !== next) window.dispatchEvent(new CustomEvent("wanmusheng:workspace-change",{detail:next}))
+        }
       })
       .catch(() => {
         if (!cancelled) setWorkspaces([])

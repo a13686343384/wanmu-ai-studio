@@ -7,6 +7,7 @@ const referenceSchema = z.object({
 
 /** 工作台生成请求。 */
 export const generateRequestSchema = z.object({
+  workspaceId:z.string().optional(),scriptId:z.string().optional(),projectId:z.string().optional(),writingProjectId:z.string().optional(),
   mediaType: z.enum(["video", "image", "audio", "text"]),
   prompt: z.string().trim().min(1, "请输入提示词").max(2000, "提示词最多 2000 字"),
   modelId: z.string().min(1),
@@ -67,9 +68,9 @@ export const generateStoryboardSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().trim().min(1).max(2000),
   negativePrompt: z.string().trim().max(1000).optional(),
-  aspectRatio: z.string().default("9:16"),
+  aspectRatio: z.string().optional(),
   resolution: z.string().default("1080p"),
-  duration: z.string().default("5s"),
+  duration: z.string().optional(),
   skipStoryboardImage: z.boolean().default(false),
 })
 

@@ -1,14 +1,10 @@
 "use client"
-import { useState } from "react"
+import { currentModelScope } from "@/lib/ai/client-scope"
 import { ArrowUp, Loader2 } from "lucide-react"
 import { useNodesData, useReactFlow } from "@xyflow/react"
-import {
-  ASPECT_RATIOS,
-  DURATIONS,
-  RESOLUTIONS,
-} from "@/lib/constants"
+import { ASPECT_RATIOS, DURATIONS, RESOLUTIONS } from "@/lib/constants"
 import { useAiModels } from "@/hooks/useAiModels"
-import { Progress } from "@/components/ui/progress"
+import { RequestPending } from "@/components/shared/RequestPending"
 import { CardSelect } from "@/components/ui/card-select"
 import { useStudio, type StudioNodeData, type StudioNodeKind } from "./types"
 
@@ -40,13 +36,12 @@ export function StudioComposer({
   const { getNodes, getEdges, updateNodeData, getNode } = useReactFlow()
   const { beforeChange } = useStudio()
   const data = useNodesData(nodeId)?.data as StudioNodeData | undefined
-  const [progress, setProgress] = useState(0)
   const request = useStudioRequest(nodeId)
   if (!data) return null
   const draft = data.prompt ?? ""
   const model = data.modelId ?? MODELS[mediaType][0]?.id ?? ""
   const current =
-    MODELS[mediaType].find((item) => item.id === model) ?? MODELS[mediaType][0]
+    MODELS[mediaType].find((item) => item.id === model)
   const running = request.running
   const params = {
     aspectRatio: String(data.aspectRatio ?? "16:9"),
@@ -70,16 +65,12 @@ export function StudioComposer({
       .join("\n")
       .slice(0, 1000)
     beforeChange()
-    setProgress(10)
-    const timer = window.setInterval(
-      () => setProgress((value) => Math.min(90, value + 10)),
-      500,
-    )
     try {
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          ...currentModelScope(),
           mediaType,
           prompt: (text
             ? `参考文本：${text}\n创作要求：${draft}`
@@ -101,6 +92,8 @@ export function StudioComposer({
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error ?? "生成失败")
+      if (mediaType === "text" ? !payload.data?.text : !payload.data?.url)
+        throw new Error("生成服务未返回有效内容")
       if (getNode(nodeId))
         updateNodeData(nodeId, {
           ...(mediaType === "text"
@@ -116,8 +109,6 @@ export function StudioComposer({
       )
     } finally {
       request.end(token)
-      window.clearInterval(timer)
-      setProgress(100)
     }
   }
   const selectClass =
@@ -147,7 +138,10 @@ export function StudioComposer({
           value={model}
           disabled={running}
           onValueChange={(value) => updateNodeData(nodeId, { modelId: value })}
-          options={MODELS[mediaType].map((item) => ({ value: item.id, label: item.name }))}
+          options={[...(!current && model ? [{value:model,label:"已保存模型不可用，请重新选择"}] : []),...MODELS[mediaType].map((item) => ({
+            value: item.id,
+            label: item.name,
+          }))]}
         />
         {(mediaType === "image" || mediaType === "video") && (
           <>
@@ -155,14 +149,18 @@ export function StudioComposer({
               ariaLabel="节点画幅"
               value={params.aspectRatio}
               disabled={running}
-              onValueChange={(value) => updateNodeData(nodeId, { aspectRatio: value })}
+              onValueChange={(value) =>
+                updateNodeData(nodeId, { aspectRatio: value })
+              }
               options={ASPECT_RATIOS.map((item) => item.value)}
             />
             <CardSelect
               ariaLabel="节点分辨率"
               value={params.resolution}
               disabled={running}
-              onValueChange={(value) => updateNodeData(nodeId, { resolution: value })}
+              onValueChange={(value) =>
+                updateNodeData(nodeId, { resolution: value })
+              }
               options={RESOLUTIONS.filter((item) =>
                 mediaType === "image" ? item.includes("K") : item.includes("p"),
               )}
@@ -174,7 +172,9 @@ export function StudioComposer({
             ariaLabel="节点时长"
             value={params.duration}
             disabled={running}
-            onValueChange={(value) => updateNodeData(nodeId, { duration: value })}
+            onValueChange={(value) =>
+              updateNodeData(nodeId, { duration: value })
+            }
             options={[...DURATIONS]}
           />
         )}
@@ -200,7 +200,7 @@ export function StudioComposer({
           aria-label="生成"
           data-testid="studio-composer-send"
           onClick={() => void send()}
-          disabled={running || !draft.trim()}
+          disabled={running || !draft.trim() || !current}
           className="flex h-7 w-8 items-center justify-center rounded-md bg-orange-500 text-white disabled:opacity-40"
         >
           {running ? (
@@ -211,11 +211,9 @@ export function StudioComposer({
         </button>
       </div>
       {running && (
-        <Progress
-          value={progress}
-          className="mt-2 h-1"
-          indicatorClassName="bg-orange-500"
-        />
+        <div className="mt-2">
+          <RequestPending startedAt={request.startedAt} />
+        </div>
       )}
     </div>
   )

@@ -21,7 +21,6 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { FadeIn } from "@/components/shared/motion"
 import { StoryboardChecks } from "./StoryboardChecks"
 import { SegmentRefsDialog, SegmentAssetsDialog } from "./SegmentDialogs"
-import { groupShots } from "@/lib/workflow/episode-state"
 import { cn } from "@/lib/utils"
 
 /**
@@ -30,7 +29,6 @@ import { cn } from "@/lib/utils"
  * 已拆分镜时展示镜头卡片网格。
  */
 export function StoryboardSection({
-  scriptId, episodeId, onEnterVideo, reviewContextKey,
   storyboards,
   loading,
   busyId,
@@ -52,10 +50,6 @@ export function StoryboardSection({
   onGenerateVideo,
   onEdit,
 }: {
-  scriptId: string
-  episodeId: string
-  reviewContextKey?: string
-  onEnterVideo: () => void
   storyboards: StoryboardDTO[]
   loading: boolean
   busyId: string | null
@@ -98,8 +92,24 @@ export function StoryboardSection({
         ? storyboards.filter((item) => item.videoUrl)
         : storyboards
 
-  const [reviewValid, setReviewValid] = useState(false)
-  const segments = groupShots(storyboards).map(group => ({...group, items:group.items.filter(item=>filtered.includes(item))})).filter(group=>group.items.length>0)
+  // 镜组（段）分组：同 segmentTitle 的连续分镜为一段；无标题时按每 6 镜自动分组
+  const segments = (() => {
+    const groups: { title: string; items: StoryboardDTO[] }[] = []
+    for (const item of filtered) {
+      const title = item.segmentTitle?.trim()
+      const last = groups[groups.length - 1]
+      if (title && last?.title === title) last.items.push(item)
+      else if (title) groups.push({ title, items: [item] })
+      else if (last && !last.title.startsWith("B") && !item.segmentTitle)
+        last.items.push(item)
+      else
+        groups.push({
+          title: `B${String(groups.length + 1).padStart(2, "0")}·镜组`,
+          items: [item],
+        })
+    }
+    return groups
+  })()
   const totalDuration = Math.round(
     filtered.reduce((sum, item) => sum + (item.duration ?? 0), 0),
   )
@@ -191,7 +201,7 @@ export function StoryboardSection({
               size="sm"
               className="h-7"
               onClick={onBatchVideo}
-              disabled={!hasEpisode || batchVideoBusy || !reviewValid}
+              disabled={!hasEpisode || batchVideoBusy}
             >
               {batchVideoBusy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -205,8 +215,8 @@ export function StoryboardSection({
               variant="inverse"
               size="sm"
               className="h-7"
-              onClick={() => setAssetsSegment(segments[0]?.id ?? null)}
-              disabled={!hasEpisode || !reviewValid}
+              onClick={() => setAssetsSegment("__all__")}
+              disabled={!hasEpisode}
             >
               <Scissors className="h-3.5 w-3.5" />
               批量生成
@@ -226,11 +236,6 @@ export function StoryboardSection({
         </div>
       </div>
 
-      {!videoMode && storyboards.length > 0 && (
-        <div className="flex justify-end border-b border-zinc-800 px-3 py-2">
-          <Button size="sm" variant="outline" disabled={!reviewValid} onClick={onEnterVideo}>进入视频阶段</Button>
-        </div>
-      )}
       {generating && !splitPhase?.active && (
         <div className="space-y-1.5 border-b border-zinc-800/80 px-3 py-2.5">
           <div className="flex items-center justify-between text-[11px]">
@@ -246,8 +251,8 @@ export function StoryboardSection({
         </div>
       )}
 
-      {/* 拆分/生成阶段：顶部「分镜 ■停止」chip（原型 image5） */}
-      {splitPhase?.active && splitPhase.mode !== "video" && (
+      {/* 拆分/生成阶段：顶部「生成中 · 暂停」红 chip（原型 image5） */}
+      {splitPhase?.active && (
         <div className="flex items-center justify-end border-b border-zinc-800/80 px-3 py-1.5">
           <span className="flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-300">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -258,7 +263,7 @@ export function StoryboardSection({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {/* 拆分进行中：居中「AI 正在拆分镜…」（原型 image4/5） */}
-        {splitPhase?.active && splitPhase.mode !== "video" && (
+        {splitPhase?.active && (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
             <p className="text-sm text-zinc-300">{splitPhase.label}</p>
@@ -269,12 +274,6 @@ export function StoryboardSection({
         )}
         {!splitPhase?.active && !loading && storyboards.length > 0 && (
           <StoryboardChecks
-            key={episodeId}
-            scriptId={scriptId}
-            episodeId={episodeId}
-            reviewContextKey={reviewContextKey}
-            onValidityChange={setReviewValid}
-            onSegmentAssets={(item) => setAssetsSegment(item.segmentId ?? null)}
             items={storyboards}
             aspectRatio={aspectRatio}
             onEdit={onEdit}
@@ -327,7 +326,7 @@ export function StoryboardSection({
                   .toFixed(1)
                 return (
                   <section
-                    key={segment.id}
+                    key={segment.title + segment.items[0]?.id}
                     className="rounded-xl border border-zinc-800 bg-zinc-900/30"
                   >
                     {/* 段头（原型：段标题 + 时长/镜数 + 状态 chips + 建议） */}
@@ -351,7 +350,7 @@ export function StoryboardSection({
                       <button
                         type="button"
                         disabled={busyId !== null || generating}
-                        onClick={() => setAssetsSegment(segment.id)}
+                        onClick={() => setAssetsSegment(segment.title)}
                         className="ml-auto rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 transition-colors hover:border-orange-500/60 hover:text-orange-300 disabled:opacity-50"
                       >
                         生成新资产
@@ -359,12 +358,11 @@ export function StoryboardSection({
                       <button
                         type="button"
                         disabled={busyId !== null || generating}
-                        onClick={() => setRefsSegment(segment.id)}
+                        onClick={() => setRefsSegment(segment.title)}
                         className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 transition-colors hover:border-orange-500/60 hover:text-orange-300 disabled:opacity-50"
                       >
                         编辑引用
                       </button>
-
                     </div>
                     <div className={cn("grid gap-2 p-2", gridCols)}>
                       {segment.items.map((storyboard) => (
@@ -377,7 +375,7 @@ export function StoryboardSection({
                           onGenerateImage={onGenerateImage}
                           onGenerateVideo={onGenerateVideo}
                           onEdit={onEdit}
-                          onEditRefs={() => setRefsSegment(segment.id)}
+                          onEditRefs={() => setRefsSegment(segment.title)}
                         />
                       ))}
                     </div>
@@ -391,12 +389,10 @@ export function StoryboardSection({
 
       {refsSegment &&
         (() => {
-          const segment = segments.find((s) => s.id === refsSegment)
+          const segment = segments.find((s) => s.title === refsSegment)
           if (!segment) return null
           return (
             <SegmentRefsDialog
-              scriptId={scriptId}
-              segmentId={segment.id}
               open
               onOpenChange={(open) => !open && setRefsSegment(null)}
               segmentTitle={segment.title}
@@ -409,12 +405,13 @@ export function StoryboardSection({
 
       {assetsSegment &&
         (() => {
-          const segment = segments.find((s) => s.id === assetsSegment)
+          const segment =
+            assetsSegment === "__all__"
+              ? { title: "本集全部分镜", items: storyboards }
+              : segments.find((s) => s.title === assetsSegment)
           if (!segment) return null
           return (
             <SegmentAssetsDialog
-              scriptId={scriptId}
-              segmentId={segment.id}
               open
               onOpenChange={(open) => !open && setAssetsSegment(null)}
               segmentTitle={segment.title}

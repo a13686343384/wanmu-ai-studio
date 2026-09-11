@@ -1,8 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useRef } from "react"
 import Link from "next/link"
-import { ListVideo, Package, Sparkles, Video, Wand2 } from "lucide-react"
+import {
+  ListVideo,
+  Loader2,
+  Package,
+  Sparkles,
+  Video,
+  Wand2,
+} from "lucide-react"
+import { startTask, type ClientTask } from "@/lib/tasks/client"
+import { episodeStage } from "@/lib/workflow/episode-state"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -58,10 +67,26 @@ export function ScriptDetailView({
   initialScript: ScriptDetail
 }) {
   const [script, setScript] = useState(initialScript)
+  const [currentTask, setCurrentTask] = useState<ClientTask | null>(null)
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(
     initialScript.episodes[0]?.id ?? null,
   )
 
+  const activeEpisodeRef = useRef(activeEpisodeId)
+  activeEpisodeRef.current = activeEpisodeId
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const batchRequests = useRef(new Set<string>())
+  const [taskPollError, setTaskPollError] = useState<string | null>(null)
+  const [stoppingTaskId, setStoppingTaskId] = useState<string | null>(null)
+  const stoppingTaskRef = useRef<string | null>(null)
+  const [storyboardsError, setStoryboardsError] = useState<string | null>(null)
+  const loadSequence = useRef(0)
   const [storyboards, setStoryboards] = useState<StoryboardDTO[]>([])
   const [storyboardsLoading, setStoryboardsLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -77,7 +102,9 @@ export function ScriptDetailView({
     label: string
     mode: string
   } | null>(null)
-  const [splitMode, setSplitMode] = useState<"text" | "image" | "video" | "bgm">("image")
+  const [splitMode, setSplitMode] = useState<
+    "text" | "image" | "video" | "bgm"
+  >("image")
   const [consultOpen, setConsultOpen] = useState(false)
   const [recapOpen, setRecapOpen] = useState(false)
   const [recapResult, setRecapResult] = useState<RecapResult | null>(null)
@@ -93,13 +120,48 @@ export function ScriptDetailView({
   const [infoOpen, setInfoOpen] = useState(false)
   const [pacingOpen, setPacingOpen] = useState(false)
   const [pacing, setPacing] = useState<PacingProfile | null>(
-    (initialScript as unknown as { pacingProfile?: PacingProfile }).pacingProfile ?? null,
+    (initialScript as unknown as { pacingProfile?: PacingProfile })
+      .pacingProfile ?? null,
   )
   const [episodesSheetOpen, setEpisodesSheetOpen] = useState(false)
   const [assetsSheetOpen, setAssetsSheetOpen] = useState(false)
 
   const activeEpisode =
     script.episodes.find((e) => e.id === activeEpisodeId) ?? null
+  const reviewContextKey = JSON.stringify({
+    content: activeEpisode?.content,
+    characters: script.characters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      appearance: c.appearance,
+      personality: c.personality,
+      costumes: (c.costumes ?? []).map((k) => ({
+        id: k.id,
+        name: k.name,
+        description: k.description,
+        situation: k.situation,
+      })),
+    })),
+    scenes: script.scenes.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      environment: s.environment,
+      lighting: s.lighting,
+    })),
+    props: script.props.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      parentCharacterId: p.parentCharacterId,
+    })),
+  })
+  const visibleTask =
+    currentTask?.episodeId === activeEpisodeId ? currentTask : null
+  const taskActive =
+    !!visibleTask &&
+    ["queued", "running", "cancel_requested"].includes(visibleTask.state)
 
   /* ---------------------------- 数据加载 ---------------------------- */
 
@@ -114,29 +176,147 @@ export function ScriptDetailView({
     }
   }, [script.id])
 
-  const loadStoryboards = useCallback(async () => {
-    if (!activeEpisodeId) {
-      setStoryboards([])
-      return
-    }
-    setStoryboardsLoading(true)
-    try {
-      const res = await fetch(
-        `/api/scripts/${script.id}/episodes/${activeEpisodeId}/storyboards`,
+  const loadStoryboards = useCallback(
+    async (background = false) => {
+      if (
+        !activeEpisodeId ||
+        activeEpisodeRef.current !== activeEpisodeId ||
+        !mounted.current
       )
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error ?? "加载分镜失败")
-      setStoryboards(payload.data.storyboards ?? [])
-    } catch {
-      setStoryboards([])
-    } finally {
-      setStoryboardsLoading(false)
-    }
-  }, [script.id, activeEpisodeId])
+        return
+      const sequence = ++loadSequence.current
+      if (!background) setStoryboardsLoading(true)
+      setStoryboardsError(null)
+      try {
+        const res = await fetch(
+          `/api/scripts/${script.id}/episodes/${activeEpisodeId}/storyboards`,
+        )
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "加载分镜失败")
+        if (
+          sequence === loadSequence.current &&
+          activeEpisodeRef.current === activeEpisodeId &&
+          mounted.current
+        )
+          setStoryboards(payload.data.storyboards ?? [])
+      } catch (error) {
+        if (
+          sequence === loadSequence.current &&
+          activeEpisodeRef.current === activeEpisodeId &&
+          mounted.current
+        )
+          setStoryboardsError(
+            error instanceof Error ? error.message : "加载分镜失败",
+          )
+      } finally {
+        if (
+          sequence === loadSequence.current &&
+          activeEpisodeRef.current === activeEpisodeId &&
+          mounted.current
+        )
+          setStoryboardsLoading(false)
+      }
+    },
+    [script.id, activeEpisodeId],
+  )
 
   useEffect(() => {
+    setStoryboards([])
+    setCurrentTask(null)
+    setSplitPhase(null)
+    setBatchVideoBusy(false)
+    setBusyId(null)
+    setEditing(null)
+    setGenerateTarget(null)
+    setSplitOpen(false)
+    setTaskPollError(null)
     void loadStoryboards()
   }, [loadStoryboards])
+
+  useEffect(() => {
+    if (!activeEpisodeId) return
+    let cancelled = false
+    let reading = false
+    let lastState = ""
+    const poll = async () => {
+      if (reading) return
+      reading = true
+      try {
+        const res = await fetch(`/api/tasks?episodeId=${activeEpisodeId}`, {
+          cache: "no-store",
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error ?? "任务状态读取失败")
+        if (cancelled || activeEpisodeRef.current !== activeEpisodeId) return
+        const tasks = payload.data as ClientTask[]
+        const task =
+          tasks.find((item) =>
+            ["queued", "running", "cancel_requested"].includes(item.state),
+          ) ??
+          tasks[0] ??
+          null
+        setTaskPollError(null)
+        setCurrentTask(task)
+        const active =
+          !!task &&
+          ["queued", "running", "cancel_requested"].includes(task.state)
+        setSplitPhase(
+          active && task?.kind === "split"
+            ? { active: true, label: task.currentLabel, mode: "text" }
+            : null,
+        )
+        setBatchVideoBusy(
+          (active && task?.kind === "video_batch") ||
+            batchRequests.current.has(activeEpisodeId),
+        )
+        const state = task
+          ? `${task.id}:${task.state}:${task.completed}:${task.failed}`
+          : "none"
+        if (state !== lastState) {
+          lastState = state
+          void loadStoryboards(true)
+          void reloadScript()
+        }
+      } catch (error) {
+        if (!cancelled && activeEpisodeRef.current === activeEpisodeId)
+          setTaskPollError(
+            error instanceof Error ? error.message : "任务状态读取失败",
+          )
+      } finally {
+        reading = false
+      }
+    }
+    void poll()
+    const timer = setInterval(() => void poll(), 1500)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [activeEpisodeId, loadStoryboards, reloadScript])
+
+  async function requestStop(task: ClientTask) {
+    if (stoppingTaskRef.current || task.state === "cancel_requested") return
+    stoppingTaskRef.current = task.id
+    setStoppingTaskId(task.id)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, { method: "PATCH" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "请求停止失败")
+      const updated = payload.data as ClientTask
+      if (mounted.current && activeEpisodeRef.current === task.episodeId)
+        setCurrentTask(updated)
+      if (updated.state === "cancelled")
+        toast.success("任务已停止，已完成产物已保留")
+      else if (updated.state === "cancel_requested")
+        toast.info("已请求停止，当前请求收尾中")
+      else toast.info("任务已结束，请查看最终结果")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "请求停止失败")
+    } finally {
+      stoppingTaskRef.current = null
+      if (mounted.current) setStoppingTaskId(null)
+    }
+  }
 
   /* ---------------------------- 交互 ---------------------------- */
 
@@ -151,7 +331,7 @@ export function ScriptDetailView({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           kind,
-          model: kind === "image" ? "man-image-v2-lite" : "seedance-2.0",
+          model: "auto",
           prompt: "按分镜描述生成",
           negativePrompt: storyboard.negativePrompt ?? undefined,
           aspectRatio: script.targetAspect,
@@ -181,7 +361,7 @@ export function ScriptDetailView({
         body: JSON.stringify({
           mediaType: "image",
           prompt: `${script.genre ?? ""} ${script.visualStyle ?? ""} 剧集封面，${script.title}`,
-          modelId: "man-image-v2-lite",
+          modelId: script.assetGenerationConfig?.imageModelId ?? "auto",
           aspectRatio: script.targetAspect,
           resolution: "1K",
           duration: "5s",
@@ -222,40 +402,51 @@ export function ScriptDetailView({
   }, [])
   const handleSplit = useCallback(() => setSplitOpen(true), [])
   const [batchVideoBusy, setBatchVideoBusy] = useState(false)
-  async function handleBatchVideo() {
-    const pending = storyboards.filter((item) => item.imageUrl && !item.videoUrl)
-    if (pending.length === 0) {
-      toast.info("没有可生成的镜头：请先补齐首帧图")
+  async function enterVideo() {
+    if (!activeEpisodeId) return
+    const res = await fetch(
+      `/api/scripts/${script.id}/episodes/${activeEpisodeId}/stage`,
+      { method: "POST" },
+    )
+    const payload = await res.json()
+    if (!res.ok) {
+      toast.error(payload.error)
       return
     }
+    await reloadScript()
+  }
+  async function handleBatchVideo() {
+    const episodeId = activeEpisodeId
+    if (!episodeId || batchRequests.current.has(episodeId)) return
+    batchRequests.current.add(episodeId)
     setBatchVideoBusy(true)
+    const stillHere = () =>
+      mounted.current && activeEpisodeRef.current === episodeId
     try {
-      for (const [index, storyboard] of pending.entries()) {
-        setSplitPhase({
-          active: true,
-          label: `正在生成视频 ${index + 1}/${pending.length}`,
-          mode: "video",
-        })
-        const res = await fetch(`/api/storyboards/${storyboard.id}/generate`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            kind: "video",
-            model: "auto",
-            prompt: "按分镜描述生成视频",
-            aspectRatio: script.targetAspect,
-          }),
-        })
-        const payload = await res.json()
-        if (!res.ok) throw new Error(payload.error ?? "视频生成失败")
+      await startTask(
+        {
+          kind: "video_batch",
+          scriptId: script.id,
+          episodeId,
+          body: { model: "auto", aspectRatio: script.targetAspect },
+        },
+        (task) => {
+          if (stillHere()) setCurrentTask(task)
+        },
+      )
+      if (stillHere()) {
+        await loadStoryboards(true)
+        await reloadScript()
+        toast.success("批量视频任务完成")
       }
-      await loadStoryboards()
-      toast.success(`批量视频生成完成（${pending.length} 个）`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "批量生成失败")
+      if (stillHere()) {
+        toast.error(error instanceof Error ? error.message : "视频任务失败")
+        await loadStoryboards(true)
+      }
     } finally {
-      setBatchVideoBusy(false)
-      setSplitPhase(null)
+      batchRequests.current.delete(episodeId)
+      if (stillHere()) setBatchVideoBusy(false)
     }
   }
   const handleRecap = useCallback(() => {
@@ -270,7 +461,7 @@ export function ScriptDetailView({
   /** 第一步：只提取资产描述词（不出图）。出图由右栏「重新出图」一次性完成。 */
   async function generateAssets(config: AssetSetup) {
     setGenerating(true)
-    setProgress(5)
+    setProgress(0)
     setProgressLabel("正在提取全剧资产描述词…")
     const poll = window.setInterval(() => void reloadScript(), 1500)
     try {
@@ -278,7 +469,6 @@ export function ScriptDetailView({
         (kind) => !script[kind].length,
       )
       if (kinds.length) {
-        setProgress(30)
         const res = await fetch(`/api/scripts/${script.id}/assets`, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -286,6 +476,7 @@ export function ScriptDetailView({
             kinds,
             model: config.textModel,
             imageModel: config.imageModel,
+            resolution: config.resolution,
           }),
         })
         const payload = await res.json()
@@ -296,7 +487,8 @@ export function ScriptDetailView({
       setProgress(100)
       await reloadScript()
       toast.success("资产描述词已提取", {
-        description: "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
+        description:
+          "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "提取失败")
@@ -336,6 +528,7 @@ export function ScriptDetailView({
   return (
     <div className="flex h-screen flex-col">
       <AssetSetupDialog
+        initialConfig={script.assetGenerationConfig}
         open={assetSetupOpen}
         onOpenChange={setAssetSetupOpen}
         aspectRatio={script.targetAspect}
@@ -349,6 +542,53 @@ export function ScriptDetailView({
         onInfo={() => setInfoOpen(true)}
       />
 
+      {taskPollError && (
+        <p
+          role="alert"
+          className="border-b border-zinc-800 px-3 py-2 text-xs text-orange-300"
+        >
+          {taskPollError}，正在重试读取；尚未确认任务最终状态。
+        </p>
+      )}
+      {visibleTask && (
+        <div
+          data-testid="episode-task-status"
+          className="flex flex-wrap items-center gap-3 border-b border-zinc-800 p-2 text-xs text-orange-300"
+        >
+          {taskActive && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <span>
+            {visibleTask.state === "cancel_requested"
+              ? "已请求停止，当前请求收尾中"
+              : visibleTask.currentLabel}
+          </span>
+          <span>
+            成功 {visibleTask.completed} · 失败 {visibleTask.failed}
+            {visibleTask.total !== null ? ` · 共 ${visibleTask.total} 项` : ""}
+          </span>
+          {visibleTask.error && <span role="alert">{visibleTask.error}</span>}
+          {visibleTask.failed > 0 && (
+            <span>已完成产物已保留，可在视频阶段重试未完成镜头。</span>
+          )}
+          {taskActive && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={
+                stoppingTaskId === visibleTask.id ||
+                visibleTask.state === "cancel_requested"
+              }
+              onClick={() => void requestStop(visibleTask)}
+            >
+              {stoppingTaskId === visibleTask.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              {visibleTask.state === "cancel_requested"
+                ? "等待停止确认"
+                : "请求停止"}
+            </Button>
+          )}
+        </div>
+      )}
       <WorkflowTabs
         script={script}
         processing={script.processingStatus}
@@ -415,9 +655,12 @@ export function ScriptDetailView({
                   !allAssetsImaged && (
                     <span className="text-[11px] text-zinc-600">
                       （
-                      {missingAssets.characters > 0 && `角色 ${missingAssets.characters} 张 `}
-                      {missingAssets.scenes > 0 && `场景 ${missingAssets.scenes} 张 `}
-                      {missingAssets.props > 0 && `道具 ${missingAssets.props} 张 `}
+                      {missingAssets.characters > 0 &&
+                        `角色 ${missingAssets.characters} 张 `}
+                      {missingAssets.scenes > 0 &&
+                        `场景 ${missingAssets.scenes} 张 `}
+                      {missingAssets.props > 0 &&
+                        `道具 ${missingAssets.props} 张 `}
                       关键资产未生成，点右栏「重新出图」补齐）
                     </span>
                   )}
@@ -462,7 +705,27 @@ export function ScriptDetailView({
               />
             </section>
             <section className="min-h-0">
+              {storyboardsError && (
+                <div
+                  role="alert"
+                  className="flex items-center gap-2 p-3 text-xs text-orange-300"
+                >
+                  {storyboardsError}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void loadStoryboards()}
+                  >
+                    重试加载分镜
+                  </Button>
+                </div>
+              )}
               <StoryboardSection
+                key={activeEpisodeId}
+                scriptId={script.id}
+                reviewContextKey={reviewContextKey}
+                episodeId={activeEpisodeId ?? ""}
+                onEnterVideo={() => void enterVideo()}
                 storyboards={storyboards}
                 loading={storyboardsLoading}
                 busyId={busyId}
@@ -473,7 +736,10 @@ export function ScriptDetailView({
                 onSplit={handleSplit}
                 splitPhase={splitPhase}
                 aspectRatio={script.targetAspect}
-                videoMode={splitPhase?.mode === "video" || (!splitPhase && script.status === "video")}
+                videoMode={
+                  activeEpisode?.productionStage === "video" ||
+                  storyboards.some((s) => s.videoUrl)
+                }
                 onBatchVideo={() => void handleBatchVideo()}
                 batchVideoBusy={batchVideoBusy}
                 assets={{
@@ -481,23 +747,37 @@ export function ScriptDetailView({
                     id: c.id,
                     name: c.name,
                     imageUrl: c.imageUrl,
-                    costumes: (c.costumes ?? []).map((k) => ({ id: k.id, name: k.name })),
+                    costumes: (c.costumes ?? []).map((k) => ({
+                      id: k.id,
+                      name: k.name,
+                    })),
                   })),
-                  scenes: script.scenes.map((s) => ({ id: s.id, name: s.name, imageUrl: s.imageUrl })),
-                  props: script.props.map((p) => ({ id: p.id, name: p.name, imageUrl: p.imageUrl })),
+                  scenes: script.scenes.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    imageUrl: s.imageUrl,
+                  })),
+                  props: script.props.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    imageUrl: p.imageUrl,
+                  })),
                 }}
                 onSegmentFill={async (items) => {
                   for (const item of items) {
-                    const res = await fetch(`/api/storyboards/${item.id}/generate`, {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({
-                        kind: "image",
-                        model: "auto",
-                        prompt: "按分镜描述生成分镜首帧图",
-                        aspectRatio: script.targetAspect,
-                      }),
-                    })
+                    const res = await fetch(
+                      `/api/storyboards/${item.id}/generate`,
+                      {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          kind: "image",
+                          model: "auto",
+                          prompt: "按分镜描述生成分镜首帧图",
+                          aspectRatio: script.targetAspect,
+                        }),
+                      },
+                    )
                     if (!res.ok) {
                       const payload = await res.json().catch(() => ({}))
                       throw new Error(payload.error ?? "首帧图生成失败")
@@ -518,6 +798,7 @@ export function ScriptDetailView({
         {/* 右：资产侧边栏 */}
         <aside className="hidden min-h-0 w-[300px] shrink-0 border-l border-zinc-800/80 bg-zinc-950/40 lg:block">
           <AssetSidebar
+            assetGenerationConfig={script.assetGenerationConfig}
             scriptId={script.id}
             characters={script.characters}
             scenes={script.scenes}
@@ -601,6 +882,7 @@ export function ScriptDetailView({
               {/* pt-10 避开 Sheet 右上角的关闭按钮，防止与刷新按钮重叠 */}
               <div className="h-full pt-10">
                 <AssetSidebar
+                  assetGenerationConfig={script.assetGenerationConfig}
                   scriptId={script.id}
                   characters={script.characters}
                   scenes={script.scenes}
@@ -621,6 +903,7 @@ export function ScriptDetailView({
       {activeEpisode && (
         <>
           <SplitStoryboardDialog
+            key={activeEpisode.id}
             open={splitOpen}
             onOpenChange={setSplitOpen}
             scriptId={script.id}
@@ -628,11 +911,21 @@ export function ScriptDetailView({
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
             initialMode={splitMode}
             onSplitPhase={(info) => {
+              if (
+                activeEpisodeRef.current !== activeEpisode.id ||
+                !mounted.current
+              )
+                return
               setSplitPhase(info)
               // 拆分启动后收起配置弹窗，进度直接展示在分镜区（原型 image4/5）
               if (info?.active) setSplitOpen(false)
             }}
             onDone={() => {
+              if (
+                activeEpisodeRef.current !== activeEpisode.id ||
+                !mounted.current
+              )
+                return
               void loadStoryboards()
               void reloadScript()
             }}
@@ -701,11 +994,20 @@ export function ScriptDetailView({
       {activeEpisode && (
         <>
           <VideoBatchDialog
+            key={activeEpisode.id}
+            scriptId={script.id}
+            episodeId={activeEpisode.id}
+            aspectRatio={script.targetAspect}
             open={videoBatchOpen}
             onOpenChange={setVideoBatchOpen}
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
             storyboards={storyboards}
             onDone={() => {
+              if (
+                activeEpisodeRef.current !== activeEpisode.id ||
+                !mounted.current
+              )
+                return
               void loadStoryboards()
               void reloadScript()
             }}

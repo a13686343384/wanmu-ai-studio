@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { jsonOk, withErrorHandling } from "@/lib/api"
 import { requireUser } from "@/lib/session"
-import { prisma } from "@/lib/prisma"
+import { listWorkspaceModels, resolveModelWorkspace } from "@/services/ai/live/workspace"
 import { getAiMode } from "@/lib/settings"
 import {
   TEXT_MODELS,
@@ -23,26 +23,18 @@ import {
  * 不传 kind 时返回全部类型的合并列表。
  */
 export const GET = withErrorHandling(async (req: Request) => {
-  await requireUser()
-  const kind = new URL(req.url).searchParams.get("kind")
+  const user = await requireUser()
+  const query = new URL(req.url).searchParams
+  const kind = query.get("kind")
+  const scope = {workspaceId:query.get("workspaceId")??undefined,scriptId:query.get("scriptId")??undefined,projectId:query.get("projectId")??undefined,writingProjectId:query.get("writingProjectId")??undefined}
+  await resolveModelWorkspace(user.id,scope)
   const mode = await getAiMode()
 
   if (mode === "mock") {
     return jsonOk(mockModels(kind))
   }
 
-  // live 模式：从 CustomModel 表读取
-  const user = await requireUser()
-  const where: Record<string, unknown> = {
-    workspace: { members: { some: { userId: user.id } } },
-    enabled: true,
-  }
-  if (kind) where.kind = kind
-
-  const models = await prisma.customModel.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-  })
+  const models = await listWorkspaceModels(user.id,scope,kind)
 
   const list: AIModel[] = models.map((m) => ({
     id: m.id,

@@ -7,7 +7,10 @@ import { ArrowLeft, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ScriptMaterialPanel } from "@/components/creation/film-factory/intake/ScriptMaterialPanel"
-import { ConfigPanel, type IntakeConfig } from "@/components/creation/film-factory/intake/ConfigPanel"
+import {
+  ConfigPanel,
+  type IntakeConfig,
+} from "@/components/creation/film-factory/intake/ConfigPanel"
 import { AnalysisLoading } from "@/components/creation/film-factory/intake/AnalysisLoading"
 import { ReviewDialog } from "@/components/creation/film-factory/intake/ReviewDialog"
 import type { ScriptAnalysis } from "@/services/ai/types"
@@ -48,7 +51,6 @@ export function IntakeForm({
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
 
   const [analyzing, setAnalyzing] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState<string | null>(null)
 
   const [scriptId, setScriptId] = useState<string | null>(null)
@@ -77,13 +79,7 @@ export function IntakeForm({
     if (!validate()) return
 
     setAnalyzing(true)
-    setProgress(8)
-    setProgressLabel("正在通读全本，理解剧情脉络…")
-
-    // 进度条在等待期间缓慢推进
-    const timer = window.setInterval(() => {
-      setProgress((value) => (value >= 92 ? value : value + 6 + Math.random() * 8))
-    }, 700)
+    setProgressLabel("正在保存剧本建档信息…")
 
     try {
       // 1) 落库
@@ -108,44 +104,52 @@ export function IntakeForm({
 
       const id: string = created.data.id
       setScriptId(id)
-      setProgressLabel("正在推断题材与风格…")
+      setProgressLabel("正在通读全本，理解剧情脉络…")
 
       // 2) AI 分析
-      const analyzeRes = await fetch(`/api/scripts/${id}/analyze`, { method: "POST" })
+      const analyzeRes = await fetch(`/api/scripts/${id}/analyze`, {
+        method: "POST",
+      })
       const analyzed = await analyzeRes.json()
       if (!analyzeRes.ok) throw new Error(analyzed.error ?? "AI 分析失败")
 
-      setProgress(100)
       setProgressLabel("分析完成")
       setAnalysis(analyzed.data.analysis as ScriptAnalysis)
       setReviewOpen(true)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "AI 立项失败，请重试")
+      toast.error(
+        error instanceof Error ? error.message : "AI 立项失败，请重试",
+      )
     } finally {
-      window.clearInterval(timer)
-      window.setTimeout(() => {
-        setAnalyzing(false)
-        setProgress(0)
-        setProgressLabel(null)
-      }, 400)
+      setAnalyzing(false)
+      setProgressLabel(null)
     }
   }
 
   return (
     <>
-      <main className={embedded ? "" : "mx-auto w-full max-w-6xl px-4 py-6 lg:px-6"}>
+      <main
+        className={embedded ? "" : "mx-auto w-full max-w-6xl px-4 py-6 lg:px-6"}
+      >
         {/* 头部 */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               {!embedded && (
-                <Button variant="ghost" size="icon-sm" asChild aria-label="返回影视工厂">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  asChild
+                  aria-label="返回影视工厂"
+                >
                   <Link href="/creation/film-factory">
                     <ArrowLeft className="h-4 w-4" />
                   </Link>
                 </Button>
               )}
-              <h1 className="text-lg font-semibold tracking-tight text-zinc-50">新建剧本</h1>
+              <h1 className="text-lg font-semibold tracking-tight text-zinc-50">
+                新建剧本
+              </h1>
               <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
                 Intake
               </span>
@@ -153,8 +157,9 @@ export function IntakeForm({
             </div>
 
             <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-500">
-              粘贴你的剧本（或文案），点「AI 智能立项」—— AI 通读全本后推荐集数 / 单集时长 / 三幕结构 /
-              题材 / 视觉风格 / 服化道，审阅微调后再创建。
+              粘贴你的剧本（或文案），点「AI 智能立项」—— AI 通读全本后推荐集数
+              / 单集时长 / 三幕结构 / 题材 / 视觉风格 /
+              服化道，审阅微调后再创建。
             </p>
           </div>
 
@@ -193,16 +198,31 @@ export function IntakeForm({
           }
         >
           {!embedded && (
-            <Button variant="ghost" onClick={() => router.push("/creation/film-factory")}>
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/creation/film-factory")}
+            >
               关闭
             </Button>
           )}
 
-          <div className={embedded ? "ml-auto flex items-center gap-3" : "flex items-center gap-3"}>
+          <div
+            className={
+              embedded
+                ? "ml-auto flex items-center gap-3"
+                : "flex items-center gap-3"
+            }
+          >
             <span className="hidden text-[11px] text-zinc-600 sm:block">
-              预计消耗 {config.processingMode === "consult_optimize" ? "5" : "5"} 积分 · 按实际步数累计
+              预计消耗{" "}
+              {config.processingMode === "consult_optimize" ? "5" : "5"} 积分 ·
+              按实际步数累计
             </span>
-            <Button variant="inverse" onClick={() => void startAnalysis()} disabled={analyzing}>
+            <Button
+              variant="inverse"
+              onClick={() => void startAnalysis()}
+              disabled={analyzing}
+            >
               <Sparkles />
               AI 智能立项
             </Button>
@@ -210,7 +230,7 @@ export function IntakeForm({
         </div>
       </main>
 
-      <AnalysisLoading active={analyzing} progress={Math.round(progress)} label={progressLabel} />
+      <AnalysisLoading active={analyzing} label={progressLabel} />
 
       {analysis && scriptId && (
         <ReviewDialog

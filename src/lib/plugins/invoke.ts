@@ -12,6 +12,9 @@ export interface InvokeInput {
   resolution?: string
   duration?: number
   quality?: string
+  system?: string
+  maxTokens?: number
+  temperature?: number
   upstreamModelId?: string
 }
 
@@ -19,12 +22,44 @@ export interface InvokeConfig {
   lifecycle: "sync" | "async"
   baseUrl: string
   apiKey?: string | null
-  auth?: { header?: string; scheme?: string; extra_headers?: Record<string, string> }
+  auth?: {
+    header?: string
+    scheme?: string
+    extra_headers?: Record<string, string>
+  }
   constraints?: Record<string, unknown>
-  submit: { method?: string; path: string; timeout_sec?: number; body: Record<string, unknown>; encoding?: string; file_field?: string }
-  edits?: { method?: string; path: string; timeout_sec?: number; body: Record<string, unknown>; encoding?: string; file_field?: string } | null
-  refRegister?: { register: { method?: string; path: string; file_field?: string; timeout_sec?: number } } | null
-  poll?: { method?: string; path: string; interval_sec?: number; deadline_sec?: number; timeout_sec?: number; not_found_grace?: number } | null
+  submit: {
+    method?: string
+    path: string
+    timeout_sec?: number
+    body: Record<string, unknown>
+    encoding?: string
+    file_field?: string
+  }
+  edits?: {
+    method?: string
+    path: string
+    timeout_sec?: number
+    body: Record<string, unknown>
+    encoding?: string
+    file_field?: string
+  } | null
+  refRegister?: {
+    register: {
+      method?: string
+      path: string
+      file_field?: string
+      timeout_sec?: number
+    }
+  } | null
+  poll?: {
+    method?: string
+    path: string
+    interval_sec?: number
+    deadline_sec?: number
+    timeout_sec?: number
+    not_found_grace?: number
+  } | null
   firstLast?: { body?: Record<string, unknown> } | null
   extract: Record<string, unknown>
   /** JS 函数体：(body, input) => body，在模板渲染后做二次加工 */
@@ -33,24 +68,34 @@ export interface InvokeConfig {
 
 /** 点路径取值：choices.0.message.content */
 export function extractPath(obj: unknown, path: string): unknown {
-  return path
-    .split(".")
-    .reduce<unknown>((current, segment) => {
-      if (current == null) return undefined
-      if (Array.isArray(current)) return current[Number(segment)]
-      if (typeof current === "object") return (current as Record<string, unknown>)[segment]
-      return undefined
-    }, obj)
+  return path.split(".").reduce<unknown>((current, segment) => {
+    if (current == null) return undefined
+    if (Array.isArray(current)) return current[Number(segment)]
+    if (typeof current === "object")
+      return (current as Record<string, unknown>)[segment]
+    return undefined
+  }, obj)
 }
 
 /** 渲染模板串：{{key}} / {{key | int}} / {{key | default:"x"}} */
-export function renderValue(value: unknown, vars: Record<string, string>): unknown {
+export function renderValue(
+  value: unknown,
+  vars: Record<string, string>,
+): unknown {
   if (typeof value === "string") {
+    const intOnly = value.match(/^\{\{\s*(\w+)\s*\|\s*int\s*\}\}$/)
+    if (intOnly) return Number.parseInt(vars[intOnly[1]] ?? "0", 10) || 0
     let out = value
     // {{key | default:"x"}}
-    out = out.replace(/\{\{\s*(\w+)\s*\|\s*default:\s*"([^"]*)"\s*\}\}/g, (_, key, fallback) => vars[key] ?? fallback)
+    out = out.replace(
+      /\{\{\s*(\w+)\s*\|\s*default:\s*"([^"]*)"\s*\}\}/g,
+      (_, key, fallback) => vars[key] ?? fallback,
+    )
     // {{key | int}}
-    out = out.replace(/\{\{\s*(\w+)\s*\|\s*int\s*\}\}/g, (_, key) => vars[key] ?? "0")
+    out = out.replace(
+      /\{\{\s*(\w+)\s*\|\s*int\s*\}\}/g,
+      (_, key) => vars[key] ?? "0",
+    )
     // {{key}}
     out = out.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => vars[key] ?? "")
     return out
@@ -58,7 +103,9 @@ export function renderValue(value: unknown, vars: Record<string, string>): unkno
   if (Array.isArray(value)) return value.map((item) => renderValue(item, vars))
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, item] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       out[key] = renderValue(item, vars)
     }
     return out
@@ -78,10 +125,13 @@ function pickString(data: unknown, paths: unknown): string | undefined {
 export async function invokeCustomModel(
   config: InvokeConfig,
   input: InvokeInput,
-): Promise<{ ok: true; url?: string; text?: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; url?: string; text?: string } | { ok: false; error: string }
+> {
   const constraints = (config.constraints ?? {}) as Record<string, unknown>
   const vars: Record<string, string> = {
-    model_id: input.upstreamModelId ?? String(constraints.model_id ?? "default"),
+    model_id:
+      input.upstreamModelId ?? String(constraints.model_id ?? "default"),
     prompt: input.prompt,
     ratio: input.ratio ?? "16:9",
     resolution: input.resolution ?? "720p",
@@ -91,11 +141,13 @@ export async function invokeCustomModel(
     image_quality: input.quality ?? "high",
     refs: (input.refs ?? []).join(","),
     refs_b64: (input.refsB64 ?? []).join(","),
-    max_tokens: "4096",
-    temperature: "0.8",
+    system: input.system ?? "",
+    max_tokens: String(input.maxTokens ?? 4096),
+    temperature: String(input.temperature ?? 0.8),
   }
 
-  const hasRefs = (input.refs?.length ?? 0) > 0 || (input.refsB64?.length ?? 0) > 0
+  const hasRefs =
+    (input.refs?.length ?? 0) > 0 || (input.refsB64?.length ?? 0) > 0
   const edits = config.edits
   const useEdits = Boolean(edits) && hasRefs
 
@@ -123,7 +175,8 @@ export async function invokeCustomModel(
     const scheme = auth.scheme ?? "Bearer"
     headers[auth.header] = `${scheme} ${config.apiKey ?? ""}`.trim()
   }
-  if (auth.header === "x-goog-api-key") headers[auth.header] = config.apiKey ?? ""
+  if (auth.header === "x-goog-api-key")
+    headers[auth.header] = config.apiKey ?? ""
   for (const [key, value] of Object.entries(auth.extra_headers ?? {})) {
     headers[key] = value
   }
@@ -138,7 +191,9 @@ export async function invokeCustomModel(
     })
     responseData = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const message = pickString(responseData, ["error.message", "error"]) ?? `上游返回 ${res.status}`
+      const message =
+        pickString(responseData, ["error.message", "error"]) ??
+        `上游返回 ${res.status}`
       return { ok: false, error: message }
     }
   } catch (error) {
@@ -149,7 +204,10 @@ export async function invokeCustomModel(
   }
 
   const extract = config.extract ?? {}
-  const statusMap = (extract.status_map ?? {}) as { done?: string[]; fail?: string[] }
+  const statusMap = (extract.status_map ?? {}) as {
+    done?: string[]
+    fail?: string[]
+  }
 
   // sync：直接提取
   if (config.lifecycle !== "async" || !config.poll) {
@@ -180,7 +238,10 @@ export async function invokeCustomModel(
     await new Promise((resolve) => setTimeout(resolve, interval))
     let data: unknown
     try {
-      const res = await fetch(pollUrl, { headers, signal: AbortSignal.timeout((poll.timeout_sec ?? 30) * 1000) })
+      const res = await fetch(pollUrl, {
+        headers,
+        signal: AbortSignal.timeout((poll.timeout_sec ?? 30) * 1000),
+      })
       data = await res.json().catch(() => ({}))
       if (!res.ok && Date.now() > graceUntil) {
         return { ok: false, error: `轮询失败 ${res.status}` }
@@ -189,7 +250,9 @@ export async function invokeCustomModel(
       continue
     }
 
-    const status = (pickString(data, [String(extract.status ?? "status")]) ?? "").toLowerCase()
+    const status = (
+      pickString(data, [String(extract.status ?? "status")]) ?? ""
+    ).toLowerCase()
     const doneKeys = statusMap.done ?? ["success", "succeeded"]
     const failKeys = statusMap.fail ?? ["failed", "error"]
     if (doneKeys.includes(status)) {
@@ -202,7 +265,8 @@ export async function invokeCustomModel(
     if (failKeys.includes(status)) {
       return {
         ok: false,
-        error: pickString(data, (extract.error as string[]) ?? []) ?? "上游任务失败",
+        error:
+          pickString(data, (extract.error as string[]) ?? []) ?? "上游任务失败",
       }
     }
   }

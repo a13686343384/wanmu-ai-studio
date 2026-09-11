@@ -1,115 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Check, Loader2, Sparkles } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
-import { cn } from "@/lib/utils"
+import { RequestPending } from "@/components/shared/RequestPending"
 
-const STEPS = [
-  "通读全本剧本",
-  "切分集数与时序",
-  "推断时代 / 题材 / 基调",
-  "推导视觉与服化道风格",
-  "生成立项方案与分集灵感",
-]
-
-/**
- * AI 分析 Loading。
- * 逐条点亮分析步骤，并展示百分比进度，营造真实推理过程。
- */
+/** Only confirmed request stages are displayed; AI internal steps are unknown. */
 export function AnalysisLoading({
   active,
-  progress,
   label,
 }: {
   active: boolean
-  progress: number
   label?: string | null
 }) {
-  const [visibleStep, setVisibleStep] = useState(0)
-  const [elapsed, setElapsed] = useState(0)
-
-  useEffect(() => {
-    if (!active) {
-      setVisibleStep(0)
-      setElapsed(0)
-      return
-    }
-    setVisibleStep(0)
-    setElapsed(0)
-    const timer = window.setInterval(() => {
-      setVisibleStep((step) => (step < STEPS.length - 1 ? step + 1 : step))
-    }, 900)
-    const clock = window.setInterval(() => setElapsed((value) => value + 1), 1000)
-    return () => {
-      window.clearInterval(timer)
-      window.clearInterval(clock)
-    }
-  }, [active])
-
   if (!active) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/15">
-            <Sparkles className="h-4 w-4 animate-pulse text-orange-400" />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-zinc-100">
-              {label ?? "正在通读全本，理解剧情脉络…"}
-            </p>
-            <p className="text-[11px] text-zinc-500">
-              已用 {elapsed}s · 吞全本 + 推理通常需 1-3 分钟，请保持弹窗打开
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-2.5">
-          {STEPS.map((step, index) => {
-            const done = index < visibleStep
-            const current = index === visibleStep
-            return (
-              <div key={step} className="flex items-center gap-2.5">
-                <span
-                  className={cn(
-                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                    done
-                      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
-                      : current
-                        ? "border-orange-500/50 bg-orange-500/15 text-orange-400"
-                        : "border-zinc-700 text-zinc-600",
-                  )}
-                >
-                  {done ? (
-                    <Check className="h-2.5 w-2.5" />
-                  ) : current ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  ) : (
-                    <span className="h-1 w-1 rounded-full bg-current" />
-                  )}
-                </span>
-                <span
-                  className={cn(
-                    "text-xs",
-                    done ? "text-zinc-400" : current ? "text-zinc-200" : "text-zinc-600",
-                  )}
-                >
-                  {step}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="mt-5 space-y-1.5">
-          <Progress value={progress} />
-          <div className="flex justify-between text-[11px] text-zinc-500">
-            <span>请稍候，通常需要 10-30 秒</span>
-            <span className="tabular-nums">{progress}%</span>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+        <h2 className="mb-4 text-lg font-medium text-zinc-100">剧本分析</h2>
+        <RequestPending label={label ?? "正在等待 AI 分析结果…"} />
+        <p className="mt-4 text-xs text-zinc-500">
+          服务尚未返回具体进度，请保持页面打开。完成后会显示分析结果。
+        </p>
       </div>
     </div>
   )

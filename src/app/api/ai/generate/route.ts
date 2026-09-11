@@ -1,6 +1,7 @@
 import { jsonError, jsonOk, withErrorHandling } from "@/lib/api"
 import { requireUser } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
+import { resolveModelWorkspace } from "@/services/ai/live/workspace"
 import { getAIService } from "@/services/ai"
 import { generateRequestSchema } from "@/lib/validations/generation"
 
@@ -13,7 +14,8 @@ export const POST = withErrorHandling(async (req: Request) => {
   const body = await req.json()
   const input = generateRequestSchema.parse(body)
 
-  const ai = getAIService()
+  const workspaceId = await resolveModelWorkspace(user.id,input)
+  const ai = getAIService(workspaceId)
 
   const result =
     input.mediaType === "text"

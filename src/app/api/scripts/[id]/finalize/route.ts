@@ -20,7 +20,7 @@ export const POST = withErrorHandling(
     const body = await req.json()
     const input = reviewScriptSchema.parse(body)
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data: outline, usage } = await ai.generateOutline({
       scriptTitle: input.title,
       content: script.content,

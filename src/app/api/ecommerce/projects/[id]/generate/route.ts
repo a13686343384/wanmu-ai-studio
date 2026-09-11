@@ -46,7 +46,7 @@ export const POST = withErrorHandling(
       data: { status: "generating" },
     })
 
-    const ai = getAIService()
+    const ai = getAIService(project.workspaceId)
     const config = project.config as {
       imageModel?: string
       textModel?: string

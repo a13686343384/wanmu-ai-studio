@@ -64,7 +64,7 @@ export const POST = withErrorHandling(
     if (targets.length === 0)
       return jsonOk({ pack, generated: 0 }, "空间资产包已齐全")
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const context = {
       visualStyle: script.visualStyle,
       costumeStyle: script.costumeStyle,

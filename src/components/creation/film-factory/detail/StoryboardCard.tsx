@@ -1,9 +1,17 @@
 "use client"
 
 import { memo, useState } from "react"
-import { Clapperboard, ImageIcon, Loader2, Pencil, Play, Video } from "lucide-react"
+import {
+  Clapperboard,
+  ImageIcon,
+  Loader2,
+  Pencil,
+  Play,
+  Video,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 export interface StoryboardDTO {
@@ -22,7 +30,19 @@ export interface StoryboardDTO {
   negativePrompt: string | null
   model: string | null
   status: string
+  segmentId?: string | null
   segmentTitle?: string | null
+  generationParams?: {
+    refs?: {
+      sceneId: string | null
+      cast: { characterId: string; costumeId: string | null }[]
+      propIds: string[]
+    }
+    refsRevision?: number
+    outputsStale?: boolean
+    imageStale?: boolean
+    videoStale?: boolean
+  } | null
   segmentNote?: string | null
 }
 
@@ -56,6 +76,10 @@ export const StoryboardCard = memo(function StoryboardCard({
 }) {
   const [previewVideo, setPreviewVideo] = useState(false)
   const hasVideo = Boolean(storyboard.videoUrl)
+  const refs = storyboard.generationParams?.refs
+  const refsCount = refs
+    ? Number(Boolean(refs.sceneId)) + refs.cast.length + refs.propIds.length
+    : 0
 
   return (
     <div
@@ -68,12 +92,30 @@ export const StoryboardCard = memo(function StoryboardCard({
             : "border-zinc-800 hover:border-zinc-700",
       )}
     >
+      {(refs || storyboard.generationParams?.outputsStale) && (
+        <button
+          type="button"
+          disabled={busy || !onEditRefs}
+          onClick={onEditRefs}
+          className="flex w-full items-center justify-between border-b border-zinc-800 px-3 py-1.5 text-[11px] text-zinc-400"
+        >
+          <span>
+            引用 {refsCount} 项 · v
+            {storyboard.generationParams?.refsRevision ?? 0}
+          </span>
+          {storyboard.generationParams?.outputsStale && (
+            <span className="text-orange-400">引用已变更，产物待更新</span>
+          )}
+        </button>
+      )}
       {/* 画面（占位框按画幅动态决定） */}
       <div
         className="relative overflow-hidden bg-zinc-950"
         style={{ aspectRatio: aspectRatio.replace(":", " / ") }}
       >
-        {videoMode ? (
+        {videoMode && storyboard.videoUrl ? (
+          <video src={storyboard.videoUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`分镜 ${storyboard.number} 视频`} />
+        ) : videoMode ? (
           <div className="flex h-full flex-col items-center justify-center gap-2">
             <button
               type="button"
@@ -147,6 +189,7 @@ export const StoryboardCard = memo(function StoryboardCard({
           </div>
         )}
 
+        {videoMode && onEditRefs && <button type="button" aria-label="编辑引用" onClick={onEditRefs} className="absolute right-2 top-9 rounded-md border border-zinc-700 bg-zinc-950/90 p-1.5 text-zinc-200"><Pencil className="h-3.5 w-3.5" /></button>}
         <Badge
           variant="muted"
           className="absolute left-2 top-2 border-white/10 bg-black/55 text-[10px] backdrop-blur"
@@ -218,7 +261,11 @@ export const StoryboardCard = memo(function StoryboardCard({
             disabled={busy}
             onClick={() => onGenerateImage(storyboard)}
           >
-            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <ImageIcon className="h-3 w-3" />
+            )}
             {storyboard.imageUrl ? "重出图" : "出图"}
           </Button>
           <Button
@@ -228,13 +275,19 @@ export const StoryboardCard = memo(function StoryboardCard({
             disabled={busy}
             onClick={() => onGenerateVideo(storyboard)}
           >
-            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Video className="h-3 w-3" />}
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Video className="h-3 w-3" />
+            )}
             出视频
           </Button>
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => (videoMode && onEditRefs ? onEditRefs() : onEdit(storyboard))}
+            onClick={() =>
+              videoMode && onEditRefs ? onEditRefs() : onEdit(storyboard)
+            }
             aria-label="编辑"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -242,27 +295,28 @@ export const StoryboardCard = memo(function StoryboardCard({
         </div>
       </div>
 
-      {previewVideo && storyboard.imageUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8"
-          onClick={() => setPreviewVideo(false)}
-        >
-          <div className="max-h-full max-w-4xl overflow-hidden rounded-xl border border-zinc-800">
+      <Dialog open={previewVideo} onOpenChange={setPreviewVideo}>
+          <DialogContent className="sm:max-w-4xl max-h-[88vh] overflow-y-auto">
+            <DialogTitle>分镜 {storyboard.number} 预览</DialogTitle>
             {hasVideo ? (
-              <video src={storyboard.videoUrl!} controls autoPlay className="max-h-[80vh]" />
+              <video
+                src={storyboard.videoUrl!}
+                controls
+                autoPlay
+                className="max-h-[80vh]"
+              />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={storyboard.imageUrl}
+                src={storyboard.imageUrl ?? undefined}
                 alt=""
                 loading="lazy"
                 decoding="async"
                 className="max-h-[80vh] object-contain"
               />
             )}
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   )
 })

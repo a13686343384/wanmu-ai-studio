@@ -32,13 +32,13 @@ function characterSheet(
   extra?: string | null,
 ): string {
   return [
-    `A 16:9 character design sheet (industry-standard character reference page), cinematic photorealistic 3D CG, high-tech spec-sheet aesthetic, deep charcoal background (#141414), thin cool-gray hairline dividers (#333333), clear in-image typography. 整张图为一张「角色设定卡」，版面构图必须严格按以下分区输出：`,
+    `A 16:9 character design sheet (industry-standard character reference page), consistent with the declared visual style, deep charcoal background (#141414), thin cool-gray hairline dividers (#333333), clear in-image typography. 整张图为一张「角色设定卡」，版面构图必须严格按以下分区输出：`,
     `① 顶部标题区：超大号角色名「${name}」+ 右侧拼音/英文名，下方一行小字身份定位（${description.slice(0, 60)}）。`,
-    `② 左栏 档案 / PROFILE：Height 身高、Age 年龄、Role 角色、Traits 特质、Signature Pose 标志姿势，每项一行中英对照。`,
+    `② 左栏 档案 / PROFILE：Height 身高、Age 年龄、Role 角色、Traits 特质、Signature Pose 标志姿势，每项一行中英对照。剧本没有说明的年龄、身高或档案事实标注「未设定」，不得捏造。`,
     `③ 中栏 主视觉 / HERO：全身立绘大图，占画面左侧约 1/3，站姿标志化，${STYLE_LINE(context)}。`,
     `④ 中上 表情集 / EXPRESSIONS：2 行 × 3 列共 6 格头像，标注 平静 Calm / 警觉 Alert / 专注 Focused / 严厉 Stern / 思考 Thinking / 威压 Imposing。`,
     `⑤ 中下 四视图 / FOUR-VIEW TURNAROUND：正面、侧面、背面、3/4 侧四联全身图，灰底。`,
-    `⑥ 右栏 服饰细节 / COSTUME DETAILS：2×2 四格特写（外套、护具、腰带金属件、鞋靴），每格下方中英文名称与材质色号。`,
+    `⑥ 右栏 服饰细节 / COSTUME DETAILS：2×2 四格特写（从剧本已知服饰中选取四处，未设定的不要强行增加护具或科幻配件），每格下方中英文名称与材质色号。`,
     `⑦ 右下 标志道具 / SIGNATURE PROPS：标志性随身物特写横条；关键特征 / KEY FEATURE：身体特征特写一格；色板 / COLOR PALETTE：6 个色块 + HEX 色号。`,
     extra ? `附加要求：${extra}` : "",
     `所有分区必须完整出现且排版整齐，文字清晰可读，不得遗漏四视图与表情集。`,
@@ -75,7 +75,7 @@ function sceneSheet(
   extra?: string | null,
 ): string {
   return [
-    `A 16:9 environment concept sheet (film-production location reference page), cinematic photorealistic, cohesive grading. 整张图为一张「场景设定卡」，版面构图严格按以下分区输出：`,
+    `A 16:9 environment concept sheet (film-production location reference page), consistent with the declared visual style, cohesive grading. 整张图为一张「场景设定卡」，版面构图严格按以下分区输出：`,
     `① 顶部标题区：超大号场景双语名称「${name} / ${name} EN」，下方一行场景定位小字。`,
     `② 左侧 主视觉 / HERO SHOT（约 2/3 宽）：场景大图，无人物（no characters），${description.slice(0, 80)}。`,
     `③ 右上 细节 / DETAIL MACROS：2×2 四格特写（关键陈设、生存/功能细节、光源发光体、地面材质），每格下方中英文名称。`,

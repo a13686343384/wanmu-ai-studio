@@ -16,7 +16,13 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -24,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Progress } from "@/components/ui/progress"
+import { RequestPending } from "@/components/shared/RequestPending"
 import { useAiModels } from "@/hooks/useAiModels"
 import type { WritingProjectDTO } from "@/lib/writing/types"
 import { cn } from "@/lib/utils"
@@ -47,9 +53,10 @@ export function WritingEditor({
   )
   const { models: textModels } = useAiModels("text")
   const [model, setModel] = useState("")
-  useEffect(() => { if (textModels.length && !model) setModel(textModels[0]!.id) }, [textModels, model])
+  useEffect(() => {
+    if (textModels.length && !model) setModel(textModels[0]!.id)
+  }, [textModels, model])
   const [busy, setBusy] = useState("")
-  const [progress, setProgress] = useState(0)
   const lock = useRef(false)
   const router = useRouter()
   const { update } = useSession()
@@ -112,11 +119,6 @@ export function WritingEditor({
     }
     lock.current = true
     setBusy(actionName)
-    setProgress(10)
-    const timer = window.setInterval(
-      () => setProgress((value) => Math.min(90, value + 8)),
-      500,
-    )
     try {
       const res = await fetch(`/api/writing-projects/${project.id}`, {
         method: "POST",
@@ -142,7 +144,6 @@ export function WritingEditor({
         next.document.episodes.find((item) => item.number === number)
           ?.content ?? "",
       )
-      setProgress(100)
       void update()
       toast.success(
         actionName === "save"
@@ -159,7 +160,6 @@ export function WritingEditor({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "操作失败")
     } finally {
-      window.clearInterval(timer)
       lock.current = false
       setBusy("")
     }
@@ -412,7 +412,15 @@ export function WritingEditor({
           )}
           {busy && (
             <div className="mt-3">
-              <Progress value={progress} indicatorClassName="bg-orange-500" />
+              <RequestPending
+                label={
+                  busy === "save"
+                    ? "正在保存正文"
+                    : busy === "import"
+                      ? "正在导入剧本"
+                      : "正在等待创作结果"
+                }
+              />
               <p role="status" className="mt-1 text-xs text-zinc-500">
                 正在
                 {busy === "save"
@@ -477,7 +485,10 @@ export function WritingEditor({
             />
             <div className="flex items-center justify-between gap-2">
               <Select value={model} onValueChange={setModel}>
-                <SelectTrigger className="h-7 min-w-0 gap-1 text-xs" aria-label="编剧模型">
+                <SelectTrigger
+                  className="h-7 min-w-0 gap-1 text-xs"
+                  aria-label="编剧模型"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -614,7 +625,10 @@ export function WritingEditor({
               <label className="block space-y-2 text-sm text-zinc-400">
                 文本模型
                 <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger className="h-10 w-full text-sm" aria-label="生成文本模型">
+                  <SelectTrigger
+                    className="h-10 w-full text-sm"
+                    aria-label="生成文本模型"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

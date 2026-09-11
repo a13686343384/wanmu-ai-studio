@@ -14,8 +14,14 @@ import { getAiMode } from "@/lib/settings"
  * 每次调用前读取模式（5s 进程缓存），切换开关即时生效。
  * 注意：不要在模块顶层读取设置后再条件导入，以便 Next.js 静态分析两种实现。
  */
-export function getAIService(): AIService {
-  return modeAwareAIService
+export function getAIService(workspaceId?: string): AIService {
+  if (!workspaceId) return modeAwareAIService
+  return new Proxy(modeAwareAIService, {
+    get(target, method: string) {
+      const impl = target[method as keyof AIService] as (input: unknown) => Promise<unknown>
+      return (input: Record<string, unknown>) => impl({ ...input, workspaceId })
+    },
+  })
 }
 
 /** 把每个方法转发到当前模式对应实现。 */

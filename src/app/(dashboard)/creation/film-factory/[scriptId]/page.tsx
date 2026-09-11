@@ -55,6 +55,7 @@ export default async function ScriptDetailPage({
   const detail: ScriptDetail = {
     ...toScriptSummary(script),
     content: script.content,
+    assetGenerationConfig: script.assetGenerationConfig as ScriptDetail["assetGenerationConfig"],
     assetPromptTemplate: script.assetPromptTemplate,
     outfitPromptTemplate: script.outfitPromptTemplate,
     propPromptTemplate: script.propPromptTemplate,
@@ -80,6 +81,8 @@ export default async function ScriptDetailPage({
       duration: episode.duration,
       style: episode.style,
       status: episode.status,
+      productionStage: episode.productionStage,
+      review: episode.review,
       audioUrl: episode.audioUrl,
       bgmPrompt: episode.bgmPrompt,
     })),

@@ -24,7 +24,7 @@ export const POST = withErrorHandling(
     const body = await req.json()
     const input = chatSchema.parse(body)
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data, usage } = await ai.consultChat({
       scriptTitle: script.title,
       suggestion: input.suggestion,

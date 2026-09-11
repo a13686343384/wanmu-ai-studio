@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-09-11 返工执行补充：开发与部署启动方式
+
+本段是 API 调试计划书返工中的启动约定；下方历史“全部完成 / 40条通过”是旧交付记录，不能作为本次返工验收结论。新一轮验收结果以 `docs/plans/2026-09-11-api-debug-execution-log.md` 为准。
+
+- 本地仍先在独立终端运行 `npm run db:dev`，然后执行 `npm run dev`。`dev` 现在通过 `scripts/run-app.mjs` 同时启动 Next.js（固定 3000 端口）和持久任务 worker，无需用户另记启动 worker 的步骤。
+- 生产环境执行数据库迁移和 `npm run build` 后，`npm run start` 同时运行 Web 与 worker；进程管理器应监督此父进程并在失败后重启。任一子服务退出会停止其配对服务，防止页面存活而任务永远排队。
+- 需要 Web/worker 分容器部署时，Web 使用 `npx next start --port 3000`，worker 使用 `npm run tasks:worker`；两者须连接同一个 PostgreSQL、使用相同应用配置和正确的 `NEXTAUTH_URL`。不要同时使用组合启动和独立 worker 来无意增加并发量。
+- Ctrl+C / SIGTERM 会向本次创建的子进程组发出停止信号；10秒未退出才强制回收本次进程组。当前无法取消的供应商请求可能结果不明，不会自动重放收费请求；超过2分钟无心跳的任务标记中断，并释放它持有的镜头生成状态，保留已有文件，用户确认后仅重试剩余项。
+- 更新 Prisma schema 并执行迁移/生成 Client 后，需要重启开发服务，避免进程级 Prisma 单例仍使用旧模型字段。新字段在数据库已保存但 API 未返回时，先检查这一点。
+
+
 ## ⚡ 断点续写指引（新会话/新 Agent 从这里开始）
 
 1. **读我**：本文件「五、最近一轮工作明细（2026-09-10）」+ `docs/plans/2026-09-10-live-ai-integration.md`（计划，已全部勾选）+ 同名 `.log.md`（执行日志）。

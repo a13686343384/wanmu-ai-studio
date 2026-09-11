@@ -38,6 +38,7 @@ export interface AIResult<T> {
 /* ---------------------------- 文本类 ---------------------------- */
 
 export interface AnalyzeScriptInput {
+  workspaceId?: string
   title: string
   content: string
   workType: string
@@ -75,6 +76,7 @@ export interface ScriptAnalysis {
 }
 
 export interface ConsultScriptInput {
+  workspaceId?: string
   scriptTitle: string
   content: string
   model: string
@@ -100,6 +102,7 @@ export interface ConsultScriptResult {
 }
 
 export interface GenerateTextInput {
+  workspaceId?: string
   prompt: string
   model: string
 }
@@ -109,6 +112,7 @@ export interface GenerateTextResult {
 }
 
 export interface ConsultChatInput {
+  workspaceId?: string
   scriptTitle: string
   /** 正在讨论的诊断建议 */
   suggestion: string
@@ -123,6 +127,7 @@ export interface ConsultChatResult {
 }
 
 export interface OptimizeDialogueInput {
+  workspaceId?: string
   content: string
   model: string
 }
@@ -133,6 +138,7 @@ export interface OptimizeDialogueResult {
 }
 
 export interface GenerateOutlineInput {
+  workspaceId?: string
   scriptTitle: string
   content: string
   totalEpisodes: number
@@ -153,6 +159,7 @@ export interface GenerateOutlineResult {
 }
 
 export interface SummarizeEpisodeInput {
+  workspaceId?: string
   episodeTitle: string
   content: string
   model: string
@@ -168,11 +175,13 @@ export interface SummarizeEpisodeResult {
 /* ---------------------------- 资产类 ---------------------------- */
 
 export interface ExtractCharactersInput {
+  workspaceId?: string
   content: string
   model: string
 }
 
 export interface CharacterDraft {
+  costumes?: { name: string; description: string; situation?: string }[]
   name: string
   description: string
   appearance: string
@@ -180,6 +189,7 @@ export interface CharacterDraft {
 }
 
 export interface ExtractScenesInput {
+  workspaceId?: string
   content: string
   model: string
 }
@@ -192,6 +202,7 @@ export interface SceneDraft {
 }
 
 export interface ExtractPropsInput {
+  workspaceId?: string
   content: string
   model: string
 }
@@ -204,6 +215,7 @@ export interface PropDraft {
 /* ---------------------------- 图像 / 视频 / 音频 ---------------------------- */
 
 export interface GenerateImageInput {
+  quality?: string
   prompt: string
   negativePrompt?: string
   model: string
@@ -283,6 +295,7 @@ export interface GenerateSubtitleResult {
 /* ---------------------------- 分镜 ---------------------------- */
 
 export interface SplitStoryboardsInput {
+  workspaceId?: string
   episodeTitle: string
   content: string
   mode: "text" | "image" | "video"
@@ -310,6 +323,7 @@ export interface SplitStoryboardsResult {
 /* ---------------------------- 服务接口 ---------------------------- */
 
 export interface AIService {
+  validateStoryboards(input: ValidateStoryboardsInput): Promise<AIResult<ValidateStoryboardsResult>>
   writeScript(input: WriteScriptInput): Promise<AIResult<WriteScriptResult>>
   analyzeScript(input: AnalyzeScriptInput): Promise<AIResult<ScriptAnalysis>>
   generateText(input: GenerateTextInput): Promise<AIResult<GenerateTextResult>>
@@ -352,6 +366,7 @@ export interface AIService {
 }
 
 export interface WriteScriptInput {
+  workspaceId?: string
   title: string
   idea: string
   genre: string
@@ -379,4 +394,15 @@ export interface WriteScriptResult {
     content: string
   }[]
   reply: string
+}
+
+export interface ValidateStoryboardsInput {
+  workspaceId?: string
+  model: string
+  content: string
+  storyboards: { id: string; description: string; duration: number | null; shotType: string; camera: string | null; refs?: unknown }[]
+  assets: unknown
+}
+export interface ValidateStoryboardsResult {
+  issues: import('@/lib/validations/storyboard-review').ReviewIssue[]
 }

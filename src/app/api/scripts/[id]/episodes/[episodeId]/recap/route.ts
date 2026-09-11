@@ -26,7 +26,7 @@ export const POST = withErrorHandling(
     const body = await req.json().catch(() => ({}))
     const input = schema.parse(body)
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data, usage } = await ai.summarizeEpisode({
       episodeTitle: episode.title,
       content: episode.content,

@@ -43,7 +43,7 @@ export const POST = withErrorHandling(
       return jsonError("勾选的建议不存在", 400)
     }
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data } = await ai.optimizeDialogue({
       content: script.content,
       model: script.dialogueModel ?? script.textModel,

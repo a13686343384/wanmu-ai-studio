@@ -1,4 +1,5 @@
 "use client"
+import { currentModelScope } from "@/lib/ai/client-scope"
 
 import { useEffect, useRef, useState } from "react"
 import {
@@ -616,6 +617,7 @@ export function StudioActionNode({ id, data, selected }: NodeProps) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          ...currentModelScope(),
           mediaType: mode === "run" ? "video" : "text",
           aspectRatio: meta.outputAspect ?? "9:16",
           duration: `${meta.clipDuration ?? 15}s`,

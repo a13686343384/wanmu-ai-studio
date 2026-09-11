@@ -1,3 +1,4 @@
+import { mockReview } from "./storyboard-validation"
 import type {
   AIService,
   AIResult,
@@ -101,6 +102,7 @@ function guessNames(content: string, limit = 6): string[] {
 }
 
 export const mockAIService: AIService = {
+  validateStoryboards: mockReview,
   writeScript: mockWriteScript,
   /* ---------------------------- 剧本分析 ---------------------------- */
 

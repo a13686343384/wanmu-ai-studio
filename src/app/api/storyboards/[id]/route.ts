@@ -2,6 +2,9 @@ import { jsonError, jsonOk, withErrorHandling } from "@/lib/api"
 import { requireUser } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { shotRefsSchema } from "@/lib/storyboards/references"
+import { saveStoryboardRefs } from "@/lib/storyboards/references-server"
+import { AppError } from "@/lib/api"
 
 const patchSchema = z.object({
   shotType: z.string().max(20).optional(),
@@ -11,22 +14,8 @@ const patchSchema = z.object({
   camera: z.string().max(120).nullable().optional(),
   duration: z.number().min(0.5).max(120).optional(),
   /** 镜头引用（整段引用编辑保存）：场景 / 人物造型 / 道具 */
-  refs: z
-    .object({
-      sceneId: z.string().nullable().optional(),
-      cast: z
-        .array(
-          z.object({
-            characterId: z.string(),
-            costumeId: z.string().nullable().optional(),
-          }),
-        )
-        .max(12)
-        .optional(),
-      propIds: z.array(z.string()).max(12).optional(),
-    })
-    .nullable()
-    .optional(),
+  refs: shotRefsSchema.optional(),
+  revision: z.number().int().min(0).optional(),
   prompt: z.string().max(2000).nullable().optional(),
   negativePrompt: z.string().max(1000).nullable().optional(),
 })
@@ -34,12 +23,15 @@ const patchSchema = z.object({
 /** 校验分镜归属。 */
 async function requireStoryboard(id: string, userId: string) {
   const storyboard = await prisma.storyboard.findFirst({
-    where: { id, episode: { script: { workspace: { members: { some: { userId } } } } } },
+    where: {
+      id,
+      episode: { script: { workspace: { members: { some: { userId } } } } },
+    },
     include: { episode: { select: { id: true, scriptId: true } } },
   })
 
   if (!storyboard) {
-    throw Object.assign(new Error("分镜不存在或无权访问"), { statusCode: 404 })
+    throw new AppError("分镜不存在或无权访问", 404)
   }
 
   return storyboard
@@ -54,20 +46,20 @@ export const PATCH = withErrorHandling(
     const body = await req.json()
     const input = patchSchema.parse(body)
 
-    const { refs, ...rest } = input
+    const { refs, revision, ...rest } = input
+    if (refs !== undefined) {
+      if (revision === undefined) throw new AppError("保存引用需要版本号", 400)
+      const [storyboard] = await saveStoryboardRefs(
+        user.id,
+        [{ storyboardId: params.id, revision, refs }],
+        undefined,
+        rest,
+      )
+      return jsonOk(storyboard, "分镜已更新")
+    }
     const storyboard = await prisma.storyboard.update({
       where: { id: params.id },
-      data: {
-        ...rest,
-        ...(refs !== undefined
-          ? {
-              generationParams: {
-                ...((storyboardCurrent?.generationParams as Record<string, unknown>) ?? {}),
-                refs,
-              },
-            }
-          : {}),
-      },
+      data: rest,
     })
 
     return jsonOk(storyboard, "分镜已更新")

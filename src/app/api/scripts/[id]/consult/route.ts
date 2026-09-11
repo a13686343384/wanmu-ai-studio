@@ -25,7 +25,7 @@ export const POST = withErrorHandling(
     const input = consultSchema.parse(body)
     const model = input.model ?? script.consultModel ?? script.textModel
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data, usage } = await ai.consultScript({
       scriptTitle: script.title,
       content: script.content,

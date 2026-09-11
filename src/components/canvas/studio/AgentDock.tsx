@@ -1,4 +1,5 @@
 "use client"
+import { currentModelScope } from "@/lib/ai/client-scope"
 import { useEffect, useRef, useState } from "react"
 import {
   Check,
@@ -69,6 +70,7 @@ export function AgentDock({ onClose }: { onClose: () => void }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          ...currentModelScope(),
           mediaType: kind,
           modelId: model,
           prompt: `${context ? `参考：${context}\n` : ""}${request}`.slice(

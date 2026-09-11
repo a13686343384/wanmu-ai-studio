@@ -37,7 +37,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScriptCard } from "@/components/creation/film-factory/ScriptCard"
-import { TaskQueueDialog, StopAllDialog } from "@/components/creation/film-factory/TaskQueueDialog"
+import {
+  TaskQueueDialog,
+  StopAllDialog,
+} from "@/components/creation/film-factory/TaskQueueDialog"
 import { RenameDialog } from "@/components/canvas/RenameDialog"
 import {
   Dialog,
@@ -79,7 +82,9 @@ export function ScriptList() {
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return []
     try {
-      return JSON.parse(localStorage.getItem("wanmusheng.pinnedScripts") ?? "[]")
+      return JSON.parse(
+        localStorage.getItem("wanmusheng.pinnedScripts") ?? "[]",
+      )
     } catch {
       return []
     }
@@ -132,7 +137,9 @@ export function ScriptList() {
   }, [scripts, sort, pinnedIds])
 
   const inProduction = sorted.filter((s) => s.processingStatus === "processing")
-  const ready = sorted.filter((s) => s.processingStatus !== "processing" && s.status !== "completed")
+  const ready = sorted.filter(
+    (s) => s.processingStatus !== "processing" && s.status !== "completed",
+  )
   const completed = sorted.filter((s) => s.status === "completed")
 
   const counts = {
@@ -142,25 +149,53 @@ export function ScriptList() {
     total: sorted.length,
   }
 
-  async function stopAll() {
-    const running = inProduction
-    if (running.length === 0) {
-      toast.info("当前没有正在运行的任务")
-      return
-    }
-
-    await Promise.all(
-      running.map((script) =>
-        fetch(`/api/scripts/${script.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ processingStatus: "idle", progressLabel: "已手动停止" }),
+  async function stopAll(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/tasks?active=1", { cache: "no-store" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "读取任务失败")
+      const tasks = (payload.data as { id: string; state: string }[]).filter(
+        (task) => ["queued", "running"].includes(task.state),
+      )
+      if (!tasks.length) {
+        toast.info("当前没有可请求停止的后台任务")
+        return true
+      }
+      const outcomes = await Promise.allSettled(
+        tasks.map(async (task) => {
+          const response = await fetch(`/api/tasks/${task.id}`, {
+            method: "PATCH",
+          })
+          const result = await response.json()
+          if (!response.ok) throw new Error(result.error ?? "请求停止失败")
+          return result.data.state as string
         }),
-      ),
-    )
-
-    toast.success(`已停止 ${running.length} 个任务`)
-    void load()
+      )
+      const failed = outcomes.filter(
+        (result) => result.status === "rejected",
+      ).length
+      const pending = outcomes.filter(
+        (result) =>
+          result.status === "fulfilled" && result.value === "cancel_requested",
+      ).length
+      const stopped = outcomes.filter(
+        (result) =>
+          result.status === "fulfilled" && result.value === "cancelled",
+      ).length
+      if (failed)
+        toast.error(
+          `停止请求失败 ${failed} 项；已停止 ${stopped} 项，收尾中 ${pending} 项，请到任务队列重试`,
+        )
+      else
+        toast.info(
+          `已停止 ${stopped} 项，收尾中 ${pending} 项；最终结果请查看任务队列`,
+        )
+      void load()
+      return failed === 0
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "请求全部停止失败")
+      return false
+    }
   }
 
   async function confirmDelete() {
@@ -197,7 +232,9 @@ export function ScriptList() {
       <section className="mt-6">
         <div className="mb-2.5 flex items-center gap-2">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          <h2 className="text-xs font-medium tracking-wider text-zinc-300">{title}</h2>
+          <h2 className="text-xs font-medium tracking-wider text-zinc-300">
+            {title}
+          </h2>
           <span className="text-xs font-medium tabular-nums text-zinc-400">
             {String(count).padStart(2, "0")}
           </span>
@@ -241,7 +278,9 @@ export function ScriptList() {
           className="ml-auto rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-200"
           aria-label={hintOpen ? "收起提示" : "展开提示"}
         >
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${hintOpen ? "" : "-rotate-90"}`} />
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform ${hintOpen ? "" : "-rotate-90"}`}
+          />
         </button>
       </div>
 
@@ -267,9 +306,16 @@ export function ScriptList() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuLabel>排序方式</DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <DropdownMenuRadioItem value="updated">最近修改</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="created">创建时间</DropdownMenuRadioItem>
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(v) => setSort(v as SortKey)}
+            >
+              <DropdownMenuRadioItem value="updated">
+                最近修改
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="created">
+                创建时间
+              </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="title">标题</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
@@ -289,18 +335,30 @@ export function ScriptList() {
             variant="ghost"
             size="sm"
             className="h-8 text-zinc-400 hover:text-rose-300"
-            disabled={inProduction.length === 0}
-            title={inProduction.length === 0 ? "没有正在进行的任务" : undefined}
             onClick={() => setStopAllOpen(true)}
           >
             <Square className="h-3.5 w-3.5 fill-current text-rose-400" />
             停止全部
           </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => toast.info("导入剧本", { description: "支持 txt / docx，即将上线" })}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() =>
+              toast.info("导入剧本", {
+                description: "支持 txt / docx，即将上线",
+              })
+            }
+          >
             <Upload className="h-3.5 w-3.5" />
             导入
           </Button>
-          <Button variant="inverse" size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="inverse"
+            size="sm"
+            className="h-8"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus />
             新建剧本
           </Button>
@@ -373,7 +431,7 @@ export function ScriptList() {
         open={stopAllOpen}
         onOpenChange={setStopAllOpen}
         runningCount={inProduction.length}
-        onConfirm={() => void stopAll()}
+        onConfirm={stopAll}
       />
 
       <RenameDialog
@@ -408,12 +466,16 @@ export function ScriptList() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+      <AlertDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>删除剧本</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除「{deleting?.title}」吗？分集、资产与分镜数据会一并删除，且不可恢复。
+              确定要删除「{deleting?.title}
+              」吗？分集、资产与分镜数据会一并删除，且不可恢复。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

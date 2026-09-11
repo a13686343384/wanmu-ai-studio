@@ -31,11 +31,17 @@ export function WorkflowTabs({
   assetsReady?: boolean
 }) {
   let current = stageIndex(script.status)
-  // 需求9：人物/场景阶段的进度以「资产是否全部出图」为准
-  if (script.status === "assets" && assetsReady !== undefined) {
+  // 需求9：进入拆分镜之前，进度以「资产是否全部出图」为准——
+  // 未出齐：停在「剧本大纲」（人物/场景灰显）；出齐：推进到「拆分镜」
+  if (
+    (script.status === "outlining" || script.status === "assets") &&
+    assetsReady !== undefined
+  ) {
     current = assetsReady
-      ? Math.min(current + 1, STAGE_ORDER.length - 1)
-      : Math.max(current - 1, 0)
+      ? STAGE_ORDER.indexOf("storyboarding") === -1
+        ? Math.min(current + 1, STAGE_ORDER.length - 1)
+        : STAGE_ORDER.indexOf("storyboarding")
+      : STAGE_ORDER.indexOf("outlining")
   }
 
   return (

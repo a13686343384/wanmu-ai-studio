@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
+import { currentModelScope } from "@/lib/ai/client-scope"
 import type { AIModel } from "@/lib/constants"
 
 export type ModelKind = "text" | "image" | "video" | "audio" | "subtitle"
@@ -12,7 +14,16 @@ export type ModelKind = "text" | "image" | "video" | "audio" | "subtitle"
  *
  * 返回 { models, loading, error }。
  */
-export function useAiModels(kind: ModelKind) {
+export function useAiModels(kind: ModelKind, scope?: string | {workspaceId?:string;scriptId?:string;projectId?:string;writingProjectId?:string}) {
+  const pathname=usePathname()
+  const [workspaceVersion,setWorkspaceVersion]=useState(0)
+  const explicitScope=JSON.stringify(typeof scope === "string"?{workspaceId:scope}:scope)
+  useEffect(()=>{
+    const changed=()=>setWorkspaceVersion(n=>n+1)
+    window.addEventListener("wanmusheng:workspace-change",changed)
+    window.addEventListener("storage",changed)
+    return ()=>{window.removeEventListener("wanmusheng:workspace-change",changed);window.removeEventListener("storage",changed)}
+  },[])
   const [models, setModels] = useState<AIModel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +33,9 @@ export function useAiModels(kind: ModelKind) {
     setLoading(true)
     setError(null)
 
-    fetch(`/api/ai/models?kind=${kind}`)
+    const scoped = explicitScope ? JSON.parse(explicitScope) : currentModelScope(pathname)
+    const query = new URLSearchParams({kind,...scoped})
+    fetch(`/api/ai/models?${query}`)
       .then((res) => res.json())
       .then((payload) => {
         if (cancelled) return
@@ -45,7 +58,7 @@ export function useAiModels(kind: ModelKind) {
     return () => {
       cancelled = true
     }
-  }, [kind])
+  }, [kind,pathname,workspaceVersion,explicitScope])
 
   return { models, loading, error }
 }

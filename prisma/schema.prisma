@@ -230,6 +230,7 @@ model Script {
   consultations Consultation[]
 
   createdAt DateTime @default(now())
+  assetGenerationConfig Json?
   pacingProfile Json?
   assetPromptTemplate String? @db.Text
   outfitPromptTemplate String? @db.Text
@@ -252,6 +253,10 @@ model Episode {
   duration Int    @default(90)
   style    String? // 单集风格，null 表示跟随全剧
   status   String @default("draft") // draft | outlined | assets_ready | storyboarded | video_ready | completed
+
+  productionStage String @default("outline")
+  review Json?
+  segments Segment[]
 
   // 后期产物
   audioUrl   String? // 配音 / BGM 混音结果
@@ -369,6 +374,8 @@ model Storyboard {
   duration  Float?
 
   // 镜组（段）归属：同 segmentTitle 的连续分镜为一段
+  segmentId String?
+  segment Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   segmentTitle String?
   segmentNote  String?
 
@@ -519,4 +526,42 @@ model EcomProject {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, module])
+}
+
+model Segment {
+  id String @id @default(cuid())
+  episodeId String
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  order Int
+  title String
+  note String?
+  products Json?
+  config Json?
+  storyboards Storyboard[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([episodeId, order])
+}
+
+model GenerationTask {
+  id String @id @default(cuid())
+  workspaceId String
+  userId String
+  episodeId String?
+  kind String
+  state String @default("queued")
+  payload Json
+  result Json?
+  completed Int @default(0)
+  failed Int @default(0)
+  total Int?
+  currentLabel String @default("等待执行")
+  error String?
+  idempotencyKey String @unique
+  leaseOwner String?
+  heartbeatAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([state, createdAt])
+  @@index([workspaceId, episodeId])
 }

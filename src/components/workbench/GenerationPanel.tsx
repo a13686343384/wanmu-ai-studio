@@ -1,30 +1,39 @@
 "use client"
+import { currentModelScope } from "@/lib/ai/client-scope"
 
 import { useCallback } from "react"
-import { AlertCircle, Play } from "lucide-react"
+import { Play } from "lucide-react"
 import { toast } from "sonner"
-import { Progress } from "@/components/ui/progress"
-import { ReferenceUpload, ReferenceThumbnails } from "@/components/workbench/ReferenceUpload"
+import { RequestPending } from "@/components/shared/RequestPending"
+import {
+  ReferenceUpload,
+  ReferenceThumbnails,
+} from "@/components/workbench/ReferenceUpload"
 import { PromptInput } from "@/components/workbench/PromptInput"
 import { ParameterBar } from "@/components/workbench/ParameterBar"
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore"
 
-const STAGES: Record<string, string[]> = {
-  video: ["解析提示词", "生成关键帧", "合成视频", "编码输出"],
-  image: ["解析提示词", "构建画面", "渲染出图"],
-  audio: ["解析风格", "生成音轨", "混音输出"],
-}
-
 /**
  * 工作台生成面板：参考素材 + 提示词 + 参数栏。
- * 负责调用 /api/ai/generate 并推进进度条、展示结果。
+ * 负责调用 /api/ai/generate 并展示真实等待状态、展示结果。
  */
 export function GenerationPanel() {
   const store = useWorkbenchStore()
-  const { mediaType, prompt, modelId, references, aspectRatio, resolution, duration, count, style, smartLyrics } =
-    store
+  const {
+    mediaType,
+    prompt,
+    modelId,
+    references,
+    aspectRatio,
+    resolution,
+    duration,
+    count,
+    style,
+    smartLyrics,
+  } = store
 
   const run = useCallback(async () => {
+    if (store.isGenerating) return
     if (!prompt.trim()) {
       toast.error("请先描述你想要的内容")
       return
@@ -32,19 +41,12 @@ export function GenerationPanel() {
 
     store.setGenerating(true, 0, "准备中…")
 
-    const stages = STAGES[mediaType] ?? STAGES.image
-    let stageIndex = 0
-    const timer = window.setInterval(() => {
-      stageIndex = Math.min(stageIndex + 1, stages.length - 1)
-      const next = Math.min(store.progress + 8 + Math.random() * 14, 92)
-      store.setProgress(Math.round(next), stages[stageIndex])
-    }, 450)
-
     try {
       const response = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          ...currentModelScope(),
           mediaType,
           prompt,
           modelId,
@@ -64,8 +66,7 @@ export function GenerationPanel() {
         throw new Error(payload.error ?? "生成失败")
       }
 
-      window.clearInterval(timer)
-      store.setProgress(100, "完成")
+      if (!payload.data?.url) throw new Error("生成服务未返回有效资源")
 
       store.addResult({
         id: payload.data.id,
@@ -79,10 +80,11 @@ export function GenerationPanel() {
 
       toast.success("生成完成", { description: "结果已加入下方作品区" })
     } catch (error) {
-      window.clearInterval(timer)
-      toast.error(error instanceof Error ? error.message : "生成失败，请稍后重试")
+      toast.error(
+        error instanceof Error ? error.message : "生成失败，请稍后重试",
+      )
     } finally {
-      window.setTimeout(() => store.setGenerating(false, 0, ""), 600)
+      store.setGenerating(false, 0, "")
     }
   }, [
     mediaType,
@@ -100,7 +102,9 @@ export function GenerationPanel() {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl backdrop-blur">
-      <div className={mediaType === "audio" ? "p-3" : "flex items-start gap-3 p-3"}>
+      <div
+        className={mediaType === "audio" ? "p-3" : "flex items-start gap-3 p-3"}
+      >
         {mediaType !== "audio" && <ReferenceUpload />}
         <PromptInput />
       </div>
@@ -109,14 +113,7 @@ export function GenerationPanel() {
 
       {store.isGenerating && (
         <div className="space-y-1.5 border-t border-zinc-800/80 px-3 py-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 text-zinc-400">
-              <AlertCircle className="h-3.5 w-3.5 animate-pulse text-orange-400" />
-              {store.progressLabel || "生成中…"}
-            </span>
-            <span className="tabular-nums text-zinc-500">{store.progress}%</span>
-          </div>
-          <Progress value={store.progress} />
+          <RequestPending />
         </div>
       )}
 

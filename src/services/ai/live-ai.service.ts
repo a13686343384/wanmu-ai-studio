@@ -34,123 +34,51 @@ import type {
   UsageInfo,
 } from "./types"
 import { prisma } from "@/lib/prisma"
-import {
-  AiUpstreamError,
-  JSON_ONLY_SUFFIX,
-  chatCompletion,
-  extractJson,
-} from "./live/openai-chat"
+import { costumeDrafts } from "@/lib/assets/config"
+import { validateWithText } from "./storyboard-validation"
+import { AppError } from "@/lib/api"
+import { resolveGenerationModel } from "./live/model-resolver"
+import { JSON_ONLY_SUFFIX, extractJson } from "./live/openai-chat"
 import { buildGraph, comfyRun, storeOutput } from "./comfy/client"
-import type { InvokeConfig, InvokeInput } from "@/lib/plugins/invoke"
+import type { InvokeInput } from "@/lib/plugins/invoke"
 import { invokeCustomModel } from "@/lib/plugins/invoke"
 
-/* ---------------------------- 统一模型查找 ---------------------------- */
-
-/**
- * 查找模型配置：先按 id 精确匹配；查无（如前端仍传 mock 模型 id）时
- * 回退到同 kind 的第一个启用模型，避免 live 模式下批量出图/出视频直接报错。
- */
-async function loadCustomModel(
-  modelId: string,
-  kind?: "text" | "image" | "video" | "audio" | "subtitle",
-): Promise<{
-  config: InvokeConfig
-  providerType: string
-  cost: number
-  name: string
-} | null> {
-  const model =
-    (await prisma.customModel.findFirst({ where: { id: modelId, enabled: true } })) ??
-    (kind
-      ? await prisma.customModel.findFirst({
-          where: { kind, enabled: true },
-          orderBy: { createdAt: "asc" },
-        })
-      : null)
-  if (!model) return null
-  const config: InvokeConfig = {
-    lifecycle: model.lifecycle === "async" ? "async" : "sync",
-    baseUrl: model.baseUrl,
-    apiKey: model.apiKey,
-    auth: (model.auth ?? {}) as InvokeConfig["auth"],
-    constraints: (model.constraints ?? {}) as Record<string, unknown>,
-    submit: model.submit as unknown as InvokeConfig["submit"],
-    edits: (model.edits ?? null) as InvokeConfig["edits"],
-    poll: (model.poll ?? null) as InvokeConfig["poll"],
-    firstLast: (model.firstLast ?? null) as InvokeConfig["firstLast"],
-    extract: (model.extract ?? {}) as Record<string, unknown>,
-    transformBody: model.transformBody,
-  }
-  return {
-    config,
-    providerType: model.providerType ?? "api",
-    cost: model.cost,
-    name: model.name,
-  }
-}
-
-/* ---------------------------- 文本通道 ---------------------------- */
-
-interface TextChannel {
-  baseUrl: string
-  apiKey: string
-  model: string
-}
-
-/** 文本通道：仅从 CustomModel(kind=text, enabled=true) 读取。无配置则返回空数组。 */
-async function textChannels(): Promise<TextChannel[]> {
-  const textModels = await prisma.customModel.findMany({
-    where: { kind: "text", enabled: true },
-    orderBy: { createdAt: "desc" },
-  })
-  return textModels.map((m) => ({
-    baseUrl: m.baseUrl,
-    apiKey: m.apiKey ?? "",
-    model: String((m.constraints as Record<string, unknown>)?.model_id ?? m.name),
-  })).filter((c) => c.baseUrl && c.apiKey)
-}
+/* ---------------------------- 统一模型查找与文本通道 ---------------------------- */
 
 async function chatText(
+  selected: { model: string; workspaceId?: string },
   system: string,
   user: string,
   options?: { maxTokens?: number; temperature?: number },
 ): Promise<{ text: string; model: string }> {
-  const channels = await textChannels()
-  if (channels.length === 0) {
-    throw new Error(
-      "live 模式未配置文本模型：请前往 /ai-settings 添加 kind=text 的自定义模型",
+  const loaded = await resolveGenerationModel(
+    selected.model,
+    "text",
+    selected.workspaceId,
+  )
+  const result = await invokeCustomModel(loaded.config, {
+    prompt: `${system}\n\n${user}`,
+    system,
+    maxTokens: options?.maxTokens,
+    temperature: options?.temperature,
+    upstreamModelId: loaded.providerModel,
+  })
+  if (!result.ok || !result.text)
+    throw new AppError(
+      "文本生成失败：" + (result.ok ? "未返回文本" : result.error),
+      502,
     )
-  }
-  const failures: string[] = []
-  for (const channel of channels) {
-    try {
-      const text = await chatCompletion({
-        baseUrl: channel.baseUrl,
-        apiKey: channel.apiKey,
-        model: channel.model,
-        system,
-        user,
-        maxTokens: options?.maxTokens,
-        temperature: options?.temperature,
-      })
-      return { text, model: channel.model }
-    } catch (error) {
-      failures.push(
-        error instanceof AiUpstreamError
-          ? `${channel.model}: ${error.message}`
-          : `${channel.model}: 请求失败`,
-      )
-    }
-  }
-  throw new Error(`文本模型全部不可用 → ${failures.join("；")}`)
+  return { text: result.text, model: loaded.id }
 }
 
 async function chatJson<T>(
+  selected: { model: string; workspaceId?: string },
   system: string,
   user: string,
   options?: { maxTokens?: number },
 ): Promise<{ data: T; model: string }> {
   const { text, model } = await chatText(
+    selected,
     `${system}\n${JSON_ONLY_SUFFIX}`,
     user,
     options,
@@ -159,7 +87,9 @@ async function chatJson<T>(
     return { data: extractJson<T>(text), model }
   } catch {
     const repair = await chatText(
-      "用户会给你一段不合法的 JSON，请修正为合法 JSON 后只输出修正结果。" + JSON_ONLY_SUFFIX,
+      selected,
+      "用户会给你一段不合法的 JSON，请修正为合法 JSON 后只输出修正结果。" +
+        JSON_ONLY_SUFFIX,
       text.slice(0, 4000),
       options,
     )
@@ -167,11 +97,52 @@ async function chatJson<T>(
   }
 }
 
+function validateMediaParameters(
+  loaded: Awaited<ReturnType<typeof resolveGenerationModel>>,
+  input: {
+    aspectRatio?: string
+    resolution?: string
+    references?: { name: string }[]
+    duration?: string
+  },
+) {
+  const c = loaded.config.constraints ?? {}
+  for (const [key, value] of [
+    ["ratios", input.aspectRatio],
+    ["resolutions", input.resolution],
+  ] as const) {
+    if (
+      value &&
+      Array.isArray(c[key]) &&
+      c[key].length &&
+      !c[key].includes(value)
+    )
+      throw new AppError(`所选模型不支持参数 ${value}`, 400)
+  }
+  const refs = input.references?.length ?? 0
+  if (typeof c.max_references === "number" && refs > c.max_references)
+    throw new AppError(`所选模型最多支持 ${c.max_references} 张参考图`, 400)
+  if (c.require_reference === true && !refs)
+    throw new AppError("所选模型需要首帧或参考图", 400)
+  if (input.duration && c.duration && typeof c.duration === "object") {
+    const seconds = Number.parseFloat(input.duration)
+    const limits = c.duration as { min?: number; max?: number }
+    if (
+      (limits.min != null && seconds < limits.min) ||
+      (limits.max != null && seconds > limits.max)
+    )
+      throw new AppError("所选时长超出模型支持范围", 400)
+  }
+}
+
 /* ---------------------------- 计费与工具 ---------------------------- */
 
-function usage(inputModel: string, usedModel: string, tapies: number): UsageInfo {
-  void usedModel
-  return { model: inputModel, tapies }
+function usage(
+  inputModel: string,
+  usedModel: string,
+  tapies: number,
+): UsageInfo {
+  return { model: usedModel || inputModel, tapies }
 }
 
 function asString(value: unknown, fallback: string): string {
@@ -193,32 +164,73 @@ function appBase(): string {
   return process.env.NEXTAUTH_URL ?? "http://localhost:3000"
 }
 
-async function fetchRefBytes(url: string): Promise<{ bytes: Buffer; mimeType: string }> {
+async function fetchRefBytes(
+  url: string,
+): Promise<{ bytes: Buffer; mimeType: string }> {
   const absolute = url.startsWith("http") ? url : `${appBase()}${url}`
   const res = await fetch(absolute)
   if (!res.ok) throw new Error(`参考素材拉取失败 ${res.status}：${url}`)
   const buffer = Buffer.from(await res.arrayBuffer())
-  return { bytes: buffer, mimeType: res.headers.get("content-type") ?? "image/png" }
+  return {
+    bytes: buffer,
+    mimeType: res.headers.get("content-type") ?? "image/png",
+  }
 }
 
 /* ---------------------------- ComfyUI 通道 ---------------------------- */
 
 function loadVideoTemplate(): Record<string, unknown> {
-  const file = path.join(process.cwd(), "src/services/ai/comfy/workflows/minimax-h3-r2v.api.json")
+  const file = path.join(
+    process.cwd(),
+    "src/services/ai/comfy/workflows/minimax-h3-r2v.api.json",
+  )
   return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>
 }
 
 /** Z-Image Turbo 文生图（对应用户工作流：CFG1 / 9 步 / res_multistep / AuraFlow shift 3）。 */
-function zImageT2iGraph(prompt: string, width: number, height: number, seed: number) {
+function zImageT2iGraph(
+  prompt: string,
+  width: number,
+  height: number,
+  seed: number,
+) {
   return buildGraph(
     {
-      "1": { class_type: "UNETLoader", inputs: { unet_name: "Z-Image\\Z-Image_Turbo_FP8_e4m3fn.safetensors", weight_dtype: "default" } },
-      "6": { class_type: "CLIPLoader", inputs: { clip_name: "Z-Image\\qwen_3_4b_fp8_mixed.safetensors", type: "lumina2", device: "default" } },
-      "11": { class_type: "VAELoader", inputs: { vae_name: "Z-Image\\ae.safetensors" } },
-      "4": { class_type: "ModelSamplingAuraFlow", inputs: { shift: 3, model: ["1", 0] } },
-      "10": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["6", 0] } },
-      "25": { class_type: "ConditioningZeroOut", inputs: { conditioning: ["10", 0] } },
-      "5": { class_type: "EmptySD3LatentImage", inputs: { width, height, batch_size: 1 } },
+      "1": {
+        class_type: "UNETLoader",
+        inputs: {
+          unet_name: "Z-Image\\Z-Image_Turbo_FP8_e4m3fn.safetensors",
+          weight_dtype: "default",
+        },
+      },
+      "6": {
+        class_type: "CLIPLoader",
+        inputs: {
+          clip_name: "Z-Image\\qwen_3_4b_fp8_mixed.safetensors",
+          type: "lumina2",
+          device: "default",
+        },
+      },
+      "11": {
+        class_type: "VAELoader",
+        inputs: { vae_name: "Z-Image\\ae.safetensors" },
+      },
+      "4": {
+        class_type: "ModelSamplingAuraFlow",
+        inputs: { shift: 3, model: ["1", 0] },
+      },
+      "10": {
+        class_type: "CLIPTextEncode",
+        inputs: { text: prompt, clip: ["6", 0] },
+      },
+      "25": {
+        class_type: "ConditioningZeroOut",
+        inputs: { conditioning: ["10", 0] },
+      },
+      "5": {
+        class_type: "EmptySD3LatentImage",
+        inputs: { width, height, batch_size: 1 },
+      },
       "13": {
         class_type: "KSampler",
         inputs: {
@@ -234,34 +246,56 @@ function zImageT2iGraph(prompt: string, width: number, height: number, seed: num
           latent_image: ["5", 0],
         },
       },
-      "15": { class_type: "VAEDecodeTiled", inputs: { samples: ["13", 0], vae: ["11", 0], tile_size: 256, overlap: 32, temporal_size: 8, temporal_overlap: 4 } },
-      "16": { class_type: "SaveImage", inputs: { images: ["15", 0], filename_prefix: "manvo/t2i" } },
+      "15": {
+        class_type: "VAEDecodeTiled",
+        inputs: {
+          samples: ["13", 0],
+          vae: ["11", 0],
+          tile_size: 256,
+          overlap: 32,
+          temporal_size: 8,
+          temporal_overlap: 4,
+        },
+      },
+      "16": {
+        class_type: "SaveImage",
+        inputs: { images: ["15", 0], filename_prefix: "manvo/t2i" },
+      },
     },
     {},
   )
 }
 
 /** 比例 → 像素（面积 ≈ 0.4MP，对齐 9:16 源工作流的 480x848 档）。 */
-function ratioToSize(ratio: string, quality: string): { width: number; height: number } {
+function ratioToSize(
+  ratio: string,
+  quality: string,
+): { width: number; height: number } {
   const scale = quality === "4K" ? 2 : quality === "2K" ? 1.5 : 1
   const [w, h] = ratio.split(":").map((n) => Number(n) || 1)
   const megapixels = 0.4 * scale * scale
   const ratioValue = w / h
-  const height = Math.round(Math.sqrt(megapixels * 1_000_000 / ratioValue) / 16) * 16
+  const height =
+    Math.round(Math.sqrt((megapixels * 1_000_000) / ratioValue) / 16) * 16
   const width = Math.round((height * ratioValue) / 16) * 16
   return { width, height }
 }
 
-async function comfyImage(input: GenerateImageInput, comfyBaseUrl: string, workflow?: string): Promise<GenerateImageResult> {
+async function comfyImage(
+  input: GenerateImageInput,
+  comfyBaseUrl: string,
+  workflow?: string,
+): Promise<GenerateImageResult> {
   const { width, height } = ratioToSize(input.aspectRatio, input.resolution)
   const count = Math.min(Math.max(input.count ?? 1, 1), 4)
   const images: { url: string }[] = []
   for (let index = 0; index < count; index += 1) {
     const seed = Math.floor(Math.random() * 2 ** 31)
     // 根据 workflow 选择工作流模板，默认 z-image-t2i
-    const graph = workflow === "z-image-t2i" || !workflow
-      ? zImageT2iGraph(input.prompt, width, height, seed)
-      : zImageT2iGraph(input.prompt, width, height, seed) // TODO: 支持更多内置工作流或从文件加载
+    const graph =
+      workflow === "z-image-t2i" || !workflow
+        ? zImageT2iGraph(input.prompt, width, height, seed)
+        : zImageT2iGraph(input.prompt, width, height, seed) // TODO: 支持更多内置工作流或从文件加载
     const outputs = await comfyRun({
       baseUrl: comfyBaseUrl,
       graph,
@@ -286,22 +320,32 @@ const H3_RATIO_LABEL: Record<string, string> = {
   "3:4": "3:4 (Classic Portrait)",
 }
 
-async function comfyVideo(input: GenerateVideoInput, comfyBaseUrl: string, workflow?: string): Promise<GenerateVideoResult> {
+async function comfyVideo(
+  input: GenerateVideoInput,
+  comfyBaseUrl: string,
+  workflow?: string,
+): Promise<GenerateVideoResult> {
   // 根据 workflow 选择视频模板，默认 minimax-h3-r2v
-  const template = workflow === "minimax-h3-r2v" || !workflow
-    ? loadVideoTemplate()
-    : loadVideoTemplate() // TODO: 支持更多内置工作流或从文件加载
+  const template =
+    workflow === "minimax-h3-r2v" || !workflow
+      ? loadVideoTemplate()
+      : loadVideoTemplate() // TODO: 支持更多内置工作流或从文件加载
   const seconds = Number.parseInt(input.duration.replace(/\D/g, ""), 10) || 5
   const seed = Math.floor(Math.random() * 2 ** 31)
 
   // 参考图：首帧优先，其次 references；不足四张时复用第一张补齐
   const refUrls = [
     ...(input.firstFrameUrl ? [input.firstFrameUrl] : []),
-    ...(input.references?.filter((r) => r.kind === "image").map((r) => r.name) ?? []),
+    ...(input.references
+      ?.filter((r) => r.kind === "image")
+      .map((r) => r.name) ?? []),
   ]
   const resolved = refUrls.slice(0, 1).length ? refUrls : []
   const padded = resolved.length
-    ? Array.from({ length: H3_REF_NODES.length }, (_, i) => resolved[i % resolved.length]!)
+    ? Array.from(
+        { length: H3_REF_NODES.length },
+        (_, i) => resolved[i % resolved.length]!,
+      )
     : []
   const refs = await Promise.all(
     padded.map(async (url, index) => {
@@ -312,7 +356,10 @@ async function comfyVideo(input: GenerateVideoInput, comfyBaseUrl: string, workf
 
   const graph = buildGraph(template, {
     43: { text: input.prompt },
-    23: { aspect_ratio: H3_RATIO_LABEL[input.aspectRatio] ?? "9:16 (Portrait Widescreen)" },
+    23: {
+      aspect_ratio:
+        H3_RATIO_LABEL[input.aspectRatio] ?? "9:16 (Portrait Widescreen)",
+    },
     25: { value: seconds },
     4: { seed },
   })
@@ -324,7 +371,8 @@ async function comfyVideo(input: GenerateVideoInput, comfyBaseUrl: string, workf
     refImageNodes: refs.length ? H3_REF_NODES : [],
     timeoutMs: 30 * 60_000,
   })
-  const video = outputs.find((o) => o.mimeType.startsWith("video/")) ?? outputs[0]!
+  const video =
+    outputs.find((o) => o.mimeType.startsWith("video/")) ?? outputs[0]!
   const poster = outputs.find((o) => o.mimeType.startsWith("image/"))
   const url = await storeOutput(
     input.workspaceId ?? (await defaultWorkspaceId()),
@@ -332,10 +380,19 @@ async function comfyVideo(input: GenerateVideoInput, comfyBaseUrl: string, workf
     "图生视频",
   )
   const posterUrl = poster
-    ? await storeOutput(input.workspaceId ?? (await defaultWorkspaceId()), poster, "视频封面")
+    ? await storeOutput(
+        input.workspaceId ?? (await defaultWorkspaceId()),
+        poster,
+        "视频封面",
+      )
     : undefined
   return {
-    video: { url, poster: posterUrl, duration: seconds, mimeType: video.mimeType },
+    video: {
+      url,
+      poster: posterUrl,
+      duration: seconds,
+      mimeType: video.mimeType,
+    },
   }
 }
 
@@ -352,13 +409,22 @@ async function defaultWorkspaceId(): Promise<string> {
 /* ---------------------------- 服务实现 ---------------------------- */
 
 export const liveAIService: AIService = {
+  async validateStoryboards(input) {
+    return validateWithText(input, (p) => liveAIService.generateText(p))
+  },
   async writeScript(input) {
     const { data, model } = await chatJson<{
       blueprint: string
       characters: { name: string; description: string }[]
-      episodes: { number: number; title: string; summary: string; content: string }[]
+      episodes: {
+        number: number
+        title: string
+        summary: string
+        content: string
+      }[]
       reply: string
     }>(
+      input,
       "你是资深短剧编剧。基于既有蓝图/正文与用户指令，推进剧本写作。",
       JSON.stringify({
         剧名: input.title,
@@ -381,7 +447,9 @@ export const liveAIService: AIService = {
     return {
       data: {
         blueprint: asString(data.blueprint, input.blueprint),
-        characters: Array.isArray(data.characters) ? data.characters : input.characters,
+        characters: Array.isArray(data.characters)
+          ? data.characters
+          : input.characters,
         episodes: Array.isArray(data.episodes) ? data.episodes : input.episodes,
         reply: asString(data.reply, "已完成本轮剧本写作。"),
       },
@@ -389,7 +457,9 @@ export const liveAIService: AIService = {
     }
   },
 
-  async analyzeScript(input: AnalyzeScriptInput): Promise<AIResult<ScriptAnalysis>> {
+  async analyzeScript(
+    input: AnalyzeScriptInput,
+  ): Promise<AIResult<ScriptAnalysis>> {
     const { data, model } = await chatJson<{
       genre: string
       narrativeStyle: string
@@ -405,6 +475,7 @@ export const liveAIService: AIService = {
       treatment: string
       episodeIdeas: { number: number; title: string; summary: string }[]
     }>(
+      input,
       "你是短剧立项分析师。通读剧本，输出立项方案。",
       JSON.stringify({
         剧名: input.title,
@@ -412,11 +483,19 @@ export const liveAIService: AIService = {
         画幅: input.targetAspect,
         剧本全文: input.content.slice(0, 24000),
         输出要求: {
-          genre: "题材", narrativeStyle: "叙事风格", visualStyle: "视觉风格",
-          costumeStyle: "服化道风格", era: "时代背景", tone: "整体基调",
-          audienceNotes: "观众画像", allowed: "允许内容数组", forbidden: "禁止内容数组",
-          recommendedEpisodes: "推荐集数（数字）", recommendedDuration: "推荐单集秒数（数字）",
-          treatment: "立项方案摘要", episodeIdeas: "分集灵感数组 number/title/summary",
+          genre: "题材",
+          narrativeStyle: "叙事风格",
+          visualStyle: "视觉风格",
+          costumeStyle: "服化道风格",
+          era: "时代背景",
+          tone: "整体基调",
+          audienceNotes: "观众画像",
+          allowed: "允许内容数组",
+          forbidden: "禁止内容数组",
+          recommendedEpisodes: "推荐集数（数字）",
+          recommendedDuration: "推荐单集秒数（数字）",
+          treatment: "立项方案摘要",
+          episodeIdeas: "分集灵感数组 number/title/summary",
         },
       }),
       { maxTokens: 8192 },
@@ -428,7 +507,10 @@ export const liveAIService: AIService = {
       costumeStyle: asString(data.costumeStyle, "都市通勤风"),
       era: asString(data.era, "当代都市"),
       tone: asString(data.tone, "细腻、克制、有温度"),
-      audienceNotes: asString(data.audienceNotes, "目标观众偏好强钩子、快节奏。"),
+      audienceNotes: asString(
+        data.audienceNotes,
+        "目标观众偏好强钩子、快节奏。",
+      ),
       allowed: asStringArray(data.allowed, ["强冲突与反转", "情感张力"]),
       forbidden: asStringArray(data.forbidden, [
         "过度血腥特写",
@@ -449,15 +531,20 @@ export const liveAIService: AIService = {
     return { data: analysis, usage: usage(input.model, model, 6) }
   },
 
-  async generateText(input: GenerateTextInput): Promise<AIResult<GenerateTextResult>> {
-    const { text } = await chatText(
+  async generateText(
+    input: GenerateTextInput,
+  ): Promise<AIResult<GenerateTextResult>> {
+    const { text, model } = await chatText(
+      input,
       "你是专业影视创作助手，用中文回答，输出直接可用的创作内容。",
       input.prompt,
     )
-    return { data: { text }, usage: usage(input.model, "", 2) }
+    return { data: { text }, usage: usage(input.model, model, 2) }
   },
 
-  async consultScript(input: ConsultScriptInput): Promise<AIResult<ConsultScriptResult>> {
+  async consultScript(
+    input: ConsultScriptInput,
+  ): Promise<AIResult<ConsultScriptResult>> {
     const { data, model } = await chatJson<{
       summary: string
       suggestions: {
@@ -468,31 +555,33 @@ export const liveAIService: AIService = {
         mustFix: boolean
       }[]
     }>(
+      input,
       "你是短剧剧本会诊医生。按 结构/人物/节奏/台词/逻辑 五类诊断，按优先级给出 5 条左右建议。",
       JSON.stringify({
         剧名: input.scriptTitle,
         剧本全文: input.content.slice(0, 24000),
         输出要求: {
           summary: "整体诊断摘要",
-          suggestions: "数组，每项 category/severity(high|medium|low)/issue/suggestion/mustFix(布尔)",
+          suggestions:
+            "数组，每项 category/severity(high|medium|low)/issue/suggestion/mustFix(布尔)",
         },
       }),
       { maxTokens: 8192 },
     )
-    const suggestions = (Array.isArray(data.suggestions) ? data.suggestions : []).map(
-      (item, index) => ({
-        id: `c-${index + 1}`,
-        category: asString(item?.category, "结构"),
-        severity: (["high", "medium", "low"] as const).includes(
-          item?.severity as "high",
-        )
-          ? (item!.severity as "high" | "medium" | "low")
-          : "medium",
-        issue: asString(item?.issue, ""),
-        suggestion: asString(item?.suggestion, ""),
-        mustFix: Boolean(item?.mustFix),
-      }),
-    )
+    const suggestions = (
+      Array.isArray(data.suggestions) ? data.suggestions : []
+    ).map((item, index) => ({
+      id: `c-${index + 1}`,
+      category: asString(item?.category, "结构"),
+      severity: (["high", "medium", "low"] as const).includes(
+        item?.severity as "high",
+      )
+        ? (item!.severity as "high" | "medium" | "low")
+        : "medium",
+      issue: asString(item?.issue, ""),
+      suggestion: asString(item?.suggestion, ""),
+      mustFix: Boolean(item?.mustFix),
+    }))
     return {
       data: {
         summary: asString(data.summary, "会诊完成。"),
@@ -513,8 +602,11 @@ export const liveAIService: AIService = {
     }
   },
 
-  async consultChat(input: ConsultChatInput): Promise<AIResult<ConsultChatResult>> {
+  async consultChat(
+    input: ConsultChatInput,
+  ): Promise<AIResult<ConsultChatResult>> {
     const { data, model } = await chatJson<{ reply: string }>(
+      input,
       "你是短剧剧本医生，围绕既有诊断项回应用户的修改想法，给出可落地的改法。",
       JSON.stringify({
         剧名: input.scriptTitle,
@@ -523,13 +615,25 @@ export const liveAIService: AIService = {
         输出要求: { reply: "给用户的回应与改法要点（纯文本）" },
       }),
     )
-    return { data: { reply: asString(data.reply, "收到。") }, usage: usage(input.model, model, 2) }
+    return {
+      data: { reply: asString(data.reply, "收到。") },
+      usage: usage(input.model, model, 2),
+    }
   },
 
-  async optimizeDialogue(input: OptimizeDialogueInput): Promise<AIResult<OptimizeDialogueResult>> {
-    const { data, model } = await chatJson<{ optimized: string; changes: string[] }>(
+  async optimizeDialogue(
+    input: OptimizeDialogueInput,
+  ): Promise<AIResult<OptimizeDialogueResult>> {
+    const { data, model } = await chatJson<{
+      optimized: string
+      changes: string[]
+    }>(
+      input,
       "你是台词医生。优化剧本台词：删解释性长句、改动作短句、统一称呼，保留信息量。",
-      JSON.stringify({ 剧本内容: input.content.slice(0, 16000), 输出要求: { optimized: "优化后全文", changes: "改动点数组" } }),
+      JSON.stringify({
+        剧本内容: input.content.slice(0, 16000),
+        输出要求: { optimized: "优化后全文", changes: "改动点数组" },
+      }),
       { maxTokens: 8192 },
     )
     return {
@@ -541,10 +645,18 @@ export const liveAIService: AIService = {
     }
   },
 
-  async generateOutline(input: GenerateOutlineInput): Promise<AIResult<GenerateOutlineResult>> {
+  async generateOutline(
+    input: GenerateOutlineInput,
+  ): Promise<AIResult<GenerateOutlineResult>> {
     const { data, model } = await chatJson<{
-      episodes: { number: number; title: string; summary: string; content: string }[]
+      episodes: {
+        number: number
+        title: string
+        summary: string
+        content: string
+      }[]
     }>(
+      input,
       "你是短剧大纲师。按指定集数输出分集大纲与每集完整正文。",
       JSON.stringify({
         剧名: input.scriptTitle,
@@ -569,8 +681,11 @@ export const liveAIService: AIService = {
     return { data: { episodes }, usage: usage(input.model, model, 8) }
   },
 
-  async summarizeEpisode(input: SummarizeEpisodeInput): Promise<AIResult<SummarizeEpisodeResult>> {
+  async summarizeEpisode(
+    input: SummarizeEpisodeInput,
+  ): Promise<AIResult<SummarizeEpisodeResult>> {
     const { data, model } = await chatJson<{ recap: string; beats: string[] }>(
+      input,
       "你是短剧导演。复述本集核心，并给出镜组（beats）建议。",
       JSON.stringify({
         集名: input.episodeTitle,
@@ -589,11 +704,13 @@ export const liveAIService: AIService = {
 
   async extractCharacters(input): Promise<AIResult<CharacterDraft[]>> {
     const { data, model } = await chatJson<{ characters: CharacterDraft[] }>(
+      input,
       "你是选角导演。从剧本正文提取全部有名有姓的角色。",
       JSON.stringify({
         剧本正文: input.content.slice(0, 20000),
         输出要求: {
-          characters: "数组，每项 name/description(身份背景与性格)/appearance(外貌服化细节)/personality",
+          characters:
+            "数组，每项 name/description(身份背景与性格)/appearance(外貌服化细节)/personality/costumes。costumes为按剧本换装提取的造型数组，每项name/description(具体服饰外观)/situation(适用剧情)；没有换装则根据已知外观提供默认造型，不要虚构剧情。",
         },
       }),
       { maxTokens: 8192 },
@@ -605,6 +722,7 @@ export const liveAIService: AIService = {
         description: asString(item?.description, ""),
         appearance: asString(item?.appearance, ""),
         personality: asString(item?.personality, ""),
+        costumes: costumeDrafts(item),
       })),
       usage: usage(input.model, model, 5),
     }
@@ -612,10 +730,14 @@ export const liveAIService: AIService = {
 
   async extractScenes(input): Promise<AIResult<SceneDraft[]>> {
     const { data, model } = await chatJson<{ scenes: SceneDraft[] }>(
+      input,
       "你是美术指导。从剧本正文提取全部场景。",
       JSON.stringify({
         剧本正文: input.content.slice(0, 20000),
-        输出要求: { scenes: "数组，每项 name/description/environment(空间结构)/lighting(光线氛围)" },
+        输出要求: {
+          scenes:
+            "数组，每项 name/description/environment(空间结构)/lighting(光线氛围)",
+        },
       }),
       { maxTokens: 8192 },
     )
@@ -633,6 +755,7 @@ export const liveAIService: AIService = {
 
   async extractProps(input): Promise<AIResult<PropDraft[]>> {
     const { data, model } = await chatJson<{ props: PropDraft[] }>(
+      input,
       "你是道具师。从剧本正文提取全部关键道具。",
       JSON.stringify({
         剧本正文: input.content.slice(0, 20000),
@@ -649,7 +772,9 @@ export const liveAIService: AIService = {
     }
   },
 
-  async splitStoryboards(input: SplitStoryboardsInput): Promise<AIResult<SplitStoryboardsResult>> {
+  async splitStoryboards(
+    input: SplitStoryboardsInput,
+  ): Promise<AIResult<SplitStoryboardsResult>> {
     const { data, model } = await chatJson<{
       storyboards: {
         number: number
@@ -663,34 +788,34 @@ export const liveAIService: AIService = {
         segmentNote?: string
       }[]
     }>(
+      input,
       "你是短剧分镜师。按镜组把本集内容切成 8-12 个分镜。",
       JSON.stringify({
         集名: input.episodeTitle,
         本集正文: input.content.slice(0, 16000),
         输出要求: {
-          storyboards: "数组，每项 number(从1递增)/shotType(远景|全景|中景|近景|特写)/description(画面描述)/dialogue(台词，可空)/action(动作)/camera(运镜)/duration(秒数)/segmentTitle(所属镜组标题，格式如 B01·闪回·有剧情镜，每 5-7 镜一组，组名体现情节拍)/segmentNote(本组衔接与出图建议，可空)",
+          storyboards:
+            "数组，每项 number(从1递增)/shotType(远景|全景|中景|近景|特写)/description(画面描述)/dialogue(台词，可空)/action(动作)/camera(运镜)/duration(秒数)/segmentTitle(所属镜组标题，格式如 B01·闪回·有剧情镜，每 5-7 镜一组，组名体现情节拍)/segmentNote(本组衔接与出图建议，可空)",
         },
       }),
       { maxTokens: 8192 },
     )
     const shotTypes = ["远景", "全景", "中景", "近景", "特写"]
-    const storyboards = (Array.isArray(data.storyboards) ? data.storyboards : []).map(
-      (item, index) => ({
-        number: asNumber(item?.number, index + 1),
-        shotType: shotTypes.includes(item?.shotType as "中景")
-          ? item!.shotType
-          : "中景",
-        description: asString(item?.description, ""),
-        dialogue: item?.dialogue ? String(item.dialogue) : undefined,
-        action: item?.action ? String(item.action) : undefined,
-        camera: item?.camera ? String(item.camera) : undefined,
-        duration: asNumber(item?.duration, 3),
-        segmentTitle: item?.segmentTitle
-          ? String(item.segmentTitle)
-          : undefined,
-        segmentNote: item?.segmentNote ? String(item.segmentNote) : undefined,
-      }),
-    )
+    const storyboards = (
+      Array.isArray(data.storyboards) ? data.storyboards : []
+    ).map((item, index) => ({
+      number: asNumber(item?.number, index + 1),
+      shotType: shotTypes.includes(item?.shotType as "中景")
+        ? item!.shotType
+        : "中景",
+      description: asString(item?.description, ""),
+      dialogue: item?.dialogue ? String(item.dialogue) : undefined,
+      action: item?.action ? String(item.action) : undefined,
+      camera: item?.camera ? String(item.camera) : undefined,
+      duration: asNumber(item?.duration, 3),
+      segmentTitle: item?.segmentTitle ? String(item.segmentTitle) : undefined,
+      segmentNote: item?.segmentNote ? String(item.segmentNote) : undefined,
+    }))
     return {
       data: {
         storyboards: storyboards.length
@@ -710,43 +835,68 @@ export const liveAIService: AIService = {
 
   /* ---------------------------- 图像 / 视频 / 音频 ---------------------------- */
 
-  async generateImage(input: GenerateImageInput): Promise<AIResult<GenerateImageResult>> {
-    const loaded = await loadCustomModel(input.model, "image")
-    if (!loaded) {
-      throw new Error(
-        "live 模式未找到图片模型：请前往 /ai-settings 接入图片模型（线上 API 或本地 ComfyUI）",
-      )
-    }
+  async generateImage(
+    input: GenerateImageInput,
+  ): Promise<AIResult<GenerateImageResult>> {
+    const loaded = await resolveGenerationModel(
+      input.model,
+      "image",
+      input.workspaceId,
+    )
+    validateMediaParameters(loaded, input)
     if (loaded.providerType === "comfyui") {
-      const workflow = String((loaded.config.constraints ?? {}).workflow ?? "z-image-t2i")
+      const workflow = String(
+        (loaded.config.constraints ?? {}).workflow ?? "z-image-t2i",
+      )
       const result = await comfyImage(input, loaded.config.baseUrl, workflow)
-      return { data: result, usage: usage(loaded.name, "", loaded.cost) }
+      return { data: result, usage: usage(loaded.id, "", loaded.cost) }
     }
     const invokeInput: InvokeInput = {
       prompt: input.prompt,
       ratio: input.aspectRatio,
       resolution: input.resolution,
       count: input.count ?? 1,
+      quality: input.quality,
       refs: input.references?.map((r) => r.name),
     }
     const result = await invokeCustomModel(loaded.config, invokeInput)
     if (!result.ok || !result.url) {
-      throw new Error("图片生成失败：" + (result.ok ? "未返回结果" : result.error))
-    }
-    return { data: { images: [{ url: result.url }] }, usage: usage(loaded.name, "", loaded.cost) }
-  },
-
-  async generateVideo(input: GenerateVideoInput): Promise<AIResult<GenerateVideoResult>> {
-    const loaded = await loadCustomModel(input.model, "video")
-    if (!loaded) {
       throw new Error(
-        "live 模式未找到视频模型：请前往 /ai-settings 接入视频模型（线上 API 或本地 ComfyUI）",
+        "图片生成失败：" + (result.ok ? "未返回结果" : result.error),
       )
     }
+    return {
+      data: { images: [{ url: result.url }] },
+      usage: usage(loaded.id, "", loaded.cost),
+    }
+  },
+
+  async generateVideo(
+    input: GenerateVideoInput,
+  ): Promise<AIResult<GenerateVideoResult>> {
+    input = {
+      ...input,
+      references: Array.from(
+        new Set([
+          ...(input.firstFrameUrl ? [input.firstFrameUrl] : []),
+          ...(input.references
+            ?.filter((r) => r.kind === "image")
+            .map((r) => r.name) ?? []),
+        ]),
+      ).map((name) => ({ name, kind: "image" as const })),
+    }
+    const loaded = await resolveGenerationModel(
+      input.model,
+      "video",
+      input.workspaceId,
+    )
+    validateMediaParameters(loaded, input)
     if (loaded.providerType === "comfyui") {
-      const workflow = String((loaded.config.constraints ?? {}).workflow ?? "minimax-h3-r2v")
+      const workflow = String(
+        (loaded.config.constraints ?? {}).workflow ?? "minimax-h3-r2v",
+      )
       const result = await comfyVideo(input, loaded.config.baseUrl, workflow)
-      return { data: result, usage: usage(loaded.name, "", loaded.cost) }
+      return { data: result, usage: usage(loaded.id, "", loaded.cost) }
     }
     const invokeInput: InvokeInput = {
       prompt: input.prompt,
@@ -757,40 +907,56 @@ export const liveAIService: AIService = {
     }
     const result = await invokeCustomModel(loaded.config, invokeInput)
     if (!result.ok || !result.url) {
-      throw new Error("视频生成失败：" + (result.ok ? "未返回结果" : result.error))
+      throw new Error(
+        "视频生成失败：" + (result.ok ? "未返回结果" : result.error),
+      )
     }
     return {
-      data: { video: { url: result.url, duration: 5, mimeType: "video/mp4" } },
-      usage: usage(loaded.name, "", loaded.cost),
+      data: {
+        video: {
+          url: result.url,
+          duration: invokeInput.duration ?? 5,
+          mimeType: "video/mp4",
+        },
+      },
+      usage: usage(loaded.id, "", loaded.cost),
     }
   },
 
-  async generateAudio(input: GenerateAudioInput): Promise<AIResult<GenerateAudioResult>> {
-    const loaded = await loadCustomModel(input.model, "audio")
-    if (!loaded) {
-      throw new Error(
-        "live 模式未找到音频模型：请前往 /ai-settings 接入音频模型（线上 API 或本地 ComfyUI）",
-      )
-    }
+  async generateAudio(
+    input: GenerateAudioInput,
+  ): Promise<AIResult<GenerateAudioResult>> {
+    const loaded = await resolveGenerationModel(
+      input.model,
+      "audio",
+      input.workspaceId,
+    )
     const invokeInput: InvokeInput = {
       prompt: input.prompt,
       duration: Number.parseInt(input.duration.replace(/\D/g, ""), 10) || 15,
     }
     const result = await invokeCustomModel(loaded.config, invokeInput)
     if (!result.ok || !result.url) {
-      throw new Error("音频生成失败：" + (result.ok ? "未返回结果" : result.error))
+      throw new Error(
+        "音频生成失败：" + (result.ok ? "未返回结果" : result.error),
+      )
     }
     return {
-      data: { audio: { url: result.url, duration: 15, mimeType: "audio/mpeg" } },
-      usage: usage(loaded.name, "", loaded.cost),
+      data: {
+        audio: { url: result.url, duration: 15, mimeType: "audio/mpeg" },
+      },
+      usage: usage(loaded.id, "", loaded.cost),
     }
   },
 
-  async generateSubtitle(input: GenerateSubtitleInput): Promise<AIResult<GenerateSubtitleResult>> {
-    const loaded = await loadCustomModel(input.model)
-    if (!loaded) {
-      throw new Error("live 模式未找到字幕模型（id=" + input.model + "）：请前往 /ai-settings 检查配置")
-    }
+  async generateSubtitle(
+    input: GenerateSubtitleInput,
+  ): Promise<AIResult<GenerateSubtitleResult>> {
+    const loaded = await resolveGenerationModel(
+      input.model,
+      "subtitle",
+      input.workspaceId,
+    )
     // ASR 调用：上传音频 URL，返回文本结果
     const invokeInput: InvokeInput = {
       prompt: input.audioUrl,
@@ -824,7 +990,7 @@ export const liveAIService: AIService = {
     }
     return {
       data: { srt, segments },
-      usage: usage(loaded.name, "", loaded.cost),
+      usage: usage(loaded.id, "", loaded.cost),
     }
   },
 }

@@ -79,6 +79,10 @@ export function toScriptSummary(script: ScriptRecord): ScriptSummary {
 /* ---------------------------- 详情页类型 ---------------------------- */
 
 export interface EpisodeDTO {
+  productionStage?: string
+  review?: unknown
+  storyboardCount?: number
+  videoCount?: number
   id: string
   number: number
   title: string
@@ -147,6 +151,7 @@ export interface ConsultationDTO {
 }
 
 export interface ScriptDetail extends ScriptSummary {
+  assetGenerationConfig?: {textModelId:string;imageModelId:string;sheetAspect:"16:9";resolution:string} | null
   content: string
   assetPromptTemplate?: string | null
   outfitPromptTemplate?: string | null

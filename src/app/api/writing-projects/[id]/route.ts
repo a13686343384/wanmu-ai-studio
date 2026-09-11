@@ -81,7 +81,7 @@ export const POST = withErrorHandling(
         throw new AppError("请先生成蓝图并选择分集")
       if (input.action === "chat" && !input.instruction)
         throw new AppError("请输入调整要求")
-      const result = await getAIService().writeScript({
+      const result = await getAIService(project.workspaceId).writeScript({
         ...project,
         ...snapshot,
         model: input.model,

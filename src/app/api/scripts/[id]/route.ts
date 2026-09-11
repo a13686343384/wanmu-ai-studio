@@ -36,7 +36,7 @@ export const GET = withErrorHandling(
       where: { id: params.id, workspace: { members: { some: { userId: user.id } } } },
       include: {
         workspace: { select: { name: true, isPersonal: true } },
-        episodes: { orderBy: { number: "asc" } },
+        episodes: { orderBy: { number: "asc" }, include: { storyboards: { select: { videoUrl: true } } } },
         characters: {
           orderBy: { createdAt: "asc" },
           include: { costumes: { orderBy: { createdAt: "asc" } } },
@@ -55,6 +55,9 @@ export const GET = withErrorHandling(
       updatedAt: script.updatedAt.toISOString(),
       episodes: script.episodes.map((e) => ({
         ...e,
+        storyboardCount: e.storyboards.length,
+        videoCount: e.storyboards.filter(s=>s.videoUrl).length,
+        storyboards: undefined,
         createdAt: e.createdAt.toISOString(),
         updatedAt: e.updatedAt.toISOString(),
       })),

@@ -14,7 +14,7 @@ export const POST = withErrorHandling(
     const user = await requireUser()
     const script = await requireScriptAccess(params.id, user.id)
 
-    const ai = getAIService()
+    const ai = getAIService(script.workspaceId)
     const { data, usage } = await ai.analyzeScript({
       title: script.title,
       content: script.content,
