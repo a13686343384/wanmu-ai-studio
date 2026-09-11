@@ -218,6 +218,13 @@ export function IntakeForm({
           </div>
         </div>
 
+        {/* 分集标记提示（原型图2底部蓝色提示条） */}
+        <div className="shrink-0 px-5">
+          <p className="flex items-start gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-[10px] leading-relaxed text-sky-300/90">
+            💡 想精确分集就在原文里标【第N集】或用 --- 分隔线，AI 会按标记数定集数、严格照标记切；不标则按时长均分。AI 还会自动推断时代 / 题材 / 视觉风格 / 服化道。
+          </p>
+        </div>
+
         {/* 底部操作栏（固定） */}
         <div
           className={
