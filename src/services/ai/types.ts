@@ -178,6 +178,7 @@ export interface ExtractCharactersInput {
   workspaceId?: string
   content: string
   model: string
+  costumeStyle?: string | null
 }
 
 export interface CharacterDraft {
@@ -192,6 +193,7 @@ export interface ExtractScenesInput {
   workspaceId?: string
   content: string
   model: string
+  costumeStyle?: string | null
 }
 
 export interface SceneDraft {
@@ -205,6 +207,7 @@ export interface ExtractPropsInput {
   workspaceId?: string
   content: string
   model: string
+  costumeStyle?: string | null
 }
 
 export interface PropDraft {

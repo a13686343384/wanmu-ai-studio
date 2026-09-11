@@ -27,12 +27,13 @@ export async function extractScriptAssets(
     scenes?: SceneDraft[]
     props?: PropDraft[]
   } = {}
+  const costumeStyle = script.costumeStyle ?? null
   if (targets.includes("characters"))
-    extracted.characters = (await ai.extractCharacters({ content, model })).data
+    extracted.characters = (await ai.extractCharacters({ content, model, costumeStyle })).data
   if (targets.includes("scenes"))
-    extracted.scenes = (await ai.extractScenes({ content, model })).data
+    extracted.scenes = (await ai.extractScenes({ content, model, costumeStyle })).data
   if (targets.includes("props"))
-    extracted.props = (await ai.extractProps({ content, model })).data
+    extracted.props = (await ai.extractProps({ content, model, costumeStyle })).data
   const counts = { characters: 0, scenes: 0, props: 0 }
   await prisma.$transaction(async (tx) => {
     // Serialize re-entrant extraction without holding a transaction during upstream requests.
