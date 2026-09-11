@@ -137,7 +137,7 @@ export function StoryboardSection({
       ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6"
       : orientation === "square"
         ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5"
-        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
 
   return (
     <div className="flex h-full flex-col">
