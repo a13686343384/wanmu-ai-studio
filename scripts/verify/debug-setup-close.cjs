@@ -1,0 +1,26 @@
+const { chromium } = require("@playwright/test");
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  const errors = [];
+  page.on("response", (res) => { if (res.url().includes("/assets") && res.status() >= 400) errors.push(`${res.status()} ${res.url()}`); });
+  await page.goto("http://localhost:3000/login");
+  await page.fill('input[type="email"]', "demo@wanmusheng.com");
+  await page.fill('input[type="password"]', "demo1234");
+  await page.click('button[type="submit"]');
+  await page.waitForLoadState("networkidle");
+  const list = (await (await page.request.get("http://localhost:3000/api/scripts")).json()).data;
+  await page.goto(`http://localhost:3000/creation/film-factory/${list[0].id}`);
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: /下一步 · 出人物/ }).click();
+  await page.waitForTimeout(500);
+  const dlg = page.locator('[role="dialog"]');
+  console.log("dialog open:", await dlg.count());
+  await dlg.getByRole("button", { name: "提取资产描述词" }).click();
+  await page.waitForTimeout(4000);
+  console.log("dialog after click:", await dlg.count());
+  console.log("toasts:", await page.locator("[data-sonner-toast]").allTextContents().catch(() => []));
+  console.log("http errors:", errors);
+  await browser.close();
+})();

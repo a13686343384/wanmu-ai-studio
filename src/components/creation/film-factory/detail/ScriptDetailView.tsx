@@ -281,9 +281,10 @@ export function ScriptDetailView({
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error ?? "提取失败")
       }
+      // 请求已受理：先关弹窗，提取在后台进行（顶部进度条 + 完成通知）
+      setAssetSetupOpen(false)
       setProgress(100)
       await reloadScript()
-      setAssetSetupOpen(false)
       toast.success("资产描述词已提取", {
         description: "第二步：点右栏右上角「重新出图」图标，一次性生成全部资产图",
       })
