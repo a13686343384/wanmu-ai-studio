@@ -57,15 +57,17 @@ export function ScriptCard({
   const router = useRouter()
   const processing = script.processingStatus === "processing"
   const done = script.status === "completed"
+  // 还在建档阶段（intake/outlining）且未进入后续流程的，点击恢复弹窗
+  const isInIntake = (script.status === "intake" || script.status === "outlining") && onResumeIntake
   const tone: "processing" | "ready" | "done" = processing ? "processing" : done ? "done" : "ready"
 
   const stageIndex = WORKFLOW_STAGES.findIndex((stage) => stage.key === script.status)
 
-  // 整卡可点：建档中→恢复弹窗；其他→进详情
+  // 整卡可点：建档阶段→恢复弹窗；其他→进详情
   function openDetail(event: React.MouseEvent) {
     if ((event.target as HTMLElement).closest("button, a, [role='menuitem']")) return
-    if (processing && onResumeIntake) {
-      onResumeIntake(script)
+    if (isInIntake) {
+      onResumeIntake!(script)
     } else {
       router.push(`/creation/film-factory/${script.id}`)
     }
@@ -87,12 +89,22 @@ export function ScriptCard({
 
         {/* 标题 + 状态 + 操作 */}
         <div className="flex items-start justify-between gap-2">
-          <Link
-            href={`/creation/film-factory/${script.id}`}
-            className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100 hover:text-orange-300"
-          >
-            {script.title}
-          </Link>
+          {isInIntake ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onResumeIntake!(script) }}
+              className="min-w-0 flex-1 truncate text-left text-sm font-medium text-zinc-100 hover:text-orange-300"
+            >
+              {script.title}
+            </button>
+          ) : (
+            <Link
+              href={`/creation/film-factory/${script.id}`}
+              className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100 hover:text-orange-300"
+            >
+              {script.title}
+            </Link>
+          )}
 
           <StatusBadge status={script.status} processing={script.processingStatus} />
 
