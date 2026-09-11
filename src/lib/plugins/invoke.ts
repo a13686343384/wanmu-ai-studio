@@ -85,6 +85,8 @@ export function renderValue(
   if (typeof value === "string") {
     const intOnly = value.match(/^\{\{\s*(\w+)\s*\|\s*int\s*\}\}$/)
     if (intOnly) return Number.parseInt(vars[intOnly[1]] ?? "0", 10) || 0
+    const floatOnly = value.match(/^\{\{\s*(\w+)\s*\|\s*float\s*\}\}$/)
+    if (floatOnly) return Number.parseFloat(vars[floatOnly[1]] ?? "0") || 0
     let out = value
     // {{key | default:"x"}}
     out = out.replace(
@@ -94,6 +96,11 @@ export function renderValue(
     // {{key | int}}
     out = out.replace(
       /\{\{\s*(\w+)\s*\|\s*int\s*\}\}/g,
+      (_, key) => vars[key] ?? "0",
+    )
+    // {{key | float}}
+    out = out.replace(
+      /\{\{\s*(\w+)\s*\|\s*float\s*\}\}/g,
       (_, key) => vars[key] ?? "0",
     )
     // {{key}}
