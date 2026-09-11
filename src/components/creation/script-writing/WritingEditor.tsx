@@ -209,33 +209,27 @@ export function WritingEditor({
         <h1 className="max-w-xs truncate text-sm text-zinc-100">
           {project.title}
         </h1>
+        <span className="text-[10px] text-zinc-500">{project.genre}</span>
+        <span className="text-[10px] text-zinc-500">{project.totalEpisodes} 集目标</span>
+        <span className={cn("rounded px-1.5 py-0.5 text-[10px]", project.document.blueprint ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-800 text-zinc-400")}>
+          {project.document.blueprint ? "大纲就绪" : "待构思"}
+        </span>
         <div className="ml-auto flex flex-wrap gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPanel("blueprint")}
-          >
-            <FileText />
-            剧本大纲
+          <Button variant="ghost" size="sm" onClick={() => setPanel("blueprint")}>
+            <FileText />大纲
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPanel("characters")}
-          >
-            <Users />
-            角色档案
+          <Button variant="ghost" size="sm" onClick={() => setPanel("characters")}>
+            <Users />角色
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setPanel("history")}>
-            <History />
-            大纲版本历史
+          <Button variant="ghost" size="sm" onClick={() => toast.info("质检功能即将上线")}>
+            <Sparkles />质检全剧
           </Button>
-          <Button
-            size="sm"
-            variant="inverse"
-            disabled={!!busy || dirty || !ready}
-            onClick={() => void action("import")}
-          >
+          <Button size="sm" variant="outline" disabled={!!busy || ready >= project.totalEpisodes}
+            onClick={() => toast.info("批量生成功能即将上线")}>
+            批量生成剩余 {Math.max(0, project.totalEpisodes - ready)} 集
+          </Button>
+          <Button size="sm" variant="inverse" disabled={!!busy || dirty || !ready}
+            onClick={() => void action("import")}>
             {project.importedScriptId ? "打开影视工厂" : "导入影视工厂"}
           </Button>
         </div>
@@ -317,29 +311,27 @@ export function WritingEditor({
                     {dirty ? "未保存" : "已保存"}
                   </span>
                   <div className="ml-auto flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={!draft}
-                      onClick={() => void copy(draft)}
-                    >
-                      <Copy />
-                      复制
+                    <Button variant="ghost" size="sm" disabled={number <= 1 || !!busy}
+                      onClick={() => { const prev = project.document.episodes.find(e => e.number === number - 1); if (prev) { setNumber(prev.number); setDraft(prev.content) } }}>
+                      ‹ 上一集
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!!busy || !dirty}
-                      onClick={() => void action("save", { content: draft })}
-                    >
+                    <Button variant="ghost" size="sm" disabled={number >= project.totalEpisodes || !!busy}
+                      onClick={() => { const next = project.document.episodes.find(e => e.number === number + 1); if (next) { setNumber(next.number); setDraft(next.content) } }}>
+                      下一集 ›
+                    </Button>
+                    <Button variant="ghost" size="sm" disabled={!draft} onClick={() => void copy(draft)}>
+                      <Copy />复制
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={!!busy || !dirty}
+                      onClick={() => void action("save", { content: draft })}>
                       保存正文
                     </Button>
-                    <Button
-                      variant="inverse"
-                      size="sm"
-                      disabled={!!busy}
-                      onClick={() => openGeneration("episode")}
-                    >
+                    <Button variant="ghost" size="sm" disabled={!!busy || !episode?.content}
+                      onClick={() => { if (confirm("确定要重写本集正文？当前内容将被覆盖。")) openGeneration("episode") }}>
+                      重写正文
+                    </Button>
+                    <Button variant="inverse" size="sm" disabled={!!busy}
+                      onClick={() => openGeneration("episode")}>
                       生成本集正文
                     </Button>
                   </div>
