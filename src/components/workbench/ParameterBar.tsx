@@ -187,7 +187,39 @@ export function ParameterBar({ onGenerate }: { onGenerate: () => void }) {
 
       {mediaType !== "audio" ? <CombinedParams /> : <LyricsSelector />}
 
-      {mediaType === "image" && <StyleSelector />}
+      {mediaType === "image" && (
+        <>
+          <StyleSelector />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:border-zinc-700">
+                低画质<ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuRadioGroup value="low">
+                <DropdownMenuRadioItem value="low">低画质</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="standard">标准画质</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="high">高画质</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:border-zinc-700">
+                不透明<ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuRadioGroup value="opaque">
+                <DropdownMenuRadioItem value="opaque">不透明</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="semi">半透明</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="transparent">透明</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <span className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-300">
