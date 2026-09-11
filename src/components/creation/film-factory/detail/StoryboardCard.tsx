@@ -185,8 +185,8 @@ export const StoryboardCard = memo(function StoryboardCard({
       </div>
 
       {/* 内容 */}
-      <div className="space-y-1.5 p-2.5">
-        <p className="line-clamp-3 text-[11px] leading-relaxed text-zinc-300">
+      <div className="space-y-1 p-2">
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-zinc-300">
           {storyboard.description}
         </p>
 

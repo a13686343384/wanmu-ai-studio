@@ -361,7 +361,7 @@ export function StoryboardSection({
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2.5 p-3 xl:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                       {segment.items.map((storyboard) => (
                         <StoryboardCard
                           key={storyboard.id}
