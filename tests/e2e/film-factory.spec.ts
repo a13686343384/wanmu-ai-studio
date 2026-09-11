@@ -229,13 +229,13 @@ test.describe("影视工厂", () => {
       timeout: 20_000,
     })
   })
-  test("下一步打开资产模型配置，分镜展示出片前检查", async ({ page }) => {
+  test("下一步打开资产提取弹窗（两步分离），分镜展示出片前检查", async ({ page }) => {
     const id = await createFreshScript(page)
     try {
       await page.goto(`/creation/film-factory/${id}`)
       await page.getByRole("button", { name: /下一步 · 出人物/ }).click()
       await expect(
-        page.getByRole("dialog", { name: "生成人物 / 场景资产" }),
+        page.getByRole("dialog", { name: "提取人物 / 场景资产" }),
       ).toBeVisible()
       await page.getByLabel("资产文本模型", { exact: true }).click()
       await page.getByRole("option", { name: "OVLM 5.6" }).click()
@@ -248,10 +248,10 @@ test.describe("影视工厂", () => {
         { data: { mode: "text", model: "ovlm-6" } },
       )
       await page.reload()
-      await expect(page.getByText("出片前检查", { exact: true })).toBeVisible()
-      await page.getByText("出片前检查", { exact: true }).click()
+      await expect(page.getByText(/出片前检查/).first()).toBeVisible()
+      await page.getByText(/出片前检查 · 建议与问题/).click()
       await expect(
-        page.getByRole("button", { name: "补首帧图" }).first(),
+        page.getByRole("button", { name: "去补首帧图" }).first(),
       ).toBeVisible()
     } finally {
       await page.request.delete(`/api/scripts/${id}`)

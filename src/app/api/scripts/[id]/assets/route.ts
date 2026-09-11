@@ -139,6 +139,14 @@ export const POST = withErrorHandling(
       }
     })
 
+    // 状态推进：完成提取后进入「人物/场景」阶段（进度条按资产出图情况再推进到拆分镜）
+    if (["intake", "outlining"].includes(script.status)) {
+      await prisma.script.update({
+        where: { id: script.id },
+        data: { status: "assets" },
+      })
+    }
+
     // 妆造兜底（需求：拆分资产后妆造库应有数据）：为没有造型的角色补「默认造型」
     const charactersAll = await prisma.character.findMany({
       where: { scriptId: script.id },

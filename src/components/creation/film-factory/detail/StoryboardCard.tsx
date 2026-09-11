@@ -40,6 +40,7 @@ export const StoryboardCard = memo(function StoryboardCard({
   onGenerateImage,
   onGenerateVideo,
   onEdit,
+  onEditRefs,
 }: {
   storyboard: StoryboardDTO
   busy: boolean
@@ -50,6 +51,8 @@ export const StoryboardCard = memo(function StoryboardCard({
   onGenerateImage: (storyboard: StoryboardDTO) => void
   onGenerateVideo: (storyboard: StoryboardDTO) => void
   onEdit: (storyboard: StoryboardDTO) => void
+  /** 视频阶段：右上角编辑 = 打开整段引用编辑 */
+  onEditRefs?: () => void
 }) {
   const [previewVideo, setPreviewVideo] = useState(false)
   const hasVideo = Boolean(storyboard.videoUrl)
@@ -70,7 +73,27 @@ export const StoryboardCard = memo(function StoryboardCard({
         className="relative overflow-hidden bg-zinc-950"
         style={{ aspectRatio: aspectRatio.replace(":", " / ") }}
       >
-        {storyboard.imageUrl ? (
+        {videoMode ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2">
+            <button
+              type="button"
+              aria-label="生成视频"
+              disabled={busy}
+              onClick={() => onGenerateVideo(storyboard)}
+              className="flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[11px] text-zinc-200 transition-colors hover:border-orange-500/60 hover:text-orange-300 disabled:opacity-50"
+            >
+              {busy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Video className="h-3.5 w-3.5" />
+              )}
+              生成视频
+            </button>
+            {storyboard.imageUrl && (
+              <span className="text-[10px] text-zinc-600">首帧图已就绪</span>
+            )}
+          </div>
+        ) : storyboard.imageUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -211,8 +234,8 @@ export const StoryboardCard = memo(function StoryboardCard({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => onEdit(storyboard)}
-            aria-label="编辑分镜"
+            onClick={() => (videoMode && onEditRefs ? onEditRefs() : onEdit(storyboard))}
+            aria-label="编辑"
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>

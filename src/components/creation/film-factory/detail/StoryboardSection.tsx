@@ -169,6 +169,18 @@ export function StoryboardSection({
             <Sparkles className="h-3.5 w-3.5" />
             先让 AI 复述理解本集
           </Button>
+          {storyboards.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              onClick={onSplit}
+              disabled={!hasEpisode}
+            >
+              <Scissors className="h-3.5 w-3.5" />
+              重新拆分镜
+            </Button>
+          )}
           {videoMode && storyboards.length > 0 ? (
             <Button
               variant="inverse"
@@ -184,6 +196,17 @@ export function StoryboardSection({
               )}
               批量生成视频
             </Button>
+          ) : storyboards.length > 0 ? (
+            <Button
+              variant="inverse"
+              size="sm"
+              className="h-7"
+              onClick={() => setAssetsSegment("__all__")}
+              disabled={!hasEpisode}
+            >
+              <Scissors className="h-3.5 w-3.5" />
+              批量生成
+            </Button>
           ) : (
             <Button
               variant="inverse"
@@ -193,7 +216,7 @@ export function StoryboardSection({
               disabled={!hasEpisode}
             >
               <Scissors className="h-3.5 w-3.5" />
-              {storyboards.length > 0 ? "重新拆分镜" : "批量生成"}
+              批量生成
             </Button>
           )}
         </div>
@@ -349,6 +372,7 @@ export function StoryboardSection({
                           onGenerateImage={onGenerateImage}
                           onGenerateVideo={onGenerateVideo}
                           onEdit={onEdit}
+                          onEditRefs={() => setRefsSegment(segment.title)}
                         />
                       ))}
                     </div>
@@ -378,7 +402,10 @@ export function StoryboardSection({
 
       {assetsSegment &&
         (() => {
-          const segment = segments.find((s) => s.title === assetsSegment)
+          const segment =
+            assetsSegment === "__all__"
+              ? { title: "本集全部分镜", items: storyboards }
+              : segments.find((s) => s.title === assetsSegment)
           if (!segment) return null
           return (
             <SegmentAssetsDialog

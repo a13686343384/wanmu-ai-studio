@@ -627,7 +627,11 @@ export function ScriptDetailView({
             episodeId={activeEpisode.id}
             episodeTitle={`EP${String(activeEpisode.number).padStart(2, "0")} ${activeEpisode.title}`}
             initialMode={splitMode}
-            onSplitPhase={setSplitPhase}
+            onSplitPhase={(info) => {
+              setSplitPhase(info)
+              // 拆分启动后收起配置弹窗，进度直接展示在分镜区（原型 image4/5）
+              if (info?.active) setSplitOpen(false)
+            }}
             onDone={() => {
               void loadStoryboards()
               void reloadScript()
