@@ -20,7 +20,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: "工作台", href: "/", icon: "Home" },
   { label: "画布", href: "/canvas", icon: "LayoutGrid" },
   { label: "创作中心", href: "/creation", icon: "Sparkles", hasDropdown: true },
-  { label: "插件", href: "/plugins", icon: "Puzzle" },
+  { label: "插件", href: "/ai-settings", icon: "Puzzle" },
   { label: "联系我们", href: "/contact", icon: "MessageSquare" },
 ] as const
 
