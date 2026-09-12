@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { CheckCircle2, Circle, Loader2, Sparkles } from "lucide-react"
+import { CheckCircle2, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -11,11 +11,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-const STEPS = ["拆分集数", "整理入库", "剧本医生会诊"] as const
+const STEPS = [
+  { label: "拆分集数 · 生成大纲", desc: "AI 通读剧本，按内容拆分集数并生成每集大纲" },
+  { label: "提取角色 / 场景 / 道具", desc: "从剧本中提取全部角色、场景、道具的描述词" },
+] as const
 
 /**
  * 创建剧本解析进度弹窗（原型图6/7）。
- * 三步进度：拆分集数 → 整理入库 → 剧本医生会诊。
+ * 两步真实进度：拆分集数+生成大纲 → 提取资产。
+ * finalize API 同步执行两步，返回后即为完成。
  */
 export function FinalizeProgress({
   open,
@@ -30,15 +34,26 @@ export function FinalizeProgress({
   onComplete: (id: string) => void
   onBackground: () => void
 }) {
-  const [step, setStep] = useState(-1) // -1=未开始, 0=拆分集数, 1=整理入库, 2=会诊
+  const [step, setStep] = useState(-1) // -1=未开始, 0=拆分集数, 1=提取资产
   const [statusText, setStatusText] = useState("")
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [resultMsg, setResultMsg] = useState("")
   const cancelledRef = useRef(false)
+
+  // 实时计时
+  useEffect(() => {
+    if (step < 0 || error) return
+    const timer = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(timer)
+  }, [step, error])
 
   useEffect(() => {
     if (!open) {
       setStep(-1)
       setError(null)
+      setElapsed(0)
+      setResultMsg("")
       cancelledRef.current = false
       return
     }
@@ -46,31 +61,40 @@ export function FinalizeProgress({
 
     async function run() {
       try {
-        // Step 0: 拆分集数（调用 finalize API）
+        // Step 0: 拆分集数 + 生成大纲 + 提取资产（finalize API 同步完成所有步骤）
         setStep(0)
-        setStatusText("正在按分集标记切剧本…")
+        setStatusText("正在按分集标记切剧本，生成每集大纲…")
+
+        // 模拟第一步完成后切换到第二步（实际 API 是同步的，这里用定时器给用户视觉反馈）
+        const stepTimer = setTimeout(() => {
+          if (!cancelledRef.current) {
+            setStep(1)
+            setStatusText("正在从剧本中提取角色 / 场景 / 道具描述词…")
+          }
+        }, 8000) // 8秒后切换到第二步提示（大纲生成通常需要这么久）
 
         const res = await fetch(`/api/scripts/${scriptId}/finalize`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(values),
         })
+        clearTimeout(stepTimer)
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error ?? "创建剧本失败")
         if (cancelledRef.current) return
 
-        // Step 1: 整理入库（finalize 内部已完成，视觉过渡）
-        setStep(1)
-        setStatusText("正在整理入库…")
-        await new Promise((r) => setTimeout(r, 600))
-        if (cancelledRef.current) return
+        // API 返回 = 两步都完成了
+        setStep(2) // 超过最后一步 = 全部完成
+        const counts = payload.data?.assetCounts
+        const msg = counts
+          ? `完成 · ${counts.characters} 个角色 · ${counts.scenes} 个场景 · ${counts.props} 个道具`
+          : "完成"
+        setResultMsg(msg)
+        setStatusText(msg)
 
-        // Step 2: 剧本医生会诊（当前跳过，直接进入详情页）
-        setStep(2)
-        setStatusText("剧本医生正在通读全剧会诊…")
-        await new Promise((r) => setTimeout(r, 400))
+        // 短暂展示完成状态后跳转
+        await new Promise(r => setTimeout(r, 1200))
         if (cancelledRef.current) return
-
         onComplete(scriptId)
       } catch (e) {
         if (cancelledRef.current) return
@@ -84,11 +108,10 @@ export function FinalizeProgress({
     }
   }, [open, scriptId, values, onComplete])
 
+  const isComplete = step >= STEPS.length
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={() => {}}
-    >
+    <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
         className="sm:max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
@@ -100,46 +123,48 @@ export function FinalizeProgress({
             AI 正在解析剧本
           </DialogTitle>
           <DialogDescription className="leading-relaxed">
-            把你的完整剧本拆成集 / 角色 / 场景。原样保留通常 5~10 分钟；若选了「会诊＋台词优化」会更久（逐步确认档几分钟出会诊报告即可；选了全自动则逐集改写＋台词都在跑，20
-            分钟以上），剧本越长越慢。可以关闭此窗，后台会继续，稍后在列表点开即可。
+            把你的完整剧本拆成集 / 角色 / 场景。通常需要 1-3 分钟，剧本越长越慢。可以关闭此窗，后台会继续。
           </DialogDescription>
         </DialogHeader>
 
-        {/* 三步进度 */}
+        {/* 两步进度 */}
         <div className="space-y-3 py-1">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center gap-3">
-              {i < step ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+          {STEPS.map((s, i) => (
+            <div key={s.label} className="flex items-start gap-3">
+              {i < step || isComplete ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
               ) : i === step && !error ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-orange-400" />
+                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-orange-400" />
               ) : (
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-[10px] text-zinc-500">
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-[10px] text-zinc-500">
                   {i + 1}
                 </span>
               )}
-              <span
-                className={
-                  i <= step && !error
-                    ? "text-sm text-zinc-200"
-                    : "text-sm text-zinc-500"
-                }
-              >
-                {label}
-              </span>
+              <div>
+                <span className={i <= step || isComplete ? "text-sm text-zinc-200" : "text-sm text-zinc-500"}>
+                  {s.label}
+                </span>
+                <p className="text-[10px] text-zinc-600">{s.desc}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* 状态文案 */}
+        {/* 状态文案 + 计时 */}
         {error ? (
-          <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-400">
-            {error}
-          </p>
+          <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-400">{error}</p>
         ) : (
-          <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-400">
-            {statusText}
-          </p>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+            <p className="text-xs text-zinc-400">{statusText}</p>
+            {!isComplete && !error && (
+              <p className="mt-1 text-[10px] tabular-nums text-zinc-600">
+                已用 {elapsed}s
+              </p>
+            )}
+            {isComplete && resultMsg && (
+              <p className="mt-1 text-[10px] text-emerald-400">✓ {resultMsg}</p>
+            )}
+          </div>
         )}
 
         {/* 底部按钮 */}

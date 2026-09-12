@@ -74,41 +74,42 @@ export const POST = withErrorHandling(
     })
     console.log(`${LOG} DB 写入完成 | ${Date.now() - t0}ms | episodes=${updated.episodes.length} status=${updated.status}`)
 
-    // ── 第三步：异步自动提取资产 ──
+    // ── 第三步：同步提取资产（角色/场景/道具/妆造） ──
+    const t2 = Date.now()
     const updatedScript = await prisma.script.findUniqueOrThrow({ where: { id: updated.id } })
-    void (async () => {
-      const t2 = Date.now()
-      try {
-        console.log(`${LOG} → 自动提取资产开始 | script=${updated.id.slice(-6)} costumeStyle="${updatedScript.costumeStyle}"`)
-        const aiService = getAIService(updatedScript.workspaceId)
-        const { config, imageModelName } = await resolveAssetConfig(updatedScript.workspaceId, updatedScript.assetGenerationConfig)
-        console.log(`${LOG}   资产配置 | textModel=${config.textModelId} imageModel=${config.imageModelId}(${imageModelName}) resolution=${config.resolution}`)
+    let assetCounts = { characters: 0, scenes: 0, props: 0 }
+    try {
+      console.log(`${LOG} → 提取资产开始 | script=${updated.id.slice(-6)} costumeStyle="${updatedScript.costumeStyle}"`)
+      const aiService = getAIService(updatedScript.workspaceId)
+      const { config, imageModelName } = await resolveAssetConfig(updatedScript.workspaceId, updatedScript.assetGenerationConfig)
+      console.log(`${LOG}   资产配置 | textModel=${config.textModelId} imageModel=${config.imageModelId}(${imageModelName}) resolution=${config.resolution}`)
 
-        const result = await extractScriptAssets(updatedScript, { config, imageModelName }, aiService)
-        console.log(`${LOG} ← 自动提取资产完成 | ${Date.now() - t2}ms | characters=${result.counts.characters} scenes=${result.counts.scenes} props=${result.counts.props}`)
+      const result = await extractScriptAssets(updatedScript, { config, imageModelName }, aiService)
+      assetCounts = result.counts
+      console.log(`${LOG} ← 提取资产完成 | ${Date.now() - t2}ms | characters=${result.counts.characters} scenes=${result.counts.scenes} props=${result.counts.props}`)
 
-        await prisma.script.update({
-          where: { id: updated.id },
-          data: { status: "assets", progressLabel: "资产描述已提取，等待主动出图" },
-        })
-        console.log(`${LOG} 状态更新 → assets | 总耗时 ${Date.now() - t0}ms`)
-      } catch (err) {
-        console.error(`${LOG} ✗ 自动提取资产失败 | ${Date.now() - t2}ms | script=${updated.id.slice(-6)}`, err)
-      }
-    })()
+      await prisma.script.update({
+        where: { id: updated.id },
+        data: { status: "assets", progressLabel: "资产描述已提取，等待主动出图" },
+      })
+    } catch (err) {
+      console.error(`${LOG} ✗ 提取资产失败 | ${Date.now() - t2}ms | script=${updated.id.slice(-6)}`, err)
+      // 资产提取失败不阻塞，用户可以在详情页手动重新提取
+    }
 
-    console.log(`${LOG} 响应返回 | ${Date.now() - t0}ms | 资产提取在后台继续`)
+    console.log(`${LOG} 全部完成 | 总耗时 ${Date.now() - t0}ms | episodes=${updated.episodes.length} 角色=${assetCounts.characters} 场景=${assetCounts.scenes} 道具=${assetCounts.props}`)
     return jsonOk(
       {
         id: updated.id,
         title: updated.title,
-        status: updated.status,
+        status: "assets",
         totalEpisodes: updated.totalEpisodes,
         episodeDuration: updated.episodeDuration,
         episodes: updated.episodes,
+        assetCounts,
         usage,
       },
-      "剧本已创建，资产正在后台提取…",
+      `剧本已创建 · ${assetCounts.characters} 角色 · ${assetCounts.scenes} 场景 · ${assetCounts.props} 道具`,
       201,
     )
   },
