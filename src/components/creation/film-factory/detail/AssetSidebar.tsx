@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import {
+  Check,
   ChevronDown,
   ClipboardList,
   Download,
@@ -694,6 +695,7 @@ function CharacterCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [genOpen, setGenOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -885,10 +887,19 @@ function CharacterCard({
           <ImageActionButton
             label="编辑"
             disabled={busy}
-            onClick={() => setGenOpen(true)}
+            onClick={() => setEditOpen(true)}
           >
             <Pencil className="h-3 w-3" />
           </ImageActionButton>
+          {character.imageUrl && (
+            <ImageActionButton
+              label="出图"
+              disabled={busy}
+              onClick={() => setGenOpen(true)}
+            >
+              <Sparkles className="h-3 w-3" />
+            </ImageActionButton>
+          )}
           {!character.imageUrl && (
             <ImageActionButton
               label="删除"
@@ -1122,6 +1133,15 @@ function CharacterCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 编辑（名称+描述） */}
+      <AssetEditDialog
+        scriptId={scriptId}
+        asset={character}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onDone={onDone}
+      />
     </div>
   )
 
@@ -1180,7 +1200,94 @@ function ImageActionButton({
   )
 }
 
-/* ---------------------------- 出参考图弹窗（角色 / 场景 · 编辑 / 单独出图） ---------------------------- */
+/* ---------------------------- 编辑资产弹窗（名称 + 描述 → 保存） ---------------------------- */
+
+function AssetEditDialog({
+  scriptId,
+  asset,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  scriptId: string
+  asset: AssetDTO
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDone: () => void
+}) {
+  const [name, setName] = useState(asset.name)
+  const [description, setDescription] = useState(asset.description)
+  const [saving, setSaving] = useState(false)
+
+  // 打开时同步最新数据
+  useEffect(() => {
+    if (open) {
+      setName(asset.name)
+      setDescription(asset.description)
+    }
+  }, [open, asset.name, asset.description])
+
+  async function save() {
+    if (!name.trim()) { toast.error("名称不能为空"); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "保存失败")
+      toast.success(`「${name.trim()}」已保存`)
+      onDone()
+      onOpenChange(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存失败")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>编辑{asset.name ? ` · ${asset.name}` : ""}</DialogTitle>
+          <DialogDescription>
+            修改名称与描述词。描述词在创建剧本提取资产时自动生成，你可以手动调整。出图时会按模板将描述词转化为提示词。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>名称</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="资产名称" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              描述词
+              <span className="ml-1 text-[10px] text-zinc-600">（用于生成参考图，出图时自动转化为提示词）</span>
+            </Label>
+            <Textarea rows={8} value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="身份背景、外貌特征、性格、服饰造型等结构化描述..."
+              className="text-xs leading-relaxed" />
+            <p className="text-[10px] text-zinc-600">
+              建议 80-150 字。Phase A 资产卡范式：主体描述 + 风格 + 构图。
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button variant="inverse" disabled={saving || !name.trim()} onClick={() => void save()}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check />}
+            保存
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ---------------------------- 出参考图弹窗（角色 / 场景 · 单独出图） ---------------------------- */
 
 function AssetGenerateDialog({
   scriptId,
@@ -1680,6 +1787,7 @@ function CostumeCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -1836,6 +1944,14 @@ function CostumeCard({
                 className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
                 <Upload className="h-3 w-3" />替换
               </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
+              </button>
+              <button type="button" aria-label="出图" disabled={busy} onClick={() => setRegenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />出图
+              </button>
             </>
           ) : (
             <>
@@ -1846,6 +1962,10 @@ function CostumeCard({
               <button type="button" aria-label="上传" disabled={busy} onClick={() => fileRef.current?.click()}
                 className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
                 <Upload className="h-3 w-3" />上传
+              </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
               </button>
               <button type="button" aria-label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
                 className="flex h-[22px] items-center gap-1 rounded bg-rose-950/90 px-1.5 text-[10px] text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50">
@@ -1930,6 +2050,55 @@ function CostumeCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 编辑造型（名称+描述） */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>编辑造型 · {costume.name}</DialogTitle>
+            <DialogDescription>修改造型名称与描述词。出图时会按模板将描述词转化为提示词。</DialogDescription>
+          </DialogHeader>
+          <CostumeEditForm costume={costume} scriptId={scriptId} onSave={() => { setEditOpen(false); onDone() }} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+/** 妆造编辑表单（内联在 Dialog 中） */
+function CostumeEditForm({ costume, scriptId, onSave }: { costume: CostumeDTO & { characterName: string }; scriptId: string; onSave: () => void }) {
+  const [name, setName] = useState(costume.name)
+  const [description, setDescription] = useState(costume.description)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setName(costume.name); setDescription(costume.description) }, [costume.name, costume.description])
+  async function save() {
+    if (!name.trim()) { toast.error("名称不能为空"); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/scripts/${scriptId}/assets/${costume.id}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error ?? "保存失败")
+      toast.success(`「${name.trim()}」已保存`)
+      onSave()
+    } catch (e) { toast.error(e instanceof Error ? e.message : "保存失败") }
+    finally { setSaving(false) }
+  }
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5"><Label>名称</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
+      <div className="space-y-1.5">
+        <Label>描述词<span className="ml-1 text-[10px] text-zinc-600">（出图时自动转化为提示词）</span></Label>
+        <Textarea rows={6} value={description} onChange={e => setDescription(e.target.value)} className="text-xs leading-relaxed" />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onSave}>取消</Button>
+        <Button variant="inverse" size="sm" disabled={saving || !name.trim()} onClick={() => void save()}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check />}保存
+        </Button>
+      </div>
     </div>
   )
 }
@@ -2386,6 +2555,7 @@ function SceneCard({
   const [preview, setPreview] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [genOpen, setGenOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [spatialOpen, setSpatialOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -2542,8 +2712,11 @@ function SceneCard({
               <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
                 <Upload className="h-3 w-3" />
               </ImageActionButton>
-              <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+              <ImageActionButton label="编辑" disabled={busy} onClick={() => setEditOpen(true)}>
                 <Pencil className="h-3 w-3" />
+              </ImageActionButton>
+              <ImageActionButton label="出图" disabled={busy} onClick={() => setGenOpen(true)}>
+                <Sparkles className="h-3 w-3" />
               </ImageActionButton>
             </>
           ) : (
@@ -2554,7 +2727,7 @@ function SceneCard({
               <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
                 <Upload className="h-3 w-3" />
               </ImageActionButton>
-              <ImageActionButton label="编辑" disabled={busy} onClick={() => setGenOpen(true)}>
+              <ImageActionButton label="编辑" disabled={busy} onClick={() => setEditOpen(true)}>
                 <Pencil className="h-3 w-3" />
               </ImageActionButton>
               <ImageActionButton label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
@@ -2729,6 +2902,15 @@ function SceneCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 编辑场景（名称+描述） */}
+      <AssetEditDialog
+        scriptId={scriptId}
+        asset={scene}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onDone={onDone}
+      />
     </div>
   )
 }
