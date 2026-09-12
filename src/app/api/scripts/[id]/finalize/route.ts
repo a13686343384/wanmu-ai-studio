@@ -6,23 +6,28 @@ import { reviewScriptSchema } from "@/lib/validations/generation"
 import { extractScriptAssets } from "@/services/assets/extraction"
 import { resolveAssetConfig } from "@/services/assets/config"
 
+const LOG = "[finalize]"
+
 /**
  * POST /api/scripts/[id]/finalize
  * INTAKE 第三步：应用用户审阅后的元信息，并用 AI 生成分集大纲。
- *
- * 副作用：
- * - 更新剧本元信息与状态（intake → outlining）
- * - 生成 Episode 记录（若已存在分集则先清空再重建）
+ * 完成后异步自动提取资产（角色/场景/道具/妆造）。
  */
 export const POST = withErrorHandling(
   async (req: Request, { params }: { params: { id: string } }) => {
+    const t0 = Date.now()
     const user = await requireUser()
     const script = await requireScriptAccess(params.id, user.id)
+    console.log(`${LOG} 开始 | script=${script.id.slice(-6)} title="${script.title}" user=${user.id.slice(-6)} ws=${script.workspaceId}`)
 
     const body = await req.json()
     const input = reviewScriptSchema.parse(body)
+    console.log(`${LOG} 输入 | episodes=${input.totalEpisodes} duration=${input.episodeDuration}s aspect=${input.targetAspect} genre="${input.genre}" costume="${input.costumeStyle}" visual="${input.visualStyle}"`)
 
+    // ── 第一步：生成分集大纲 ──
+    console.log(`${LOG} → generateOutline 开始 | model=${script.textModel} contentLen=${script.content.length}`)
     const ai = getAIService(script.workspaceId)
+    const t1 = Date.now()
     const { data: outline, usage } = await ai.generateOutline({
       scriptTitle: input.title,
       content: script.content,
@@ -30,11 +35,11 @@ export const POST = withErrorHandling(
       episodeDuration: input.episodeDuration,
       model: script.textModel,
     })
+    console.log(`${LOG} ← generateOutline 完成 | ${Date.now() - t1}ms | episodes=${outline.episodes.length} model=${usage.model}`)
 
+    // ── 第二步：写入数据库 ──
     const updated = await prisma.$transaction(async (tx) => {
-      // 重建分集（INTAKE 阶段重复提交时保持幂等）
       await tx.episode.deleteMany({ where: { scriptId: script.id } })
-
       return tx.script.update({
         where: { id: script.id },
         data: {
@@ -67,25 +72,32 @@ export const POST = withErrorHandling(
         },
       })
     })
+    console.log(`${LOG} DB 写入完成 | ${Date.now() - t0}ms | episodes=${updated.episodes.length} status=${updated.status}`)
 
-    // 异步自动提取资产（不阻塞响应，用户进入详情页时资产已就绪）
+    // ── 第三步：异步自动提取资产 ──
     const updatedScript = await prisma.script.findUniqueOrThrow({ where: { id: updated.id } })
     void (async () => {
+      const t2 = Date.now()
       try {
+        console.log(`${LOG} → 自动提取资产开始 | script=${updated.id.slice(-6)} costumeStyle="${updatedScript.costumeStyle}"`)
         const aiService = getAIService(updatedScript.workspaceId)
         const { config, imageModelName } = await resolveAssetConfig(updatedScript.workspaceId, updatedScript.assetGenerationConfig)
-        await extractScriptAssets(updatedScript, { config, imageModelName }, aiService)
-        // 提取完成后更新状态
+        console.log(`${LOG}   资产配置 | textModel=${config.textModelId} imageModel=${config.imageModelId}(${imageModelName}) resolution=${config.resolution}`)
+
+        const result = await extractScriptAssets(updatedScript, { config, imageModelName }, aiService)
+        console.log(`${LOG} ← 自动提取资产完成 | ${Date.now() - t2}ms | characters=${result.counts.characters} scenes=${result.counts.scenes} props=${result.counts.props}`)
+
         await prisma.script.update({
           where: { id: updated.id },
           data: { status: "assets", progressLabel: "资产描述已提取，等待主动出图" },
         })
-        console.log(`[finalize] 自动提取资产完成: ${updated.id}`)
+        console.log(`${LOG} 状态更新 → assets | 总耗时 ${Date.now() - t0}ms`)
       } catch (err) {
-        console.error(`[finalize] 自动提取资产失败: ${updated.id}`, err)
+        console.error(`${LOG} ✗ 自动提取资产失败 | ${Date.now() - t2}ms | script=${updated.id.slice(-6)}`, err)
       }
     })()
 
+    console.log(`${LOG} 响应返回 | ${Date.now() - t0}ms | 资产提取在后台继续`)
     return jsonOk(
       {
         id: updated.id,

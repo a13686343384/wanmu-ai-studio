@@ -46,17 +46,22 @@ import { loadStyleTemplate, renderTemplate } from "@/lib/style-templates"
 
 /* ---------------------------- 统一模型查找与文本通道 ---------------------------- */
 
+const LOG_AI = "[live-ai]"
+
 async function chatText(
   selected: { model: string; workspaceId?: string },
   system: string,
   user: string,
   options?: { maxTokens?: number; temperature?: number },
 ): Promise<{ text: string; model: string }> {
+  const t0 = Date.now()
+  console.log(`${LOG_AI} chatText 开始 | model=${selected.model} ws=${selected.workspaceId?.slice(-8)} maxTokens=${options?.maxTokens ?? "default"} promptLen=${user.length}`)
   const loaded = await resolveGenerationModel(
     selected.model,
     "text",
     selected.workspaceId,
   )
+  console.log(`${LOG_AI} chatText 模型解析 | ${loaded.id}(${loaded.name}) provider=${loaded.providerModel} baseUrl=${loaded.config.baseUrl?.slice(0, 40)}`)
   const result = await invokeCustomModel(loaded.config, {
     prompt: `${system}\n\n${user}`,
     system,
@@ -64,11 +69,14 @@ async function chatText(
     temperature: options?.temperature,
     upstreamModelId: loaded.providerModel,
   })
-  if (!result.ok || !result.text)
+  if (!result.ok || !result.text) {
+    console.error(`${LOG_AI} chatText 失败 | ${Date.now() - t0}ms | ok=${result.ok} error=${result.ok ? "无文本" : result.error}`)
     throw new AppError(
       "文本生成失败：" + (result.ok ? "未返回文本" : result.error),
       502,
     )
+  }
+  console.log(`${LOG_AI} chatText 完成 | ${Date.now() - t0}ms | responseLen=${result.text.length} model=${loaded.id}`)
   return { text: result.text, model: loaded.id }
 }
 
@@ -461,6 +469,8 @@ export const liveAIService: AIService = {
   async analyzeScript(
     input: AnalyzeScriptInput,
   ): Promise<AIResult<ScriptAnalysis>> {
+    const t0 = Date.now()
+    console.log(`${LOG_AI} analyzeScript 开始 | title="${input.title}" contentLen=${input.content.length} model=${input.model}`)
     // ── 第一步：分析元信息（不含分集灵感，避免 token 不够导致截断） ──
     const { data: meta, model } = await chatJson<{
       genre: string
@@ -502,6 +512,7 @@ export const liveAIService: AIService = {
     )
 
     const totalEpisodes = asNumber(meta.recommendedEpisodes, 12)
+    console.log(`${LOG_AI} analyzeScript 第一步完成 | ${Date.now() - t0}ms | genre="${meta.genre}" costume="${meta.costumeStyle}" episodes=${totalEpisodes} duration=${meta.recommendedDuration}s`)
 
     // ── 第二步：单独生成分集灵感（给足 token） ──
     let episodeIdeas: { number: number; title: string; summary: string }[] = []
@@ -558,6 +569,7 @@ export const liveAIService: AIService = {
       treatment: asString(meta.treatment, "立项方案生成中内容缺失。"),
       episodeIdeas,
     }
+    console.log(`${LOG_AI} analyzeScript 完成 | 总耗时 ${Date.now() - t0}ms | genre="${analysis.genre}" costume="${analysis.costumeStyle}" episodes=${analysis.recommendedEpisodes} ideas=${episodeIdeas.length}`)
     return { data: analysis, usage: usage(input.model, model, 8) }
   },
 
@@ -734,8 +746,11 @@ export const liveAIService: AIService = {
 
   async extractCharacters(input): Promise<AIResult<CharacterDraft[]>> {
     // 加载风格模板的提取模板
+    const t0 = Date.now()
+    console.log(`${LOG_AI} extractCharacters 开始 | model=${input.model} costumeStyle="${input.costumeStyle}" contentLen=${input.content.length}`)
     const styleTemplate = await loadStyleTemplate(input.costumeStyle ?? null)
     const extractionTpl = styleTemplate.extractionTemplates.character
+    console.log(`${LOG_AI} extractCharacters 模板 | ${extractionTpl ? "使用风格模板(" + extractionTpl.slice(0, 30) + "...)" : "使用默认模板"}`)
     const systemPrompt = extractionTpl
       ? `你是选角导演。严格按照以下模板格式从剧本正文中提取角色信息，输出 JSON。\n\n${extractionTpl}`
       : "你是选角导演。从剧本正文提取全部有名有姓的角色。"
@@ -755,6 +770,7 @@ export const liveAIService: AIService = {
       { maxTokens: 8192 },
     )
     const characters = Array.isArray(data.characters) ? data.characters : []
+    console.log(`${LOG_AI} extractCharacters 完成 | ${Date.now() - t0}ms | count=${characters.length} names=[${characters.map(c => c?.name).join(", ")}]`)
     return {
       data: characters.map((item) => ({
         name: asString(item?.name, "未命名角色"),
@@ -768,8 +784,11 @@ export const liveAIService: AIService = {
   },
 
   async extractScenes(input): Promise<AIResult<SceneDraft[]>> {
+    const t0 = Date.now()
+    console.log(`${LOG_AI} extractScenes 开始 | model=${input.model} costumeStyle="${input.costumeStyle}"`)
     const styleTemplate = await loadStyleTemplate(input.costumeStyle ?? null)
     const extractionTpl = styleTemplate.extractionTemplates.scene
+    console.log(`${LOG_AI} extractScenes 模板 | ${extractionTpl ? "使用风格模板" : "使用默认模板"}`)
     const systemPrompt = extractionTpl
       ? `你是美术指导。严格按照以下模板格式从剧本正文中提取场景信息，输出 JSON。\n\n${extractionTpl}`
       : "你是美术指导。从剧本正文提取全部场景。"
@@ -786,6 +805,7 @@ export const liveAIService: AIService = {
       { maxTokens: 8192 },
     )
     const scenes = Array.isArray(data.scenes) ? data.scenes : []
+    console.log(`${LOG_AI} extractScenes 完成 | ${Date.now() - t0}ms | count=${scenes.length} names=[${scenes.map(s => s?.name).join(", ")}]`)
     return {
       data: scenes.map((item) => ({
         name: asString(item?.name, "未命名场景"),
@@ -798,8 +818,11 @@ export const liveAIService: AIService = {
   },
 
   async extractProps(input): Promise<AIResult<PropDraft[]>> {
+    const t0 = Date.now()
+    console.log(`${LOG_AI} extractProps 开始 | model=${input.model} costumeStyle="${input.costumeStyle}"`)
     const styleTemplate = await loadStyleTemplate(input.costumeStyle ?? null)
     const extractionTpl = styleTemplate.extractionTemplates.prop
+    console.log(`${LOG_AI} extractProps 模板 | ${extractionTpl ? "使用风格模板" : "使用默认模板"}`)
     const systemPrompt = extractionTpl
       ? `你是道具师。严格按照以下模板格式从剧本正文中提取道具信息，输出 JSON。\n\n${extractionTpl}`
       : "你是道具师。从剧本正文提取全部关键道具。"
@@ -815,6 +838,7 @@ export const liveAIService: AIService = {
       userPrompt,
     )
     const props = Array.isArray(data.props) ? data.props : []
+    console.log(`${LOG_AI} extractProps 完成 | ${Date.now() - t0}ms | count=${props.length} names=[${props.map(p => p?.name).join(", ")}]`)
     return {
       data: props.map((item) => ({
         name: asString(item?.name, "未命名道具"),

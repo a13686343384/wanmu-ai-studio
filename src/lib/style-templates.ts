@@ -24,19 +24,27 @@ export async function loadStyleTemplate(styleName?: string | null): Promise<Styl
   if (styleName) {
     const found = await prisma.styleTemplate.findFirst({
       where: { name: styleName },
-      select: { templates: true },
+      select: { templates: true, name: true },
     })
-    if (found) return found.templates as unknown as StyleTemplateData
+    if (found) {
+      console.log(`[style-template] 命中风格模板 "${found.name}" (按名称匹配 "${styleName}")`)
+      return found.templates as unknown as StyleTemplateData
+    }
+    console.log(`[style-template] 未找到风格模板 "${styleName}"，回退到默认`)
   }
 
   // 2. 回退到默认模板
   const defaultTpl = await prisma.styleTemplate.findFirst({
     where: { isDefault: true },
-    select: { templates: true },
+    select: { templates: true, name: true },
   })
-  if (defaultTpl) return defaultTpl.templates as unknown as StyleTemplateData
+  if (defaultTpl) {
+    console.log(`[style-template] 使用默认模板 "${defaultTpl.name}"`)
+    return defaultTpl.templates as unknown as StyleTemplateData
+  }
 
   // 3. 兜底：返回空模板（调用方应使用内置默认）
+  console.warn("[style-template] 数据库中无风格模板，返回空模板（将使用内置默认）")
   return {
     extractionTemplates: { character: "", scene: "", prop: "", costume: "" },
     imagePromptTemplates: { character: "", scene: "", prop: "", costume: "" },
