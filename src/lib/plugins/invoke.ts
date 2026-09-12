@@ -1,3 +1,4 @@
+import { log } from "@/lib/logger"
 /**
  * 插件模型调用引擎：按模板配置渲染请求体 → 提交 → （async）轮询 → 按点路径提取结果。
  * 模板结构见备忘录第五节（16 个模板，src/lib/plugins/templates.ts）。
@@ -194,7 +195,7 @@ export async function invokeCustomModel(
 
   let responseData: unknown
   try {
-    console.log("[invoke] POST", url, "model=", vars.model_id, "max_tokens=", vars.max_tokens, "temp=", vars.temperature)
+    log.info(`[invoke] POST ${url} model=${vars.model_id} max_tokens=${vars.max_tokens} temp=${vars.temperature}`)
     const res = await fetch(url, {
       method,
       headers,
@@ -202,16 +203,16 @@ export async function invokeCustomModel(
       signal: AbortSignal.timeout((action.timeout_sec ?? 300) * 1000),
     })
     responseData = await res.json().catch(() => ({}))
-    console.log("[invoke] response status=", res.status)
+    log.info(`[invoke] response status=${res.status}`)
     if (!res.ok) {
       const message =
         pickString(responseData, ["error.message", "error"]) ??
         `上游返回 ${res.status}`
-      console.error("[invoke] upstream error:", message, JSON.stringify(responseData).slice(0, 500))
+      log.error(`[invoke] upstream error: ${message}`, JSON.stringify(responseData).slice(0, 500))
       return { ok: false, error: message }
     }
   } catch (error) {
-    console.error("[invoke] fetch failed:", error instanceof Error ? error.message : error)
+    log.error(`[invoke] fetch failed: ${error instanceof Error ? error.message : String(error)}`)
     return {
       ok: false,
       error: error instanceof Error ? error.message : "上游请求失败",

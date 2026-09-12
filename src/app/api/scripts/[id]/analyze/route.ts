@@ -1,4 +1,5 @@
 import { jsonOk, withErrorHandling } from "@/lib/api"
+import { log } from "@/lib/logger"
 import { requireScriptAccess, requireUser } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { getAIService } from "@/services/ai"
@@ -23,7 +24,7 @@ export const POST = withErrorHandling(
       detectedEpisodes = typeof body?.detectedEpisodes === "number" ? body.detectedEpisodes : 0
     } catch { /* body 可选，解析失败忽略 */ }
 
-    console.log(`${LOG} 开始 | script=${script.id.slice(-6)} title="${script.title}" contentLen=${script.content.length} detectedEpisodes=${detectedEpisodes}`)
+    log.info(`${LOG} 开始 | script=${script.id.slice(-6)} title="${script.title}" contentLen=${script.content.length} detectedEpisodes=${detectedEpisodes}`)
 
     const ai = getAIService(script.workspaceId)
     const { data, usage } = await ai.analyzeScript({
@@ -35,7 +36,7 @@ export const POST = withErrorHandling(
       detectedEpisodes,
     })
 
-    console.log(`${LOG} 完成 | genre="${data.genre}" costume="${data.costumeStyle}" recommendedEpisodes=${data.recommendedEpisodes} duration=${data.recommendedDuration}s ideas=${data.episodeIdeas.length}`)
+    log.info(`${LOG} 完成 | genre="${data.genre}" costume="${data.costumeStyle}" recommendedEpisodes=${data.recommendedEpisodes} duration=${data.recommendedDuration}s ideas=${data.episodeIdeas.length}`)
 
     const updated = await prisma.script.update({
       where: { id: script.id },

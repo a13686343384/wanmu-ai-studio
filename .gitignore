@@ -49,3 +49,4 @@ next-env.d.ts
 # embedded dev database & screenshots (AGENTS.md: 不要提交)
 /.pgdata/
 /.screenshots/
+.logs/

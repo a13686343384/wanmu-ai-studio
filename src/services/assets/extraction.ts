@@ -7,6 +7,7 @@ import type {
   PropDraft,
 } from "@/services/ai/types"
 import { costumeDrafts, type AssetGenerationConfig } from "@/lib/assets/config"
+import { log } from "@/lib/logger"
 
 const LOG = "[extraction]"
 
@@ -25,7 +26,7 @@ export async function extractScriptAssets(
   const targets = options.kinds ?? ["characters", "scenes", "props"]
   const model = options.config.textModelId
   const costumeStyle = script.costumeStyle ?? null
-  console.log(`${LOG} 开始 | script=${script.id.slice(-6)} targets=[${targets}] model=${model} costumeStyle="${costumeStyle}" contentLen=${script.content.length} merge=${!!options.merge}`)
+  log.info(`${LOG} 开始 | script=${script.id.slice(-6)} targets=[${targets}] model=${model} costumeStyle="${costumeStyle}" contentLen=${script.content.length} merge=${!!options.merge}`)
 
   const content = `[目标图片模型] ${options.imageModelName}。请为此模型给出具体视觉、材质、光线与构图关键词。只提取剧本有依据的资产及服饰。${options.keyword ? `重点检查：${options.keyword}` : ""}\n\n${script.content}`
   const extracted: {
@@ -39,9 +40,9 @@ export async function extractScriptAssets(
     const t = Date.now()
     try {
       extracted.characters = (await ai.extractCharacters({ content, model, costumeStyle })).data
-      console.log(`${LOG} ← extractCharacters | ${Date.now() - t}ms | count=${extracted.characters.length} | names=[${extracted.characters.map(c => c.name).join(", ")}]`)
+      log.info(`${LOG} ← extractCharacters | ${Date.now() - t}ms | count=${extracted.characters.length} | names=[${extracted.characters.map(c => c.name).join(", ")}]`)
     } catch (err) {
-      console.error(`${LOG} ✗ extractCharacters 失败 | ${Date.now() - t}ms`, err)
+      log.error(`${LOG} ✗ extractCharacters 失败 | ${Date.now() - t}ms`, err)
       throw err
     }
   }
@@ -50,9 +51,9 @@ export async function extractScriptAssets(
     const t = Date.now()
     try {
       extracted.scenes = (await ai.extractScenes({ content, model, costumeStyle })).data
-      console.log(`${LOG} ← extractScenes | ${Date.now() - t}ms | count=${extracted.scenes.length} | names=[${extracted.scenes.map(s => s.name).join(", ")}]`)
+      log.info(`${LOG} ← extractScenes | ${Date.now() - t}ms | count=${extracted.scenes.length} | names=[${extracted.scenes.map(s => s.name).join(", ")}]`)
     } catch (err) {
-      console.error(`${LOG} ✗ extractScenes 失败 | ${Date.now() - t}ms`, err)
+      log.error(`${LOG} ✗ extractScenes 失败 | ${Date.now() - t}ms`, err)
       throw err
     }
   }
@@ -61,9 +62,9 @@ export async function extractScriptAssets(
     const t = Date.now()
     try {
       extracted.props = (await ai.extractProps({ content, model, costumeStyle })).data
-      console.log(`${LOG} ← extractProps | ${Date.now() - t}ms | count=${extracted.props.length} | names=[${extracted.props.map(p => p.name).join(", ")}]`)
+      log.info(`${LOG} ← extractProps | ${Date.now() - t}ms | count=${extracted.props.length} | names=[${extracted.props.map(p => p.name).join(", ")}]`)
     } catch (err) {
-      console.error(`${LOG} ✗ extractProps 失败 | ${Date.now() - t}ms`, err)
+      log.error(`${LOG} ✗ extractProps 失败 | ${Date.now() - t}ms`, err)
       throw err
     }
   }
@@ -104,7 +105,7 @@ export async function extractScriptAssets(
           })
       }
       counts.characters++
-      console.log(`${LOG}   角色入库 | "${draft.name}" | ${existing ? "更新" : "新建"} | 造型=${costumes.length}`)
+      log.info(`${LOG}   角色入库 | "${draft.name}" | ${existing ? "更新" : "新建"} | 造型=${costumes.length}`)
     }
 
     for (const draft of extracted.scenes ?? []) {
@@ -116,7 +117,7 @@ export async function extractScriptAssets(
       else if (!options.merge && !existing.locked)
         await tx.scene.update({ where: { id: existing.id }, data: draft })
       counts.scenes++
-      console.log(`${LOG}   场景入库 | "${draft.name}" | ${existing ? "更新" : "新建"}`)
+      log.info(`${LOG}   场景入库 | "${draft.name}" | ${existing ? "更新" : "新建"}`)
     }
 
     for (const draft of extracted.props ?? []) {
@@ -128,7 +129,7 @@ export async function extractScriptAssets(
       else if (!options.merge && !existing.locked)
         await tx.prop.update({ where: { id: existing.id }, data: draft })
       counts.props++
-      console.log(`${LOG}   道具入库 | "${draft.name}" | ${existing ? "更新" : "新建"}`)
+      log.info(`${LOG}   道具入库 | "${draft.name}" | ${existing ? "更新" : "新建"}`)
     }
 
     // 兜底：无造型的角色补默认造型
@@ -139,7 +140,7 @@ export async function extractScriptAssets(
       await tx.costume.create({
         data: { ...costumeDrafts(c)[0], characterId: c.id },
       })
-      console.log(`${LOG}   兜底造型 | "${c.name}" 补默认造型`)
+      log.info(`${LOG}   兜底造型 | "${c.name}" 补默认造型`)
     }
 
     const current = await tx.script.findUniqueOrThrow({
@@ -160,7 +161,7 @@ export async function extractScriptAssets(
       },
     })
   })
-  console.log(`${LOG} DB 写入完成 | ${Date.now() - tDb}ms | 角色=${counts.characters} 场景=${counts.scenes} 道具=${counts.props}`)
+  log.info(`${LOG} DB 写入完成 | ${Date.now() - tDb}ms | 角色=${counts.characters} 场景=${counts.scenes} 道具=${counts.props}`)
 
   const [characters, scenes, props] = await Promise.all([
     prisma.character.findMany({
@@ -179,7 +180,7 @@ export async function extractScriptAssets(
   ])
 
   const totalCostumes = characters.reduce((sum, c) => sum + c.costumes.length, 0)
-  console.log(`${LOG} 完成 | 总耗时 ${Date.now() - t0}ms | 角色=${counts.characters}(造型${totalCostumes}) 场景=${counts.scenes} 道具=${counts.props}`)
+  log.info(`${LOG} 完成 | 总耗时 ${Date.now() - t0}ms | 角色=${counts.characters}(造型${totalCostumes}) 场景=${counts.scenes} 道具=${counts.props}`)
 
   return { counts, characters, scenes, props, config: options.config }
 }

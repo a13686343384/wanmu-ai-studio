@@ -1,3 +1,4 @@
+import { log } from "@/lib/logger"
 import type { Script } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { AppError } from "@/lib/api"
@@ -24,7 +25,7 @@ export async function generateScriptAssets(
   ai: AIService,
 ) {
   const t0 = Date.now()
-  console.log(`${LOG_GEN} 开始 | script=${script.id.slice(-6)} kind=${input.kind} mode=${input.mode} ids=${input.ids?.length ?? "all"} costumeStyle="${script.costumeStyle}"`)
+  log.info(`${LOG_GEN} 开始 | script=${script.id.slice(-6)} kind=${input.kind} mode=${input.mode} ids=${input.ids?.length ?? "all"} costumeStyle="${script.costumeStyle}"`)
   const selection = input.ids ? { id: { in: input.ids } } : {}
   const rows =
     input.kind === "character"
@@ -136,12 +137,12 @@ export async function generateScriptAssets(
       if (!url) throw new Error("供应商未返回图片")
       await write(row.id, { imageUrl: url, prompt, status: "completed" })
       generated++
-      console.log(`${LOG_GEN} ✓ 出图成功 | "${row.name}" | promptLen=${prompt.length}`)
+      log.info(`${LOG_GEN} ✓ 出图成功 | "${row.name}" | promptLen=${prompt.length}`)
     } catch (error) {
       await write(row.id, { status: "failed" })
       failed++
       const errMsg = error instanceof Error ? error.message : "图片生成失败"
-      console.error(`${LOG_GEN} ✗ 出图失败 | "${row.name}" | ${errMsg}`)
+      log.error(`${LOG_GEN} ✗ 出图失败 | "${row.name}" | ${errMsg}`)
       errors.push({
         id: row.id,
         name: row.name,
@@ -153,7 +154,7 @@ export async function generateScriptAssets(
     where: { id: script.id },
     data: { updatedAt: new Date() },
   })
-  console.log(`${LOG_GEN} 完成 | 总耗时 ${Date.now() - t0}ms | kind=${input.kind} generated=${generated} failed=${failed} skipped=${skipped} total=${rows.length}`)
+  log.info(`${LOG_GEN} 完成 | 总耗时 ${Date.now() - t0}ms | kind=${input.kind} generated=${generated} failed=${failed} skipped=${skipped} total=${rows.length}`)
   return {
     kind: input.kind,
     generated,
