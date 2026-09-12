@@ -109,9 +109,21 @@ export function IntakeForm({
   }, [resumeScriptId])
 
   // 统计正文里的分集标记（【第N集 …】），供审阅弹窗按标记切集
+  // 检测剧本中的分集标记（支持多种格式）
   const markedEpisodes = (() => {
-    const matches = content.match(/【第\s*\d+\s*集[^】]*】/g)
-    return matches ? new Set(matches).size : 0
+    const patterns = [
+      /【第\s*\d+\s*集[^】]*】/g,          // 【第1集 xxx】
+      /^第\s*\d+\s*集/gm,                   // 第1集（行首）
+      /^EP\s*\d+/gim,                       // EP01 / ep1
+      /^Episode\s*\d+/gim,                  // Episode 1
+      /^#{1,3}\s*第\s*\d+\s*集/gm,         // # 第1集 / ## 第1集
+    ]
+    const allMatches = new Set<string>()
+    for (const pattern of patterns) {
+      const matches = content.match(pattern)
+      if (matches) matches.forEach(m => allMatches.add(m.trim().toLowerCase()))
+    }
+    return allMatches.size
   })()
 
   function patchConfig(patch: Partial<IntakeConfig>) {
@@ -166,10 +178,12 @@ export function IntakeForm({
       setScriptId(id)
       setProgressLabel("正在通读全本，理解剧情脉络…")
 
-      // 2) AI 分析
+      // 2) AI 分析（传入检测到的分集数）
       const analyzeRes = await fetch(`/api/scripts/${id}/analyze`, {
         method: "POST",
         signal: controller.signal,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ detectedEpisodes: markedEpisodes }),
       })
       // 切换到第二阶段文案
       setProgressLabel("正在推断题材 / 时代 / 视觉风格…")

@@ -44,6 +44,8 @@ export interface AnalyzeScriptInput {
   workType: string
   targetAspect: string
   model: string
+  /** 前端检测到的分集标记数量（0 = 未检测到） */
+  detectedEpisodes?: number
 }
 
 export interface ScriptAnalysis {

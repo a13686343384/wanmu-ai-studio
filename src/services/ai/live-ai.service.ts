@@ -470,7 +470,18 @@ export const liveAIService: AIService = {
     input: AnalyzeScriptInput,
   ): Promise<AIResult<ScriptAnalysis>> {
     const t0 = Date.now()
-    console.log(`${LOG_AI} analyzeScript 开始 | title="${input.title}" contentLen=${input.content.length} model=${input.model}`)
+    const detected = input.detectedEpisodes ?? 0
+    console.log(`${LOG_AI} analyzeScript 开始 | title="${input.title}" contentLen=${input.content.length} model=${input.model} detectedEpisodes=${detected}`)
+
+    // 根据检测到的集数和内容长度，计算合理的集数范围
+    const contentLen = input.content.length
+    // 短剧每集约 800-1500 字，据此估算合理集数
+    const estimatedByLength = Math.max(1, Math.round(contentLen / 1000))
+    // 如果检测到分集标记，以检测值为准；否则按内容长度估算
+    const suggestedEpisodes = detected > 0 ? detected : estimatedByLength
+    // 上限：不超过内容长度 / 500（每集至少 500 字），且不超过 50
+    const maxReasonable = Math.min(50, Math.max(suggestedEpisodes + 2, Math.ceil(contentLen / 500)))
+
     // ── 第一步：分析元信息（不含分集灵感，避免 token 不够导致截断） ──
     const { data: meta, model } = await chatJson<{
       genre: string
@@ -493,6 +504,9 @@ export const liveAIService: AIService = {
         作品类型: input.workType,
         画幅: input.targetAspect,
         剧本全文: input.content.slice(0, 24000),
+        分集信息: detected > 0
+          ? `用户剧本中检测到 ${detected} 个分集标记，请以此为基础推荐集数。如果内容量偏多可以适当增加到 ${Math.min(detected + 2, maxReasonable)} 集，但绝不能超过 ${maxReasonable} 集。`
+          : `剧本共约 ${contentLen} 字，按短剧每集 800-1500 字估算约 ${estimatedByLength} 集。请推荐 ${suggestedEpisodes}~${maxReasonable} 集之间的合理集数，绝不能超过 ${maxReasonable} 集。`,
         输出要求: {
           genre: "题材",
           narrativeStyle: "叙事风格",
@@ -503,15 +517,21 @@ export const liveAIService: AIService = {
           audienceNotes: "观众画像",
           allowed: "允许内容数组",
           forbidden: "禁止内容数组",
-          recommendedEpisodes: "推荐集数（数字）",
-          recommendedDuration: "推荐单集秒数（数字）",
+          recommendedEpisodes: `推荐集数（数字，必须在 ${suggestedEpisodes}~${maxReasonable} 之间）`,
+          recommendedDuration: "推荐单集秒数（数字，短剧通常 60-120 秒）",
           treatment: "立项方案摘要（200字以内）",
         },
       }),
       { maxTokens: 4096 },
     )
 
-    const totalEpisodes = asNumber(meta.recommendedEpisodes, 12)
+    // 校验 AI 返回的集数是否在合理范围内
+    let totalEpisodes = asNumber(meta.recommendedEpisodes, suggestedEpisodes)
+    if (totalEpisodes > maxReasonable) {
+      console.warn(`${LOG_AI} AI 推荐集数 ${totalEpisodes} 超过上限 ${maxReasonable}，强制修正为 ${suggestedEpisodes}`)
+      totalEpisodes = suggestedEpisodes
+    }
+    if (totalEpisodes < 1) totalEpisodes = suggestedEpisodes
     console.log(`${LOG_AI} analyzeScript 第一步完成 | ${Date.now() - t0}ms | genre="${meta.genre}" costume="${meta.costumeStyle}" episodes=${totalEpisodes} duration=${meta.recommendedDuration}s`)
 
     // ── 第二步：单独生成分集灵感（给足 token） ──
