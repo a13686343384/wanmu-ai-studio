@@ -774,15 +774,15 @@ export const liveAIService: AIService = {
     const systemPrompt = extractionTpl
       ? `你是选角导演。严格按照以下模板格式从剧本正文中提取角色信息，输出 JSON。\n\n${extractionTpl}`
       : "你是选角导演。从剧本正文提取全部有名有姓的角色。"
-    const userPrompt = extractionTpl
-      ? JSON.stringify({ 剧本正文: input.content.slice(0, 20000) })
-      : JSON.stringify({
-          剧本正文: input.content.slice(0, 20000),
-          输出要求: {
-            characters:
-              "数组，每项 name/description(身份背景与性格)/appearance(外貌服化细节)/personality/costumes。costumes为按剧本换装提取的造型数组，每项name/description(具体服饰外观)/situation(适用剧情)；没有换装则根据已知外观提供默认造型，不要虚构剧情。",
-          },
-        })
+    // 无论是否使用风格模板，都需要告诉 AI 输出 JSON 格式
+    const outputRequirement = {
+      characters:
+        "数组，每项 name/description(身份背景与性格)/appearance(外貌服化细节)/personality/costumes。costumes为按剧本换装提取的造型数组，每项name/description(具体服饰外观)/situation(适用剧情)；没有换装则根据已知外观提供默认造型，不要虚构剧情。",
+    }
+    const userPrompt = JSON.stringify({
+      剧本正文: input.content.slice(0, 20000),
+      输出要求: outputRequirement,
+    })
     const { data, model } = await chatJson<{ characters: CharacterDraft[] }>(
       input,
       systemPrompt,
@@ -812,12 +812,10 @@ export const liveAIService: AIService = {
     const systemPrompt = extractionTpl
       ? `你是美术指导。严格按照以下模板格式从剧本正文中提取场景信息，输出 JSON。\n\n${extractionTpl}`
       : "你是美术指导。从剧本正文提取全部场景。"
-    const userPrompt = extractionTpl
-      ? JSON.stringify({ 剧本正文: input.content.slice(0, 20000) })
-      : JSON.stringify({
-          剧本正文: input.content.slice(0, 20000),
-          输出要求: { scenes: "数组，每项 name/description/environment(空间结构)/lighting(光线氛围)" },
-        })
+    const userPrompt = JSON.stringify({
+      剧本正文: input.content.slice(0, 20000),
+      输出要求: { scenes: "数组，每项 name/description/environment(空间结构)/lighting(光线氛围)" },
+    })
     const { data, model } = await chatJson<{ scenes: SceneDraft[] }>(
       input,
       systemPrompt,
@@ -846,12 +844,10 @@ export const liveAIService: AIService = {
     const systemPrompt = extractionTpl
       ? `你是道具师。严格按照以下模板格式从剧本正文中提取道具信息，输出 JSON。\n\n${extractionTpl}`
       : "你是道具师。从剧本正文提取全部关键道具。"
-    const userPrompt = extractionTpl
-      ? JSON.stringify({ 剧本正文: input.content.slice(0, 20000) })
-      : JSON.stringify({
-          剧本正文: input.content.slice(0, 20000),
-          输出要求: { props: "数组，每项 name/description(外观与一致性细节)" },
-        })
+    const userPrompt = JSON.stringify({
+      剧本正文: input.content.slice(0, 20000),
+      输出要求: { props: "数组，每项 name/description(外观与一致性细节)" },
+    })
     const { data, model } = await chatJson<{ props: PropDraft[] }>(
       input,
       systemPrompt,
