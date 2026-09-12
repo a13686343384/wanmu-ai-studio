@@ -3,6 +3,8 @@ import { requireScriptAccess, requireUser } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { getAIService } from "@/services/ai"
 import { reviewScriptSchema } from "@/lib/validations/generation"
+import { extractScriptAssets } from "@/services/assets/extraction"
+import { resolveAssetConfig } from "@/services/assets/config"
 
 /**
  * POST /api/scripts/[id]/finalize
@@ -66,6 +68,24 @@ export const POST = withErrorHandling(
       })
     })
 
+    // 异步自动提取资产（不阻塞响应，用户进入详情页时资产已就绪）
+    const updatedScript = await prisma.script.findUniqueOrThrow({ where: { id: updated.id } })
+    void (async () => {
+      try {
+        const aiService = getAIService(updatedScript.workspaceId)
+        const { config, imageModelName } = await resolveAssetConfig(updatedScript.workspaceId, updatedScript.assetGenerationConfig)
+        await extractScriptAssets(updatedScript, { config, imageModelName }, aiService)
+        // 提取完成后更新状态
+        await prisma.script.update({
+          where: { id: updated.id },
+          data: { status: "assets", progressLabel: "资产描述已提取，等待主动出图" },
+        })
+        console.log(`[finalize] 自动提取资产完成: ${updated.id}`)
+      } catch (err) {
+        console.error(`[finalize] 自动提取资产失败: ${updated.id}`, err)
+      }
+    })()
+
     return jsonOk(
       {
         id: updated.id,
@@ -76,7 +96,7 @@ export const POST = withErrorHandling(
         episodes: updated.episodes,
         usage,
       },
-      "剧本已创建",
+      "剧本已创建，资产正在后台提取…",
       201,
     )
   },
