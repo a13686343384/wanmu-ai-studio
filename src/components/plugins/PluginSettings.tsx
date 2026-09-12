@@ -454,7 +454,12 @@ function ModelConfigDialog({ editing, credentials, onClose, onSaved }: { editing
     let config: Record<string, unknown>; try { config = JSON.parse(draft.json) } catch { toast.error("JSON 格式不合法"); return }
     setSaving(true)
     try {
-      const payload = { name: draft.name, kind: draft.kind, lifecycle: draft.lifecycle, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined, upstreamModelId: draft.upstreamModelId || undefined, templateKey: draft.templateKey ?? undefined, enabled: draft.enabled, ...config, constraints: { ...(config.constraints as Record<string, unknown>), model_id: draft.upstreamModelId || draft.name }, submit: { ...(config.submit as Record<string, unknown>), path: draft.path || (config.submit as Record<string, unknown>).path, timeout_sec: draft.timeoutSec } }
+      // 如果 submit.body 为空，自动填充默认的 OpenAI 兼容请求体模板
+      const submitRaw = (config.submit ?? {}) as Record<string, unknown>
+      const bodyRaw = (submitRaw.body ?? {}) as Record<string, unknown>
+      const hasBodyFields = Object.keys(bodyRaw).length > 0
+      const defaultBody = { model: "{{model_id}}", messages: [{ role: "user", content: "{{prompt}}" }], max_tokens: "{{max_tokens | int}}", temperature: "{{temperature | float}}" }
+      const payload = { name: draft.name, kind: draft.kind, lifecycle: draft.lifecycle, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined, upstreamModelId: draft.upstreamModelId || undefined, templateKey: draft.templateKey ?? undefined, enabled: draft.enabled, ...config, constraints: { ...(config.constraints as Record<string, unknown>), model_id: draft.upstreamModelId || draft.name }, submit: { ...submitRaw, body: hasBodyFields ? bodyRaw : defaultBody, path: draft.path || submitRaw.path, timeout_sec: draft.timeoutSec } }
       const res = await fetch(editing.id ? `/api/plugins/models/${editing.id}` : "/api/plugins/models", { method: editing.id ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
       const p = await res.json(); if (!res.ok) throw new Error(p.error ?? "保存失败")
       toast.success(editing.id ? "模型已更新" : "模型已创建"); onSaved()
