@@ -855,60 +855,49 @@ function CharacterCard({
           </span>
         </div>
 
-        {/* 悬浮操作条（右下角）：有图=下载/上传/编辑/更多；无图=生成/上传/编辑/删除 */}
+        {/* 悬浮操作条（右下角）：有图=重出/替换/编辑/出图；无图=生成/上传/编辑/删除 */}
         <div className={cn(
           "absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1",
           character.imageUrl ? "opacity-0 transition-opacity duration-150 group-hover:opacity-100" : "opacity-100",
         )}>
           {character.imageUrl ? (
-            <ImageActionButton
-              label="下载原图"
-              disabled={busy}
-              onClick={downloadImage}
-            >
-              <Download className="h-3 w-3" />
-            </ImageActionButton>
+            <>
+              <button type="button" aria-label="重出" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <RefreshCw className="h-3 w-3" />重出
+              </button>
+              <button type="button" aria-label="替换" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />替换
+              </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
+              </button>
+              <button type="button" aria-label="出图" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />出图
+              </button>
+            </>
           ) : (
-            <ImageActionButton
-              label="生成"
-              disabled={busy}
-              onClick={() => setGenOpen(true)}
-            >
-              <Sparkles className="h-3 w-3" />
-            </ImageActionButton>
-          )}
-          <ImageActionButton
-            label="上传"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="h-3 w-3" />
-          </ImageActionButton>
-          <ImageActionButton
-            label="编辑"
-            disabled={busy}
-            onClick={() => setEditOpen(true)}
-          >
-            <Pencil className="h-3 w-3" />
-          </ImageActionButton>
-          {character.imageUrl && (
-            <ImageActionButton
-              label="出图"
-              disabled={busy}
-              onClick={() => setGenOpen(true)}
-            >
-              <Sparkles className="h-3 w-3" />
-            </ImageActionButton>
-          )}
-          {!character.imageUrl && (
-            <ImageActionButton
-              label="删除"
-              disabled={busy}
-              onClick={() => setDeleteOpen(true)}
-              className="bg-rose-950/90 text-rose-200 ring-rose-500/40 hover:bg-rose-900"
-            >
-              <Trash2 className="h-3 w-3" />
-            </ImageActionButton>
+            <>
+              <button type="button" aria-label="生成" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />生成
+              </button>
+              <button type="button" aria-label="上传" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />上传
+              </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
+              </button>
+              <button type="button" aria-label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-rose-950/90 px-1.5 text-[10px] text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50">
+                <Trash2 className="h-3 w-3" />删除
+              </button>
+            </>
           )}
           {character.imageUrl && (
             <DropdownMenu>
@@ -1298,8 +1287,8 @@ function AssetGenerateDialog({
   onDone,
 }: {
   scriptId: string
-  kind: "character" | "scene"
-  asset: AssetDTO
+  kind: "character" | "scene" | "outfit" | "prop"
+  asset: AssetDTO | (CostumeDTO & { characterName: string })
   open: boolean
   onOpenChange: (open: boolean) => void
   onDone: () => void
@@ -1309,8 +1298,9 @@ function AssetGenerateDialog({
   const { models: textModels } = useAiModels("text")
   const [model, setModel] = useState(savedConfig.imageModelId)
   const [promptModel, setPromptModel] = useState(savedConfig.textModelId)
-  const [prompt, setPrompt] = useState(character.prompt ?? "")
-  const [refs, setRefs] = useState<string[]>(character.refImages ?? [])
+  const assetAny = character as any
+  const [prompt, setPrompt] = useState(assetAny.prompt ?? assetAny.description ?? "")
+  const [refs, setRefs] = useState<string[]>(assetAny.refImages ?? [])
   const [resolution, setResolution] = useState<string>(savedConfig.resolution)
   const [quality, setQuality] = useState<string>("标准画质")
   const [starting, setStarting] = useState(false)
@@ -1404,7 +1394,7 @@ function AssetGenerateDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5">
             <Wand2 className="h-4 w-4" />
-            {kind === "character" ? "出角色参考图" : "出场景参考图"}
+            {{ character: "出角色参考图", scene: "出场景参考图", outfit: "出妆造参考图", prop: "出道具参考图" }[kind]}
           </DialogTitle>
         </DialogHeader>
         <p className="-mt-1 text-[11px] leading-relaxed text-zinc-500">
@@ -1787,6 +1777,7 @@ function CostumeCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [genOpen, setGenOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -1955,7 +1946,7 @@ function CostumeCard({
             </>
           ) : (
             <>
-              <button type="button" aria-label="生成" disabled={busy} onClick={() => setRegenOpen(true)}
+              <button type="button" aria-label="生成" disabled={busy} onClick={() => setGenOpen(true)}
                 className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
                 <Sparkles className="h-3 w-3" />生成
               </button>
@@ -2061,6 +2052,16 @@ function CostumeCard({
           <CostumeEditForm costume={costume} scriptId={scriptId} onSave={() => { setEditOpen(false); onDone() }} />
         </DialogContent>
       </Dialog>
+
+      {/* 出妆造参考图（首次生成 / 重新出图） */}
+      <AssetGenerateDialog
+        scriptId={scriptId}
+        kind="outfit"
+        asset={costume as unknown as AssetDTO}
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onDone={onDone}
+      />
     </div>
   )
 }
@@ -2118,6 +2119,7 @@ function PropCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [genOpen, setGenOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -2279,7 +2281,7 @@ function PropCard({
               <RefreshCw className="h-3 w-3" />重出
             </button>
           ) : (
-            <button type="button" aria-label="生成" disabled={busy} onClick={() => setRegenOpen(true)}
+            <button type="button" aria-label="生成" disabled={busy} onClick={() => setGenOpen(true)}
               className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
               <Sparkles className="h-3 w-3" />生成
             </button>
@@ -2404,6 +2406,16 @@ function PropCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 出道具参考图（首次生成 / 重新出图） */}
+      <AssetGenerateDialog
+        scriptId={scriptId}
+        kind="prop"
+        asset={prop}
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onDone={onDone}
+      />
     </div>
   )
 }
@@ -2706,34 +2718,41 @@ function SceneCard({
         )}>
           {scene.imageUrl ? (
             <>
-              <ImageActionButton label="下载原图" disabled={busy} onClick={downloadImage}>
-                <Download className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Upload className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="编辑" disabled={busy} onClick={() => setEditOpen(true)}>
-                <Pencil className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="出图" disabled={busy} onClick={() => setGenOpen(true)}>
-                <Sparkles className="h-3 w-3" />
-              </ImageActionButton>
+              <button type="button" aria-label="重出" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <RefreshCw className="h-3 w-3" />重出
+              </button>
+              <button type="button" aria-label="替换" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />替换
+              </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
+              </button>
+              <button type="button" aria-label="出图" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />出图
+              </button>
             </>
           ) : (
             <>
-              <ImageActionButton label="生成" disabled={busy} onClick={() => setGenOpen(true)}>
-                <Sparkles className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="上传" disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Upload className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="编辑" disabled={busy} onClick={() => setEditOpen(true)}>
-                <Pencil className="h-3 w-3" />
-              </ImageActionButton>
-              <ImageActionButton label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
-                className="bg-rose-950/90 text-rose-200 ring-rose-500/40 hover:bg-rose-900">
-                <Trash2 className="h-3 w-3" />
-              </ImageActionButton>
+              <button type="button" aria-label="生成" disabled={busy} onClick={() => setGenOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Sparkles className="h-3 w-3" />生成
+              </button>
+              <button type="button" aria-label="上传" disabled={busy} onClick={() => fileRef.current?.click()}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Upload className="h-3 w-3" />上传
+              </button>
+              <button type="button" aria-label="编辑" disabled={busy} onClick={() => setEditOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-zinc-950/85 px-1.5 text-[10px] text-zinc-300 ring-1 ring-zinc-700/70 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50">
+                <Pencil className="h-3 w-3" />编辑
+              </button>
+              <button type="button" aria-label="删除" disabled={busy} onClick={() => setDeleteOpen(true)}
+                className="flex h-[22px] items-center gap-1 rounded bg-rose-950/90 px-1.5 text-[10px] text-rose-200 ring-1 ring-rose-500/40 transition-colors hover:bg-rose-900 disabled:opacity-50">
+                <Trash2 className="h-3 w-3" />删除
+              </button>
             </>
           )}
           {scene.imageUrl && (
